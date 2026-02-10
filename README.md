@@ -48,35 +48,25 @@ The designs are mobile-first and intentionally minimalist, prioritising clarity,
 The following diagrams guide the design and implementation of the system:
 
 ### 1. System Architecture Diagram
-- Flutter mobile application (UI layer)
-- Firebase backend services
-  - Authentication
-  - Firestore database
-  - Cloud Storage
-- External API integrations
-  - Google Maps & Places API
-  - Transport partner API (fare estimation)
-- Secure client-to-service communication
+The system architecture illustrates how ExpatHomes is structured as a mobile-first platform backed by Firebase services and external APIs. The mobile application serves as the primary interface for all users (Expats, Agents/Landlords, and Service Providers), while Firebase handles backend responsibilities such as authentication, data storage, and real-time communication. External services such as Google Maps and partner transport providers (e.g., Move) are integrated to support location discovery and ride cost estimation without replicating existing third-party solutions.
+<div align="center">
+  <img src="png_directory/sys_dir/SYS ARCH.png" width="200" alt="SYS Diagram">
+</div>
 
 ### 2. Entity Relationship Diagram (ERD)
-- Users (Expats, Agents/Landlords)
-- Property Listings
-- Inquiries
-- Chat Sessions and Messages
-- Community Posts
+The ERD provides a database-level view of how data is structured and related within Firestore. It focuses on persistence concerns such as ownership, foreign-key–like references, and cardinality between users, listings, inquiries, chats, and messages. The ERD ensures data consistency, scalability, and clarity in how information flows through the system.
 
-### 3. UML Class Diagram
-- Core domain models
-- Role inheritance and permissions
-- Abstractions for translation and location discovery
+### 3. UML Use Case 
+The use case diagram captures how different actors interact with the system and clarifies role-based access across the platform. Expats are the primary users, engaging with listings, community features, messaging, exploration tools, and arrival support. Agents and landlords focus on managing listings and communicating with expats, while administrators oversee verification and moderation. This diagram ensures functional boundaries are clearly defined and aligned with trust and transparency goals.
 
-*(Diagrams are included in the project documentation and design materials.)*
+### 4. UML Class Diagram
+The class diagram represents the core domain entities of ExpatHomes and their relationships. Central to the model is the `User` entity, which is extended through roles such as Expat, Agent, and Landlord. Supporting entities include Property Listings, Inquiries, Chat Sessions, Messages, and Community Posts. This diagram informed both the Firestore data structure and the UI component logic within the mobile application.
 
 ---
 
 ## Deployment Plan
 
-At the current stage, ExpatHomes focuses on **design, prototyping, and system modeling** rather than full production deployment.
+At this stage, ExpatHomes focuses on design, prototyping, and system modelling rather than full production deployment.
 
 ### Planned Architecture
 - **Frontend:** Flutter (Android / iOS)
