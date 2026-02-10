@@ -50,7 +50,7 @@ The following diagrams guide the design and implementation of the system:
 ### 1. System Architecture Diagram
 The system architecture illustrates how ExpatHomes is structured as a mobile-first platform backed by Firebase services and external APIs. The mobile application serves as the primary interface for all users (Expats, Agents/Landlords, and Service Providers), while Firebase handles backend responsibilities such as authentication, data storage, and real-time communication. External services such as Google Maps and partner transport providers (e.g., Move) are integrated to support location discovery and ride cost estimation without replicating existing third-party solutions.
 <div align="center">
-  <img src="png_directory/sys_dir/SYS ARCH.png" width="200" alt="SYS Diagram">
+  <img src="png_directory/sys_dir/SYS ARCH.png" alt="SYS Diagram">
 </div>
 
 ### 2. Entity Relationship Diagram (ERD)
