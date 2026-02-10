@@ -40,7 +40,15 @@ The interactive design prototype demonstrates the full system behaviour and user
 - Role-based interfaces for expats and agents/landlords
 
 The designs are mobile-first and intentionally minimalist, prioritising clarity, trust, and communication over transactional complexity.
-
+<div align="center">
+  <img src="png_directory/figma_mockups/Welcome Screen.png">
+  <img src="png_directory/figma_mockups/Community Page 1_Feed.png">
+  <img src="png_directory/figma_mockups/Estate Page 3.png">
+  <img src="png_directory/figma_mockups/Messages Epat Interface 2.png">
+  <img src="png_directory/figma_mockups/Landlord Interface 2.png">
+  <img src="png_directory/figma_mockups/Rides Interface 2.png">
+  <img src="png_directory/figma_mockups/Rides Interface 3.png">
+</div>
 ---
 
 ## System Diagrams
