@@ -22,15 +22,13 @@ ExpatHomes addresses these issues by prioritizing:
 - **Lightweight integrations with trusted external services**
 - **Community-driven knowledge sharing**
 
-This project is currently being developed as a **final year capstone project at the African Leadership University**, with a strong emphasis on system design, UX, and socio-technical considerations. While still in development, ExpatHomes is intended to evolve beyond the academic phase into a real-world platform.
-
 ---
 
 ## Designs
 
 ### Figma Mockups
 
-Design Link: *(add your Figma link here)*
+Design Link: *https://www.figma.com/design/ZzcXrh5VLp93Em9U8tpXK4/Expat?node-id=455-3067&t=Q0yACGkum3N2qMm0-1*
 
 The interactive design prototype demonstrates the full system behavior and user flows, including:
 
@@ -140,6 +138,7 @@ The demo showcases:
 
 ## Author
 
-**Azeez Damilare Gbenga**  
-Final Year Student, African Leadership University  
+**Somtochukwu Nelson**  
+**Email:** m.nelson@alustudent.com
+**Supervisor:** Pelin Mutanguha
 Project: ExpatHomes
