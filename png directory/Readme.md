@@ -1,0 +1,1 @@
+This directory holds all images at the current stage of development for the Expat Homes project
