@@ -55,12 +55,21 @@ The system architecture illustrates how ExpatHomes is structured as a mobile-fir
 
 ### 2. Entity Relationship Diagram (ERD)
 The ERD provides a database-level view of how data is structured and related within Firestore. It focuses on persistence concerns such as ownership, foreign-key–like references, and cardinality between users, listings, inquiries, chats, and messages. The ERD ensures data consistency, scalability, and clarity in how information flows through the system.
+<div align="center">
+  <img src="png_directory/sys_dir/ERD.png" alt="SYS Diagram">
+</div>
 
 ### 3. UML Use Case 
 The use case diagram captures how different actors interact with the system and clarifies role-based access across the platform. Expats are the primary users, engaging with listings, community features, messaging, exploration tools, and arrival support. Agents and landlords focus on managing listings and communicating with expats, while administrators oversee verification and moderation. This diagram ensures functional boundaries are clearly defined and aligned with trust and transparency goals.
+<div align="center">
+  <img src="png_directory/sys_dir/Use Case.png" alt="SYS Diagram">
+</div>
 
 ### 4. UML Class Diagram
 The class diagram represents the core domain entities of ExpatHomes and their relationships. Central to the model is the `User` entity, which is extended through roles such as Expat, Agent, and Landlord. Supporting entities include Property Listings, Inquiries, Chat Sessions, Messages, and Community Posts. This diagram informed both the Firestore data structure and the UI component logic within the mobile application.
+<div align="center">
+  <img src="png_directory/sys_dir/Class.png" alt="SYS Diagram">
+</div>
 
 ---
 
