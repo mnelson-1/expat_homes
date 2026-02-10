@@ -15,7 +15,7 @@ Relocating to a new country can be overwhelming, particularly for first-time arr
 - Fragmented arrival and onboarding experiences
 - Limited access to trusted community guidance
 
-ExpatHomes addresses these issues by prioritizing:
+ExpatHomes addresses these issues by prioritising:
 - **Verified housing listings**
 - **Direct, secure communication**
 - **Role-based access control**
@@ -30,7 +30,7 @@ ExpatHomes addresses these issues by prioritizing:
 
 Design Link: *https://www.figma.com/design/ZzcXrh5VLp93Em9U8tpXK4/Expat?node-id=455-3067&t=Q0yACGkum3N2qMm0-1*
 
-The interactive design prototype demonstrates the full system behavior and user flows, including:
+The interactive design prototype demonstrates the full system behaviour and user flows, including:
 
 - Community feed and topic-based groups (Bowls)
 - Verified estate listings with inquiry-driven interaction
@@ -39,7 +39,7 @@ The interactive design prototype demonstrates the full system behavior and user 
 - Location-based discovery via Google Maps
 - Role-based interfaces for expats and agents/landlords
 
-The designs are mobile-first and intentionally minimalist, prioritizing clarity, trust, and communication over transactional complexity.
+The designs are mobile-first and intentionally minimalist, prioritising clarity, trust, and communication over transactional complexity.
 
 ---
 
@@ -74,7 +74,7 @@ The following diagrams guide the design and implementation of the system:
 
 ---
 
-## Deployment Plan (Conceptual)
+## Deployment Plan
 
 At the current stage, ExpatHomes focuses on **design, prototyping, and system modeling** rather than full production deployment.
 
@@ -94,7 +94,7 @@ Production deployment and advanced backend logic are planned as future work beyo
 
 ## Video Demo
 
-🎥 **Video Demo:** *(add link here)*
+🎥 **Video Demo:** *https://drive.google.com/drive/folders/1YhtUzBrgGVvE0uT6gy-Anae2fN02YtvV?usp=sharing*
 
 The demo showcases:
 - Project motivation and problem context
@@ -103,7 +103,7 @@ The demo showcases:
 - Secure messaging with live translation
 - Explore feature using location-based discovery
 - Rides feature for arrival cost transparency
-- Role-based access behavior
+- Role-based access behaviour
 
 ---
 
@@ -111,9 +111,9 @@ The demo showcases:
 
 - ✅ Problem analysis and system requirements
 - ✅ UX/UI design and interactive prototyping
-- ✅ UML and system architecture modeling
+- ✅ UML and system architecture modelling
 - 🔄 Firebase-backed implementation (planned / in progress)
-- 🔄 External API integrations (conceptual / limited scope)
+- 🔄 External API integrations
 
 ---
 
