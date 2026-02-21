@@ -63,96 +63,71 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
         children: [
           _buildHeader(textTheme),
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: ConstrainedBox(
-                    constraints:
-                        BoxConstraints(minHeight: constraints.maxHeight),
-                    child: Column(
-                      mainAxisAlignment: _verificationMessageSent
-                          ? MainAxisAlignment.center
-                          : MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (!_verificationMessageSent)
-                          const SizedBox(height: 24),
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                    alignment: Alignment.topCenter,
-                    child: _verificationMessageSent
-                        ? const SizedBox.shrink()
-                        : Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildSectionLabel(
-                                  textTheme, 'What best describes you?'),
-                              const SizedBox(height: 8),
-                              _buildDropdown<String>(
-                                value: _selectedRole?.label,
-                                hint: 'Select an option',
-                                items: _UserRole.values
-                                    .map(
-                                      (r) => DropdownMenuItem<String>(
-                                        value: r.label,
-                                        child: Text(
-                                          r.label,
-                                          style: _dropdownItemStyle(context),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (v) {
-                                  if (v == null) return;
-                                  setState(() {
-                                    _selectedRole = _UserRole.values
-                                        .firstWhere((r) => r.label == v);
-                                  });
-                                },
-                              ),
-                              const SizedBox(height: 4),
-                              _buildHelper(
-                                textTheme,
-                                'The interface will be customized according to your selection.',
-                              ),
-                              const SizedBox(height: 20),
-                              _buildSectionLabel(
-                                  textTheme, 'Preferred language'),
-                              const SizedBox(height: 8),
-                              _buildDropdown<String>(
-                                value: _selectedLanguage,
-                                hint: 'Select language',
-                                items: _supportedLanguages
-                                    .map(
-                                      (lang) => DropdownMenuItem<String>(
-                                        value: lang,
-                                        child: Text(lang,
-                                            style: _dropdownItemStyle(context)),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (v) => setState(
-                                    () => _selectedLanguage = v ?? 'English'),
-                              ),
-                              const SizedBox(height: 4),
-                              _buildHelper(
-                                textTheme,
-                                "We'll use this to personalise your experience and translate messages.",
-                              ),
-                              const SizedBox(height: 20),
-                            ],
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 24),
+                  _buildSectionLabel(textTheme, 'What best describes you?'),
+                  const SizedBox(height: 8),
+                  _buildDropdown<String>(
+                    value: _selectedRole?.label,
+                    hint: 'Select an option',
+                    items: _UserRole.values
+                        .map(
+                          (r) => DropdownMenuItem<String>(
+                            value: r.label,
+                            child: Text(
+                              r.label,
+                              style: _dropdownItemStyle(context),
+                            ),
                           ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() {
+                        _selectedRole =
+                            _UserRole.values.firstWhere((r) => r.label == v);
+                      });
+                    },
                   ),
+                  const SizedBox(height: 4),
+                  _buildHelper(
+                    textTheme,
+                    'The interface will be customized according to your selection.',
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSectionLabel(textTheme, 'Preferred language'),
+                  const SizedBox(height: 8),
+                  _buildDropdown<String>(
+                    value: _selectedLanguage,
+                    hint: 'Select language',
+                    items: _supportedLanguages
+                        .map(
+                          (lang) => DropdownMenuItem<String>(
+                            value: lang,
+                            child: Text(lang,
+                                style: _dropdownItemStyle(context)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) =>
+                        setState(() => _selectedLanguage = v ?? 'English'),
+                  ),
+                  const SizedBox(height: 4),
+                  _buildHelper(
+                    textTheme,
+                    "We'll use this to personalise your experience and translate messages.",
+                  ),
+                  const SizedBox(height: 20),
                   _buildTextField(
                     controller: _emailController,
                     focusNode: _emailFocus,
                     hint: 'Email',
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
-                    readOnly: _verificationMessageSent,
                   ),
                   if (_verificationMessageSent) ...[
                     const SizedBox(height: 4),
@@ -172,10 +147,7 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
                   _buildGoogleButton(textTheme),
                   const SizedBox(height: 32),
                 ],
-                    ),
-                  ),
-                );
-              },
+              ),
             ),
           ),
         ],
