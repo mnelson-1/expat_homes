@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:expat_app/screens/sign_in_screen.dart';
+import 'package:expat_app/screens/sign_up_screen.dart';
 
 /// Palette and typography for Get Started / onboarding screens.
 class _GetStartedColors {
@@ -286,6 +288,14 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
   Widget _buildContinueButton(TextTheme textTheme) {
     return FilledButton(
       onPressed: () {
+        if (_selectedRole == _UserRole.expat) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const SignUpScreen(),
+            ),
+          );
+          return;
+        }
         final email = _emailController.text.trim();
         if (email.isNotEmpty) {
           setState(() => _verificationMessageSent = true);
@@ -311,7 +321,13 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
   Widget _buildLoginPrompt(TextTheme textTheme) {
     return Center(
       child: GestureDetector(
-        onTap: () {},
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const SignInScreen(),
+            ),
+          );
+        },
         child: RichText(
           text: TextSpan(
             style: textTheme.bodyLarge?.copyWith(
