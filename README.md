@@ -8,19 +8,25 @@ Rather than replacing existing service providers, ExpatHomes acts as a **connect
 
 ## Project Description
 
-Relocating to a new country can be overwhelming, particularly for first-time arrivals. Expats often face:
-- Unverified housing agents and opaque pricing
-- Communication barriers with landlords and service providers
-- Difficulty navigating unfamiliar locations
-- Fragmented arrival and onboarding experiences
-- Limited access to trusted community guidance
+Relocating to a new country can be overwhelming, particularly for first-time arrivals. In Kigali’s evolving real estate market, expatriates often encounter:
+- Unverified housing listings and informal brokerage practices
+- Opaque agent commission structures and inconsistent pricing
+- Limited visibility into agent credentials
+- Communication barriers between landlords, agents, and international tenants
+- Fragmented arrival and neighbourhood discovery experiences
+- Lack of structured accountability in property negotiations
 
 ExpatHomes addresses these issues by prioritising:
-- **Verified housing listings**
-- **Direct, secure communication**
-- **Role-based access control**
-- **Lightweight integrations with trusted external services**
-- **Community-driven knowledge sharing**
+- Verified property listings (admin-reviewed ownership validation before publication)
+- Licensed agent verification workflow (credential-based access control before platform entry)
+- Exclusive agent delegation model (one verified agent per property)
+- Structured commission tracking system using internal reference IDs
+- Landlord-uploaded rental contracts for transparency and documentation
+- Role-based access control (Expat, Landlord, Agent, Admin)
+- Secure in-app messaging with multilingual support and live translation
+- Neighbourhood intelligence (“Explore”) powered by location services
+- Arrival mobility support (“Rides”) integration concept
+- Community-driven peer knowledge sharing and feedback features
 
 ---
 
