@@ -43,7 +43,11 @@ The interactive design prototype demonstrates the full system behaviour and user
 - Secure messaging with live translation
 - Arrival support through transport cost estimation
 - Location-based discovery via Google Maps
-- Role-based interfaces for expats and agents/landlords
+- Role-based interfaces for expats, agents, and landlords
+- Mock Payment workflows
+- Commission and payment status tracker
+- Agent Rating and Allocation
+- Landlord Assignment
 
 The designs are mobile-first and intentionally minimalist, prioritising clarity, trust, and communication over transactional complexity.
 <div align="center">
