@@ -44,16 +44,17 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: (_totalDuration * 1000).round()),
-    )
-      ..addStatusListener((status) {
-        if (status == AnimationStatus.completed && mounted) {
-          widget.onComplete?.call();
-        }
-      })
-      ..forward();
+    _controller =
+        AnimationController(
+            vsync: this,
+            duration: Duration(milliseconds: (_totalDuration * 1000).round()),
+          )
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed && mounted) {
+              widget.onComplete?.call();
+            }
+          })
+          ..forward();
   }
 
   @override
@@ -71,9 +72,11 @@ class _SplashScreenState extends State<SplashScreen>
     final t = _t;
     if (t < _phase1SweepEnd) return (1, curve.transform(t / _sweepDuration));
     if (t < _phase1HoldEnd) return (1, 1.0);
-    if (t < _phase2SweepEnd) return (2, curve.transform((t - _phase2Start) / _sweepDuration));
+    if (t < _phase2SweepEnd)
+      return (2, curve.transform((t - _phase2Start) / _sweepDuration));
     if (t < _phase2HoldEnd) return (2, 1.0);
-    if (t < _phase3SweepEnd) return (3, curve.transform((t - _phase3Start) / _sweepDuration));
+    if (t < _phase3SweepEnd)
+      return (3, curve.transform((t - _phase3Start) / _sweepDuration));
     if (t < _phase3HoldEnd) return (3, 1.0);
     if (t < _phase4DiagonalEnd) {
       final linear = (t - _phase4Start) / _curtainDuration;
@@ -85,26 +88,26 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF212C2F),
+      backgroundColor: const Color(0xFF1A2E35),
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
             final (phase, progress) = _phaseProgress();
 
-            final baseStyle = Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                );
+            final baseStyle = Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(
+              color: Colors.white,
+              fontSize: 48,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 2,
+            );
 
             final baseText = Text(_word, style: baseStyle);
             final greenText = Text(
               _word,
-              style: baseStyle?.copyWith(
-                color: const Color(0xFF8ED966),
-              ),
+              style: baseStyle?.copyWith(color: const Color(0xFF8ED966)),
             );
 
             return Stack(
