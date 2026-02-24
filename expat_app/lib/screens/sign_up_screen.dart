@@ -1,3 +1,4 @@
+import 'package:expat_app/screens/expat_home_screen.dart';
 import 'package:flutter/material.dart';
 
 /// Shared palette for onboarding screens (matches Get Started).
@@ -350,7 +351,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Widget _buildAgreeButton(TextTheme textTheme) {
     return FilledButton(
-      onPressed: () {},
+      onPressed: () {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute<void>(
+            builder: (_) => const ExpatHomeScreen(),
+          ),
+          (route) => false,
+        );
+      },
       style: FilledButton.styleFrom(
         backgroundColor: _SignUpColors.accentGreen,
         foregroundColor: _SignUpColors.primaryDark,

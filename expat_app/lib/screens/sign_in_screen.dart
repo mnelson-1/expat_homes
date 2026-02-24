@@ -1,3 +1,4 @@
+import 'package:expat_app/screens/expat_home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:expat_app/screens/sign_up_screen.dart';
 
@@ -160,7 +161,14 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Widget _buildSignInButton(TextTheme textTheme) {
     return FilledButton(
-      onPressed: () {},
+      onPressed: () {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute<void>(
+            builder: (_) => const ExpatHomeScreen(),
+          ),
+          (route) => false,
+        );
+      },
       style: FilledButton.styleFrom(
         backgroundColor: _SignInColors.accentGreen,
         foregroundColor: _SignInColors.primaryDark,
