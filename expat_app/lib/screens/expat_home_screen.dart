@@ -151,7 +151,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
       children: [
-        const Divider(height: 1, color: Color(0xFFE0E0E0)),
         _buildPostBlock(
           textTheme,
           avatarPath: 'assets/images/avatar_benjamin_nelson.png',
@@ -222,7 +221,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
-        const Divider(height: 1, color: Color(0xFFE0E0E0)),
         const SizedBox(height: 16),
         Text(
           'My Bowls',
