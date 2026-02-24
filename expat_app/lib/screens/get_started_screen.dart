@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:expat_app/screens/agent_sign_up_screen.dart';
 import 'package:expat_app/screens/landlord_sign_up_screen.dart';
 import 'package:expat_app/screens/sign_in_screen.dart';
 import 'package:expat_app/screens/sign_up_screen.dart';
@@ -301,6 +302,14 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => const LandlordSignUpScreen(),
+            ),
+          );
+          return;
+        }
+        if (_selectedRole == _UserRole.agent) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const AgentSignUpScreen(),
             ),
           );
           return;
