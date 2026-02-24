@@ -104,7 +104,8 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   Widget _buildTabBar(TextTheme textTheme) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      // Slight top padding; underline still sits on the divider below.
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -124,25 +125,29 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     final bool selected = _selectedTabIndex == index;
     return GestureDetector(
       onTap: () => setState(() => _selectedTabIndex = index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: textTheme.titleMedium?.copyWith(
-              color:
-                  selected ? _ExpatHomeColors.bodyText : _ExpatHomeColors.hint,
-              fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+      child: IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: textTheme.titleMedium?.copyWith(
+                color:
+                    selected
+                        ? _ExpatHomeColors.bodyText
+                        : _ExpatHomeColors.hint,
+                fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Container(
-            height: 2,
-            width: 36,
-            color: selected ? _ExpatHomeColors.bodyText : Colors.transparent,
-          ),
-        ],
+            const SizedBox(height: 2),
+            Container(
+              height: 2,
+              width: double.infinity,
+              color: selected ? _ExpatHomeColors.bodyText : Colors.transparent,
+            ),
+          ],
+        ),
       ),
     );
   }
