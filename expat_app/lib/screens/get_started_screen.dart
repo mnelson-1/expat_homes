@@ -9,9 +9,9 @@ class _GetStartedColors {
   static const Color primaryDark = Color(0xFF1A2E35);
   static const Color accentGreen = Color(0xFF8ED966);
   static const Color border = Color(0xFF9E9E9E);
-  static const Color hint = Color(0xFF757575);
-  static const Color helper = Color(0xFF9E9E9E);
-  static const Color bodyText = Color(0xFF212121);
+  static const Color hint = Color(0xFF9CA5A8);
+  static const Color helper = Color(0xFF9CA5A8);
+  static const Color bodyText = Color(0xFF1A2E35);
 
   static const double fieldFontSize = 14;
   static const double helperFontSize = 12;
@@ -349,7 +349,7 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
         child: RichText(
           text: TextSpan(
             style: textTheme.bodyLarge?.copyWith(
-              color: const Color(0xFF424242),
+              color: _GetStartedColors.bodyText,
             ),
             children: [
               const TextSpan(text: 'Have an account? '),
@@ -389,7 +389,7 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
     return OutlinedButton(
       onPressed: () {},
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF212121),
+        foregroundColor: _GetStartedColors.bodyText,
         side: const BorderSide(color: _GetStartedColors.border),
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -409,7 +409,7 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
           Text(
             'Google',
             style: textTheme.titleMedium?.copyWith(
-              color: const Color(0xFF212121),
+              color: _GetStartedColors.bodyText,
               fontWeight: FontWeight.bold,
               fontSize: 17,
             ),

@@ -5,10 +5,10 @@ class _LandlordSignUpColors {
   static const Color primaryDark = Color(0xFF1A2E35);
   static const Color accentGreen = Color(0xFF8ED966);
   static const Color border = Color(0xFF9E9E9E);
-  static const Color hint = Color(0xFF757575);
-  static const Color helper = Color(0xFF9E9E9E);
-  static const Color bodyText = Color(0xFF212121);
-  static const Color link = Color(0xFF1A2E35);
+  static const Color hint = Color(0xFF9CA5A8);
+  static const Color helper = Color(0xFF9CA5A8);
+  static const Color bodyText = Color(0xFF1A2E35);
+  static const Color link = Color(0xFF157A88);
 
   static const double fieldFontSize = 14;
   static const double helperFontSize = 12;

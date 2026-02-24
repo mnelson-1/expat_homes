@@ -6,9 +6,9 @@ class _SignInColors {
   static const Color primaryDark = Color(0xFF1A2E35);
   static const Color accentGreen = Color(0xFF8ED966);
   static const Color border = Color(0xFF9E9E9E);
-  static const Color hint = Color(0xFF757575);
-  static const Color helper = Color(0xFF9E9E9E);
-  static const Color bodyText = Color(0xFF212121);
+  static const Color hint = Color(0xFF9CA5A8);
+  static const Color helper = Color(0xFF9CA5A8);
+  static const Color bodyText = Color(0xFF1A2E35);
 
   static const double fieldFontSize = 14;
   static const double helperFontSize = 12;
@@ -193,7 +193,7 @@ class _SignInScreenState extends State<SignInScreen> {
         child: RichText(
           text: TextSpan(
             style: textTheme.bodyLarge?.copyWith(
-              color: const Color(0xFF424242),
+              color: _SignInColors.bodyText,
             ),
             children: [
               const TextSpan(text: 'Don\'t have an account? '),
