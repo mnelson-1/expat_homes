@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'agent_profile_screen.dart';
+
 /// Empty-state view for the Messages tab.
 ///
 /// When messages are populated and the list becomes scrollable,
@@ -163,33 +165,53 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   color: Colors.white, size: 18),
               onPressed: () => Navigator.of(context).pop(),
             ),
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.grey.shade300,
-              child: const Icon(Icons.person, color: Colors.white),
-            ),
-            const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    contactName,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => AgentProfileScreen(
+                        agentName: contactName,
+                        agentFullName: contactName,
+                        agentId: 'KM-201903',
+                      ),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    contactSubtitle,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withOpacity(0.8),
+                  );
+                },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.grey.shade300,
+                      child: const Icon(Icons.person, color: Colors.white),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            contactName,
+                            style: textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            contactSubtitle,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -204,14 +226,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
         Text(
           '09/02/2026',
           style: textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF157A88),
+            color: const Color(0xFF1A2E35),
           ),
         ),
         const SizedBox(height: 4),
         Text(
           'This chat is end-end encrypted',
           style: textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF157A88),
+            color: const Color(0xFF1A2E35),
           ),
         ),
       ],
