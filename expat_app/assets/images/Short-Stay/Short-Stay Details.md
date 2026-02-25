@@ -1,105 +1,99 @@
-### **APARTMENTS Details**
+### **Short-Stay Details**
 
+**Cascadia Hotel**
 
-
-**Elizabeth Golf Apartments**
-
-Location: KG 439 Street, Kigali
-Price: USD 2,430 per month
+Location: 7 KG 203 St, Kigali
+Price: USD 110 per night
 
 Details:
 
-Elizabeth Golf Apartment by Link in Kigali offers a garden, open-air bath, indoor swimming pool, and free Wi-Fi. Guests enjoy a lounge, lift, 24-hour front desk, and free on-site private parking.
+Cascadia Hotel Apartments by GF Greenland in Kigali offers family rooms with private bathrooms, air-conditioning, and modern amenities. Each room includes a balcony or terrace with pool or city views.
 
 
 
-The apartment features a kitchenette, balcony, washing machine, private bathroom, and city views. Additional amenities include a dining area, a work desk, and free Wi-Fi.
+Guests can enjoy a rooftop swimming pool, indoor pool, fitness centre, and a lush garden. Additional facilities include a restaurant, bar, outdoor fireplace, and a business area.
 
 
 
-Located 7 km from Kigali International Airport, the property is a 12-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.2 km) and Kigali Convention Centre (5 km).
+Located 1.8 km from Kigali Convention Centre and 3 km from Kigali International Airport, the hotel is near attractions such as Kigali Centenary Park and Nyamata Genocide Museum.
 
+**Mythos Boutique Hotel**
 
-
-
-
-**Greenland Apartments**
-
-Location: 249 KN 3 Street, Kigali
-Price: USD 2,025 per month
+Location: KN 50 Street Kiyovu, Kigali
+Price: USD 112 per night
 
 Details:
 
-Greenland Apartment by Link in Kigali offers a terrace and free Wi-Fi. The apartment features a balcony with city views, a fully equipped kitchen, and a private bathroom.
+Mythos Boutique Hotel in Kigali offers family rooms with garden, pool, or mountain views. Each room includes air-conditioning, a private bathroom, and modern amenities.
 
 
 
-Guests benefit from a fitness room, lift, 24-hour front desk, daily housekeeping, family rooms, full-day security, and luggage storage. Free on-site private parking is available.
+Guests enjoy a swimming pool with a view, fitness centre, sun terrace, and lush garden. The hotel features a restaurant, bar, and free Wi-Fi, ensuring a pleasant stay.
 
 
 
-Located 9 km from Kigali International Airport, the apartment is near Belgian Peacekeepers Memorial (2 km), Kigali City Tower (less than 1 km), and Kandt House Natural History Museum (1.9 km).
+Located 9 km from Kigali International Airport, the hotel is near attractions such as Kigali Centenary Park (3.2 km) and Kigali Genocide Memorial (6 km). Free on-site private parking is available.
 
+**Peponi Living Hotel**
 
-
-
-
-**IZA Serene Apartments**
-
-Location: ECD Plaza, Kigali
-Price: USD 1,842 per month
+Location: KG 729 Street Kagugu, Kigali
+Price: USD 50 per night
 
 Details:
 
-IZA Serene city centre apartments in Kigali offer spacious apartments with terraces, balconies, and city views. Each apartment includes air-conditioning, a fully equipped kitchen, and a private bathroom.
+Peponi offers accommodation in Kigali. Guests can enjoy the on-site restaurant. Certain rooms feature a seating area to relax in after a busy day. The property offers a flat screen TV in all living rooms.
 
 
 
-Guests can enjoy African and international cuisines at the on-site restaurant, which serves vegetarian meals for lunch and dinner. The terrace provides a relaxing outdoor space, complemented by free WiFi throughout the property.
+Kigali International Community School is 1.9 km from Peponi, while Big Local food Market is 2.4 km away. The nearest airport is Kigali International Airport, 8 km from Peponi.
 
+**REBERO Resort**
 
-
-Located 11 km from Kigali International Airport, the apartments are close to attractions such as the Belgian Peacekeepers Memorial (7-minute walk), Kandt House Natural History Museum (1.5 km), and Kigali City Tower (15-minute walk). Free on-site private parking is available.
-
-
-
-**Rose Garden Apartments**
-
-Location: KG 9 Avenue, Nyarutarama, Gasabo, Kigali
-Price: USD 1,485 per month
+Location: KK 30 Avenue, Kigali
+Price: USD 80 per night
 
 Details:
 
-Rose Garden Private Apartment by LINK in Kigali offers aparthotel-style accommodation with a garden and terrace. Guests enjoy free WiFi, ensuring connectivity throughout their stay.
+REBERO RESORT Ltd in Kigali offers an adults-only hotel with a rooftop swimming pool, sun terrace, and lush garden. Guests enjoy free Wi-Fi, a fitness centre, and complimentary bicycles.
 
 
 
-Each apartment features a kitchenette, a balcony with city views, a washing machine, and a private bathroom. Additional amenities include a fitness room, a lift, a 24-hour front desk, concierge service, and free on-site parking.
+The property features a restaurant, bar, and coffee shop. Additional facilities include a hot tub, outdoor play area, and themed dinner nights. Free airport shuttle service is available 9 km from Kigali International Airport.
 
 
 
-Located 5 km from Kigali International Airport, the property is an 8-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.5 km) and Kigali Convention Centre (4.1 km). Guests appreciate the attentive staff and room cleanliness.
+Located on a quiet street, the hotel offers mountain and city views. Nearby attractions include the Belgian Peacekeepers Memorial (8 km) and Kigali Convention Centre (9 km). Guests appreciate the attentive staff and scenic surroundings.
 
+**Centric Hotel**
 
-
-**AGASARO Apartments**
-
-Location: KG 768, Kigali
-Price: USD 1,480 per month
+Location: KG 213 Street, Kigali
+Price: USD 100 per night
 
 Details:
 
-AGASARO LUXURY Apartment in Kigali offers a spacious two-bedroom apartment with two bathrooms. The living room features a sofa bed and a work desk, ensuring comfort and convenience.
+Centric Hotel in Kigali offers family rooms with private bathrooms, air-conditioning, and free Wi-Fi. Each room includes a work desk, TV, and modern amenities.
 
 
 
-Guests can relax in the year-round outdoor swimming pool with a view or enjoy the terrace and garden. The property includes a restaurant, bar, and free WiFi, providing ample leisure options.
+Guests can enjoy a terrace, restaurant, and bar. The family-friendly restaurant serves African, American, Italian, and Thai cuisines. Additional facilities include a lounge, outdoor seating area, and live music.
 
 
 
-The family-friendly restaurant serves African, Dutch, British, Ethiopian, French, American, Argentinian, Belgian, and Brazilian cuisines. Breakfast is continental with fruits, and lunch and dinner are available.
+Located 3 km from Kigali International Airport, the hotel is near attractions such as Kigali Convention Centre (3.6 km) and Kigali Genocide Memorial (10 km). Free on-site parking is available.
+
+**M Hotel**
+
+Location: KN 1 Avenue Kiyovu, Kigali
+Price: USD 200 per night
+
+Details:
+
+M Hotel Kigali in Kigali offers comfortable rooms with air-conditioning, private bathrooms, and modern amenities. Each room features a balcony with garden or mountain views, ensuring a pleasant stay.
 
 
 
-Located 10 km from Kigali International Airport, the apartment is near attractions such as Kigali Genocide Memorial (3.5 km) and Kigali Golf Club (4.5 km). Free on-site private parking is provided.
+The family-friendly restaurant serves African, Chinese, Indian, and local cuisines in a traditional and modern setting. Breakfast includes continental and buffet options with local specialities, fresh pastries, and more.
 
+
+
+Located 9 km from Kigali International Airport, the hotel is a 15-minute walk from Kigali City Tower. Nearby attractions include the Belgian Peacekeepers Memorial and Kigali Genocide Memorial, each within 3 km.

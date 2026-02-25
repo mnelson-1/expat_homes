@@ -1,105 +1,87 @@
-### **APARTMENTS Details**
+### **House Details**
 
+**5-Bedroom Villa**
 
-
-**Elizabeth Golf Apartments**
-
-Location: KG 439 Street, Kigali
-Price: USD 2,430 per month
+Location: 6 KG 323 Street, Kigali
+Price: USD 7,650 per month
 
 Details:
 
-Elizabeth Golf Apartment by Link in Kigali offers a garden, open-air bath, indoor swimming pool, and free Wi-Fi. Guests enjoy a lounge, lift, 24-hour front desk, and free on-site private parking.
+5 - Bedroom Villa in Kigali offers a spacious layout with five bedrooms and five bathrooms. The property includes a living room and family rooms, ensuring comfort for all guests.
 
 
 
-The apartment features a kitchenette, balcony, washing machine, private bathroom, and city views. Additional amenities include a dining area, a work desk, and free Wi-Fi.
+The villa provides free Wi-Fi, a fully equipped kitchen, a washing machine, and a dishwasher. Additional amenities include a dining area, TV, and outdoor furniture.
 
 
 
-Located 7 km from Kigali International Airport, the property is a 12-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.2 km) and Kigali Convention Centre (5 km).
+Located 5 km from Kigali International Airport and Kigali Convention Centre, the property is also close to attractions such as Kigali Golf Club (3.3 km) and Kigali Genocide Memorial (8 km).
 
+**Villa d'exception Rebero**
 
-
-
-
-**Greenland Apartments**
-
-Location: 249 KN 3 Street, Kigali
-Price: USD 2,025 per month
+Location: Rebero KK 857 St 13, Kigali
+Price: USD 2,693 per month
 
 Details:
 
-Greenland Apartment by Link in Kigali offers a terrace and free Wi-Fi. The apartment features a balcony with city views, a fully equipped kitchen, and a private bathroom.
+Villa d'exception Rebero in Kigali offers a spacious layout with five bedrooms and four bathrooms. The property includes a living room and family rooms, ensuring comfort for all guests.
 
 
 
-Guests benefit from a fitness room, lift, 24-hour front desk, daily housekeeping, family rooms, full-day security, and luggage storage. Free on-site private parking is available.
+The villa features free Wi-Fi, a fully equipped kitchen, a washing machine, and a seating area. Additional amenities include a balcony, TV, and private entrance.
 
 
 
-Located 9 km from Kigali International Airport, the apartment is near Belgian Peacekeepers Memorial (2 km), Kigali City Tower (less than 1 km), and Kandt House Natural History Museum (1.9 km).
+Located 9 km from Kigali International Airport, the villa is close to attractions such as Kigali Centenary Park and Kigali Genocide Memorial, each 8 km away. Free on-site private parking is available.
 
+**3-Bedroom Villa**
 
-
-
-
-**IZA Serene Apartments**
-
-Location: ECD Plaza, Kigali
-Price: USD 1,842 per month
+Location: 25CR+V6P, Kigali
+Price: USD 1,575 per month
 
 Details:
 
-IZA Serene city centre apartments in Kigali offer spacious apartments with terraces, balconies, and city views. Each apartment includes air-conditioning, a fully equipped kitchen, and a private bathroom.
+Rose Garden Luxury, Unique 3 Bedrooms House in Kigali offers a villa with three bedrooms and three bathrooms. Guests enjoy a spacious garden and terrace, complemented by free Wi-Fi throughout the property.
 
 
 
-Guests can enjoy African and international cuisines at the on-site restaurant, which serves vegetarian meals for lunch and dinner. The terrace provides a relaxing outdoor space, complemented by free WiFi throughout the property.
+The villa features a fully equipped kitchen, a balcony with mountain views, a washing machine, and a dining area. Additional amenities include a 24-hour front desk, a minimarket, a hairdresser/beautician, and family rooms.
 
 
 
-Located 11 km from Kigali International Airport, the apartments are close to attractions such as the Belgian Peacekeepers Memorial (7-minute walk), Kandt House Natural History Museum (1.5 km), and Kigali City Tower (15-minute walk). Free on-site private parking is available.
+Located 5 km from Kigali International Airport, the property is close to attractions such as the Presidential Palace Museum (3.2 km) and Kigali Golf Club (15 km). Free on-site private parking is available.
 
+**Green Valley Villa**
 
-
-**Rose Garden Apartments**
-
-Location: KG 9 Avenue, Nyarutarama, Gasabo, Kigali
-Price: USD 1,485 per month
+Location: 49 KG 706 Street 1, Kigali
+Price: USD 2,754 per month
 
 Details:
 
-Rose Garden Private Apartment by LINK in Kigali offers aparthotel-style accommodation with a garden and terrace. Guests enjoy free WiFi, ensuring connectivity throughout their stay.
+Green Valley Residence By Serenova Retreats in Kigali offers a spacious villa with four bedrooms and three bathrooms. The property includes a living room, dining area, and a fully equipped kitchen.
 
 
 
-Each apartment features a kitchenette, a balcony with city views, a washing machine, and a private bathroom. Additional amenities include a fitness room, a lift, a 24-hour front desk, concierge service, and free on-site parking.
+Guests enjoy free WiFi, a terrace, balcony, and a kitchenette. Additional amenities include a washing machine, dishwasher, microwave, and a work desk. Free on-site private parking is available.
 
 
 
-Located 5 km from Kigali International Airport, the property is an 8-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.5 km) and Kigali Convention Centre (4.1 km). Guests appreciate the attentive staff and room cleanliness.
+Located 9 km from Kigali International Airport, the villa is 1.9 km from the Kigali Genocide Memorial. Nearby attractions include Kigali Centenary Park (3.7 km) and Nyamata Genocide Museum (33 km).
 
+**JAMOS Guest House**
 
-
-**AGASARO Apartments**
-
-Location: KG 768, Kigali
-Price: USD 1,480 per month
+Location: Kigali-Gatuna Road, Kigali
+Price: USD 4,200 per month
 
 Details:
 
-AGASARO LUXURY Apartment in Kigali offers a spacious two-bedroom apartment with two bathrooms. The living room features a sofa bed and a work desk, ensuring comfort and convenience.
+JAMOS Gest House in Kigali offers a spacious, adults-only villa with eight bedrooms and eight bathrooms. The property features a living room, private check-in and check-out services, and a 24-hour front desk.
 
 
 
-Guests can relax in the year-round outdoor swimming pool with a view or enjoy the terrace and garden. The property includes a restaurant, bar, and free WiFi, providing ample leisure options.
+Guests can enjoy a sun terrace, bar, and free Wi-Fi. Additional amenities include an outdoor fireplace, lounge, coffee shop, and outdoor seating area. Free on-site private parking is available.
 
 
 
-The family-friendly restaurant serves African, Dutch, British, Ethiopian, French, American, Argentinian, Belgian, and Brazilian cuisines. Breakfast is continental with fruits, and lunch and dinner are available.
-
-
-
-Located 10 km from Kigali International Airport, the apartment is near attractions such as Kigali Genocide Memorial (3.5 km) and Kigali Golf Club (4.5 km). Free on-site private parking is provided.
+Located 15 km from Kigali International Airport, the villa is near attractions such as Niyo Arts Gallery (8 km) and Kigali Genocide Memorial (7 km). The surrounding area offers mountain and city views.
 

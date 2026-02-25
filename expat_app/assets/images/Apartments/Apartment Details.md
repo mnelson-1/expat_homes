@@ -1,7 +1,5 @@
 ### **APARTMENTS Details**
 
-
-
 **Elizabeth Golf Apartments**
 
 Location: KG 439 Street, Kigali
@@ -18,10 +16,6 @@ The apartment features a kitchenette, balcony, washing machine, private bathroom
 
 
 Located 7 km from Kigali International Airport, the property is a 12-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.2 km) and Kigali Convention Centre (5 km).
-
-
-
-
 
 **Greenland Apartments**
 
@@ -40,10 +34,6 @@ Guests benefit from a fitness room, lift, 24-hour front desk, daily housekeeping
 
 Located 9 km from Kigali International Airport, the apartment is near Belgian Peacekeepers Memorial (2 km), Kigali City Tower (less than 1 km), and Kandt House Natural History Museum (1.9 km).
 
-
-
-
-
 **IZA Serene Apartments**
 
 Location: ECD Plaza, Kigali
@@ -55,13 +45,11 @@ IZA Serene city centre apartments in Kigali offer spacious apartments with terra
 
 
 
-Guests can enjoy African and international cuisines at the on-site restaurant, which serves vegetarian meals for lunch and dinner. The terrace provides a relaxing outdoor space, complemented by free WiFi throughout the property.
+Guests can enjoy African and international cuisines at the on-site restaurant, which serves vegetarian meals for lunch and dinner. The terrace provides a relaxing outdoor space, complemented by free Wi-Fi throughout the property.
 
 
 
 Located 11 km from Kigali International Airport, the apartments are close to attractions such as the Belgian Peacekeepers Memorial (7-minute walk), Kandt House Natural History Museum (1.5 km), and Kigali City Tower (15-minute walk). Free on-site private parking is available.
-
-
 
 **Rose Garden Apartments**
 
@@ -70,7 +58,7 @@ Price: USD 1,485 per month
 
 Details:
 
-Rose Garden Private Apartment by LINK in Kigali offers aparthotel-style accommodation with a garden and terrace. Guests enjoy free WiFi, ensuring connectivity throughout their stay.
+Rose Garden Private Apartment by LINK in Kigali offers aparthotel-style accommodation with a garden and terrace. Guests enjoy free Wi-Fi, ensuring connectivity throughout their stay.
 
 
 
@@ -79,8 +67,6 @@ Each apartment features a kitchenette, a balcony with city views, a washing mach
 
 
 Located 5 km from Kigali International Airport, the property is an 8-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.5 km) and Kigali Convention Centre (4.1 km). Guests appreciate the attentive staff and room cleanliness.
-
-
 
 **AGASARO Apartments**
 
@@ -93,7 +79,7 @@ AGASARO LUXURY Apartment in Kigali offers a spacious two-bedroom apartment with 
 
 
 
-Guests can relax in the year-round outdoor swimming pool with a view or enjoy the terrace and garden. The property includes a restaurant, bar, and free WiFi, providing ample leisure options.
+Guests can relax in the year-round outdoor swimming pool with a view or enjoy the terrace and garden. The property includes a restaurant, bar, and free Wi-Fi, providing ample leisure options.
 
 
 
@@ -102,4 +88,3 @@ The family-friendly restaurant serves African, Dutch, British, Ethiopian, French
 
 
 Located 10 km from Kigali International Airport, the apartment is near attractions such as Kigali Genocide Memorial (3.5 km) and Kigali Golf Club (4.5 km). Free on-site private parking is provided.
-
