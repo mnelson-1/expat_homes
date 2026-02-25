@@ -9,6 +9,8 @@ class _ExpatHomeColors {
   static const Color hint = Color(0xFF9CA5A8);
   // Background for inline comment bubble (Ama Boateng).
   static const Color commentBackground = Color(0xFFE3E7E9);
+  // Explore Area button on estate cards.
+  static const Color exploreYellow = Color(0xFFFFD54F);
 }
 
 class ExpatHomeScreen extends StatefulWidget {
@@ -20,7 +22,58 @@ class ExpatHomeScreen extends StatefulWidget {
 
 class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   int _selectedTabIndex = 0; // 0 = Feed, 1 = Bowls
-  int _selectedBottomIndex = 0; // 0 = Community
+  int _selectedBottomIndex = 0; // 0 = Community, 2 = Estates, etc.
+  int _selectedEstateFilter = 0; // 0 = All, 1 = Apartments, 2 = Houses, 3 = Short-Stay
+
+  final ScrollController _feedScrollController = ScrollController();
+  final ScrollController _bowlsScrollController = ScrollController();
+  final ScrollController _estatesScrollController = ScrollController();
+  double _feedScrollOffset = 0;
+  double _bowlsScrollOffset = 0;
+  double _estatesScrollOffset = 0;
+
+  static const List<BoxShadow> _tabBarShadow = [
+    BoxShadow(
+      color: Color(0x33000000),
+      offset: Offset(0, 6),
+      blurRadius: 10,
+      spreadRadius: 0,
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _feedScrollController.addListener(_onFeedScroll);
+    _bowlsScrollController.addListener(_onBowlsScroll);
+    _estatesScrollController.addListener(_onEstatesScroll);
+  }
+
+  @override
+  void dispose() {
+    _feedScrollController.removeListener(_onFeedScroll);
+    _bowlsScrollController.removeListener(_onBowlsScroll);
+    _estatesScrollController.removeListener(_onEstatesScroll);
+    _feedScrollController.dispose();
+    _bowlsScrollController.dispose();
+    _estatesScrollController.dispose();
+    super.dispose();
+  }
+
+  void _onFeedScroll() {
+    final o = _feedScrollController.offset;
+    if (_feedScrollOffset != o) setState(() => _feedScrollOffset = o);
+  }
+
+  void _onBowlsScroll() {
+    final o = _bowlsScrollController.offset;
+    if (_bowlsScrollOffset != o) setState(() => _bowlsScrollOffset = o);
+  }
+
+  void _onEstatesScroll() {
+    final o = _estatesScrollController.offset;
+    if (_estatesScrollOffset != o) setState(() => _estatesScrollOffset = o);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,18 +84,36 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
       body: Column(
         children: [
           _buildHeader(textTheme),
-          _buildTabBar(textTheme),
-          const Divider(height: 1, color: Color(0xFFE0E0E0)),
           Expanded(
-            child:
-                _selectedTabIndex == 0
-                    ? _buildFeedList(textTheme)
-                    : _buildBowlsContent(textTheme),
+            child: _selectedBottomIndex == 0
+                ? Column(
+                    children: [
+                      _buildTabBar(textTheme),
+                      const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                      Expanded(
+                        child: _selectedTabIndex == 0
+                            ? _buildFeedList(textTheme)
+                            : _buildBowlsContent(textTheme),
+                      ),
+                    ],
+                  )
+                : _selectedBottomIndex == 2
+                    ? _buildEstatesContent(textTheme)
+                    : Center(
+                        child: Text(
+                          'Content for other tabs will live here.',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: _ExpatHomeColors.helper,
+                          ),
+                        ),
+                      ),
           ),
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
-      floatingActionButton: _buildShareExperienceButton(textTheme),
+      floatingActionButton: _selectedBottomIndex == 0 && _selectedTabIndex == 0
+          ? _buildShareExperienceButton(textTheme)
+          : null,
       bottomNavigationBar: _buildBottomNav(textTheme),
     );
   }
@@ -54,6 +125,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
       child: SafeArea(
         bottom: false,
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               'expat',
@@ -63,11 +135,11 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                 fontSize: 22,
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(child: _buildSearchBar(textTheme)),
-            const SizedBox(width: 16),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 140, maxWidth: 220),
+              child: _buildSearchBar(textTheme),
+            ),
             const Icon(Icons.notifications_none, color: Colors.white),
-            const SizedBox(width: 12),
             const Icon(Icons.person_outline, color: Colors.white),
           ],
         ),
@@ -102,10 +174,23 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   }
 
   Widget _buildTabBar(TextTheme textTheme) {
+    final showShadow = (_selectedTabIndex == 0 && _feedScrollOffset > 0) ||
+        (_selectedTabIndex == 1 && _bowlsScrollOffset > 0);
     return Container(
-      color: Colors.white,
-      // Slight top padding; underline still sits on the divider below.
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        // Always show a light shadow for separation; stronger when scrolled
+        boxShadow: [
+          const BoxShadow(
+            color: Color(0x26000000),
+            offset: Offset(0, 4),
+            blurRadius: 8,
+          ),
+          if (showShadow) ..._tabBarShadow,
+        ],
+      ),
+      // Extra top padding so tab text doesn't look tight; underline still sits on the divider below.
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -154,6 +239,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
 
   Widget _buildFeedList(TextTheme textTheme) {
     return ListView(
+      controller: _feedScrollController,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
       children: [
         _buildPostBlock(
@@ -224,6 +310,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     ];
 
     return ListView(
+      controller: _bowlsScrollController,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
         const SizedBox(height: 16),
@@ -295,6 +382,406 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static const List<_EstateFilterOption> _estateFilterOptions = [
+    _EstateFilterOption(label: 'All', index: 0),
+    _EstateFilterOption(label: 'Apartments', index: 1),
+    _EstateFilterOption(label: 'Houses', index: 2),
+    _EstateFilterOption(label: 'Short-Stay', index: 3),
+  ];
+
+  Widget _buildEstatesContent(TextTheme textTheme) {
+    var estates = _estateList
+        .where((e) {
+          if (_selectedEstateFilter == 0) return true;
+          if (_selectedEstateFilter == 1) return e.type == 'apartment';
+          if (_selectedEstateFilter == 2) return e.type == 'house';
+          if (_selectedEstateFilter == 3) return e.type == 'short_stay';
+          return true;
+        })
+        .toList();
+    if (_selectedEstateFilter == 0) {
+      estates.sort((a, b) => a.title.compareTo(b.title));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            // Always show a light shadow for separation; stronger when scrolled
+            boxShadow: [
+              const BoxShadow(
+                color: Color(0x26000000),
+                offset: Offset(0, 4),
+                blurRadius: 8,
+              ),
+              if (_estatesScrollOffset > 0) ..._tabBarShadow,
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: _estateFilterOptions
+                .map((opt) => _buildEstateFilterItem(textTheme, opt))
+                .toList(),
+          ),
+        ),
+        const Divider(height: 1, color: Color(0xFFE0E0E0)),
+        Expanded(
+          child: ListView.builder(
+            controller: _estatesScrollController,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            itemCount: estates.length,
+            itemBuilder: (context, index) {
+              if (index > 0) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                    _buildEstateCard(textTheme, estates[index]),
+                  ],
+                );
+              }
+              return _buildEstateCard(textTheme, estates[index]);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEstateFilterItem(TextTheme textTheme, _EstateFilterOption option) {
+    final bool selected = _selectedEstateFilter == option.index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedEstateFilter = option.index),
+      child: IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              option.label,
+              style: textTheme.titleMedium?.copyWith(
+                color: selected
+                    ? _ExpatHomeColors.bodyText
+                    : _ExpatHomeColors.hint,
+                fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Container(
+              height: 2,
+              width: double.infinity,
+              color: selected ? _ExpatHomeColors.bodyText : Colors.transparent,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static List<_Estate> get _estateList => [
+        const _Estate(
+          title: 'Elizabeth Golf Apartments',
+          location: 'KG 439 Street, Kigali',
+          price: '\$2,430/mo',
+          type: 'apartment',
+          imagePath: 'assets/images/Apartments/Elizabeth G Apartments/1.jpg',
+        ),
+        const _Estate(
+          title: 'Greenland Apartments',
+          location: '249 KN 3 Street, Kigali',
+          price: '\$2,025/mo',
+          type: 'apartment',
+          imagePath: 'assets/images/Apartments/Greenland Apartments/1.jpg',
+        ),
+        const _Estate(
+          title: 'IZA Serene Apartments',
+          location: 'ECD Plaza, Kigali',
+          price: '\$1,842/mo',
+          type: 'apartment',
+          imagePath: 'assets/images/Apartments/IZA Serene Apartments/1.jpg',
+        ),
+        const _Estate(
+          title: 'Rose Garden Apartments',
+          location: 'KG 9 Avenue, Nyarutarama, Gasabo, Kigali',
+          price: '\$1,485/mo',
+          type: 'apartment',
+          imagePath: 'assets/images/Apartments/Rose Garden Apartments/1.jpg',
+        ),
+        const _Estate(
+          title: 'AGASARO Apartments',
+          location: 'KG 768, Kigali',
+          price: '\$1,480/mo',
+          type: 'apartment',
+          imagePath: 'assets/images/Apartments/AGASARO Apartments/1.jpg',
+        ),
+        const _Estate(
+          title: 'Phoenix Apartments',
+          location: 'KG 768, Kigali',
+          price: '\$2,309/mo',
+          type: 'apartment',
+          imagePath: 'assets/images/Apartments/Phoenix Apartment/1.jpg',
+        ),
+        const _Estate(
+          title: 'Comfort Deluxe Apartments',
+          location: 'KG 10 Avenue, Kigali',
+          price: '\$2,040/mo',
+          type: 'apartment',
+          imagePath: 'assets/images/Apartments/Comfort Deluxe Apartments/1.jpg',
+        ),
+        const _Estate(
+          title: '3-Bedroom Villa',
+          location: '25CR+V6P, Kigali',
+          price: '\$1,575/mo',
+          type: 'house',
+          imagePath: 'assets/images/Houses/3-Bedroom Villa/1.jpg',
+        ),
+        const _Estate(
+          title: 'Green Valley Villa',
+          location: '49 KG 706 Street 1, Kigali',
+          price: '\$2,754/mo',
+          type: 'house',
+          imagePath: 'assets/images/Houses/Green Valley Villa/1.jpg',
+        ),
+        const _Estate(
+          title: 'JAMOS Guest House',
+          location: 'Kigali-Gatuna Road, Kigali',
+          price: '\$4,200/mo',
+          type: 'house',
+          imagePath: 'assets/images/Houses/JAMOS Guest House/1.jpg',
+        ),
+        const _Estate(
+          title: '5-Bedroom Villa',
+          location: '6 KG 323 Street, Kigali',
+          price: '\$7,650/mo',
+          type: 'house',
+          imagePath: 'assets/images/Houses/5-Bedroom Villa/1.jpg',
+        ),
+        const _Estate(
+          title: "Villa d'exception Rebero",
+          location: 'Rebero KK 857 St 13, Kigali',
+          price: '\$2,693/mo',
+          type: 'house',
+          imagePath: 'assets/images/Houses/Villa Rebero/1.jpg',
+        ),
+        const _Estate(
+          title: 'Kigali Luxury Home',
+          location: 'KK 15 Road, Kigali',
+          price: '\$5,355/mo',
+          type: 'house',
+          imagePath: 'assets/images/Houses/Kigali Home/1.jpg',
+        ),
+        const _Estate(
+          title: 'Cascadia Hotel',
+          location: '7 KG 203 St, Kigali',
+          price: '\$110/night',
+          type: 'short_stay',
+          imagePath: 'assets/images/Short-Stay/Cascadia Hotel/1.jpg',
+        ),
+        const _Estate(
+          title: 'Mythos Boutique Hotel',
+          location: 'KN 50 Street Kiyovu, Kigali',
+          price: '\$112/night',
+          type: 'short_stay',
+          imagePath: 'assets/images/Short-Stay/Mythos Boutique Hotel/1.jpg',
+        ),
+        const _Estate(
+          title: 'Peponi Living Hotel',
+          location: 'KG 729 Street Kagugu, Kigali',
+          price: '\$50/night',
+          type: 'short_stay',
+          imagePath: 'assets/images/Short-Stay/Peponi Living Hotel/1.jpg',
+        ),
+        const _Estate(
+          title: 'REBERO Resort',
+          location: 'KK 30 Avenue, Kigali',
+          price: '\$80/night',
+          type: 'short_stay',
+          imagePath: 'assets/images/Short-Stay/REBERO Resort/1.jpg',
+        ),
+        const _Estate(
+          title: 'Centric Hotel',
+          location: 'KG 213 Street, Kigali',
+          price: '\$100/night',
+          type: 'short_stay',
+          imagePath: 'assets/images/Short-Stay/Centric Hotel/1.jpg',
+        ),
+        const _Estate(
+          title: 'M Hotel',
+          location: 'KN 1 Avenue Kiyovu, Kigali',
+          price: '\$200/night',
+          type: 'short_stay',
+          imagePath: 'assets/images/Short-Stay/M Hotel/1.jpg',
+        ),
+        const _Estate(
+          title: 'Gloria Hotel',
+          location: 'KN 59 ST, Kigali',
+          price: '\$120/night',
+          type: 'short_stay',
+          imagePath: 'assets/images/Short-Stay/Gloria Hotel/1.jpg',
+        ),
+        const _Estate(
+          title: 'Olympic Hotel',
+          location: 'KG 11 Ave, Kigali',
+          price: '\$80/night',
+          type: 'short_stay',
+          imagePath: 'assets/images/Short-Stay/Olympic Hotel/1.jpg',
+        ),
+      ];
+
+  /// Renders price with currency/amount in bold and suffix (e.g. "/mo") in regular weight.
+  Widget _buildPriceText(TextTheme textTheme, String price) {
+    final parts = price.split('/');
+    final amount = parts.isNotEmpty ? parts[0] : price; // e.g. "\$1,200" or "\$45"
+    final suffix = parts.length > 1 ? '/${parts[1]}' : ''; // e.g. "/mo", "/night"
+    return RichText(
+      text: TextSpan(
+        style: textTheme.titleSmall?.copyWith(color: _ExpatHomeColors.bodyText),
+        children: [
+          TextSpan(
+            text: amount,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: textTheme.titleSmall?.fontSize,
+              color: _ExpatHomeColors.bodyText,
+            ),
+          ),
+          TextSpan(
+            text: suffix,
+            style: TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: textTheme.bodySmall?.fontSize,
+              color: _ExpatHomeColors.bodyText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEstateCard(TextTheme textTheme, _Estate estate) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              estate.imagePath,
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                height: 180,
+                color: Colors.grey.shade300,
+                child: const Center(child: Icon(Icons.home, size: 48)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      estate.title,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: _ExpatHomeColors.bodyText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      estate.location,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _ExpatHomeColors.bodyText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _ExpatHomeColors.helper,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      estate.type == 'short_stay'
+                          ? 'Short-Stay'
+                          : estate.type == 'apartment'
+                              ? 'Apartment'
+                              : 'House',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _ExpatHomeColors.bodyText,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _buildPriceText(textTheme, estate.price),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {},
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _ExpatHomeColors.accentGreen,
+                    foregroundColor: _ExpatHomeColors.bodyText,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                  ),
+                  child: Text(
+                    'Get a Ride',
+                    style: textTheme.titleMedium?.copyWith(
+                      color: _ExpatHomeColors.bodyText,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {},
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _ExpatHomeColors.exploreYellow,
+                    foregroundColor: _ExpatHomeColors.bodyText,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                  ),
+                  child: Text(
+                    'Explore Area',
+                    style: textTheme.titleMedium?.copyWith(
+                      color: _ExpatHomeColors.bodyText,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -526,46 +1013,58 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
 
   Widget _buildBottomNav(TextTheme textTheme) {
     return Container(
-      decoration: const BoxDecoration(color: _ExpatHomeColors.primaryDark),
+      decoration: BoxDecoration(
+        color: _ExpatHomeColors.primaryDark,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 12,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 64,
-          child: Row(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: SizedBox(
+            height: 64,
+            child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildBottomItem(
                 textTheme,
                 index: 0,
-                icon: Icons.groups,
+                imagePath: 'assets/images/Community Icon.png',
                 label: 'Community',
               ),
               _buildBottomItem(
                 textTheme,
                 index: 1,
-                icon: Icons.directions_car_outlined,
+                imagePath: 'assets/images/Rides Icon.png',
                 label: 'Rides',
               ),
               _buildBottomItem(
                 textTheme,
                 index: 2,
-                icon: Icons.home_outlined,
+                imagePath: 'assets/images/Estates Icon.png',
                 label: 'Estates',
               ),
               _buildBottomItem(
                 textTheme,
                 index: 3,
-                icon: Icons.chat_bubble_outline,
+                imagePath: 'assets/images/Messages icon.png',
                 label: 'Messages',
               ),
               _buildBottomItem(
                 textTheme,
                 index: 4,
-                icon: Icons.explore_outlined,
+                imagePath: 'assets/images/Explore Icon.png',
                 label: 'Explore',
               ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -574,7 +1073,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   Widget _buildBottomItem(
     TextTheme textTheme, {
     required int index,
-    required IconData icon,
+    required String imagePath,
     required String label,
   }) {
     final bool selected = _selectedBottomIndex == index;
@@ -585,7 +1084,14 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 22, color: color),
+          Image.asset(
+            imagePath,
+            width: 22,
+            height: 22,
+            color: color,
+            colorBlendMode: BlendMode.srcIn,
+            errorBuilder: (_, __, ___) => Icon(Icons.circle, size: 22, color: color),
+          ),
           const SizedBox(height: 4),
           Text(
             label,
@@ -625,5 +1131,27 @@ class _Bowl {
 
   final String title;
   final String description;
+  final String imagePath;
+}
+
+class _EstateFilterOption {
+  const _EstateFilterOption({required this.label, required this.index});
+  final String label;
+  final int index;
+}
+
+class _Estate {
+  const _Estate({
+    required this.title,
+    required this.location,
+    required this.price,
+    required this.type,
+    required this.imagePath,
+  });
+
+  final String title;
+  final String location;
+  final String price;
+  final String type; // 'apartment' | 'house' | 'short_stay'
   final String imagePath;
 }

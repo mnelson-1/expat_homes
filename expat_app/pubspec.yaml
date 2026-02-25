@@ -61,6 +61,27 @@ flutter:
   assets:
     - images/
     - assets/images/
+    - assets/images/Apartments/Elizabeth G Apartments/
+    - assets/images/Apartments/Greenland Apartments/
+    - assets/images/Apartments/IZA Serene Apartments/
+    - assets/images/Apartments/Rose Garden Apartments/
+    - assets/images/Apartments/AGASARO Apartments/
+    - assets/images/Apartments/Phoenix Apartment/
+    - assets/images/Apartments/Comfort Deluxe Apartments/
+    - assets/images/Houses/3-Bedroom Villa/
+    - assets/images/Houses/Green Valley Villa/
+    - assets/images/Houses/JAMOS Guest House/
+    - assets/images/Houses/5-Bedroom Villa/
+    - assets/images/Houses/Villa Rebero/
+    - assets/images/Houses/Kigali Home/
+    - assets/images/Short-Stay/Cascadia Hotel/
+    - assets/images/Short-Stay/Mythos Boutique Hotel/
+    - assets/images/Short-Stay/Peponi Living Hotel/
+    - assets/images/Short-Stay/REBERO Resort/
+    - assets/images/Short-Stay/Centric Hotel/
+    - assets/images/Short-Stay/M Hotel/
+    - assets/images/Short-Stay/Gloria Hotel/
+    - assets/images/Short-Stay/Olympic Hotel/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
