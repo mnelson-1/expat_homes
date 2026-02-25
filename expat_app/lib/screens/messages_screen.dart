@@ -93,7 +93,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
 }
 
 /// Conversation thread screen opened after tapping "Inquire".
-class ConversationScreen extends StatelessWidget {
+class ConversationScreen extends StatefulWidget {
   const ConversationScreen({
     super.key,
     required this.listingTitle,
@@ -110,6 +110,13 @@ class ConversationScreen extends StatelessWidget {
   final String imagePath;
   final String contactName;
   final String contactSubtitle;
+
+  @override
+  State<ConversationScreen> createState() => _ConversationScreenState();
+}
+
+class _ConversationScreenState extends State<ConversationScreen> {
+  bool _liveTranslateEnabled = true;
 
   @override
   Widget build(BuildContext context) {
@@ -132,23 +139,18 @@ class ConversationScreen extends StatelessWidget {
                   textTheme,
                   'Hey there! I would like to get more\ninformation on this Listing.',
                 ),
-                const SizedBox(height: 24),
-                _buildIncomingBubble(
-                  textTheme,
-                  'Hello, how can I help you?',
-                ),
-                const SizedBox(height: 24),
-                _buildTypingIndicatorRow(),
               ],
             ),
           ),
-          _buildComposer(textTheme),
+          _buildComposer(context, textTheme),
         ],
       ),
     );
   }
 
   Widget _buildHeader(BuildContext context, TextTheme textTheme) {
+    final contactName = widget.contactName;
+    final contactSubtitle = widget.contactSubtitle;
     return Container(
       color: const Color(0xFF1A2E35),
       padding: const EdgeInsets.only(top: 40, left: 8, right: 16, bottom: 12),
@@ -202,14 +204,14 @@ class ConversationScreen extends StatelessWidget {
         Text(
           '09/02/2026',
           style: textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF9CA5A8),
+            color: const Color(0xFF157A88),
           ),
         ),
         const SizedBox(height: 4),
         Text(
           'This chat is end-end encrypted',
           style: textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF9CA5A8),
+            color: const Color(0xFF157A88),
           ),
         ),
       ],
@@ -220,7 +222,7 @@ class ConversationScreen extends StatelessWidget {
     return Align(
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 280),
+        constraints: const BoxConstraints(maxWidth: 240),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -243,7 +245,7 @@ class ConversationScreen extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Center(
                   child: Text(
-                    listingTitle,
+                    widget.listingTitle,
                     style: textTheme.titleSmall?.copyWith(
                       color: const Color(0xFF1A2E35),
                       fontWeight: FontWeight.w600,
@@ -254,9 +256,9 @@ class ConversationScreen extends StatelessWidget {
                 ),
               ),
               AspectRatio(
-                aspectRatio: 16 / 9,
+                aspectRatio: 4 / 3,
                 child: Image.asset(
-                  imagePath,
+                  widget.imagePath,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) =>
                       Container(color: Colors.grey.shade300),
@@ -273,7 +275,7 @@ class ConversationScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            price,
+                            widget.price,
                             style: textTheme.titleMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -281,7 +283,7 @@ class ConversationScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            location,
+                            widget.location,
                             style: textTheme.bodySmall?.copyWith(
                               color: Colors.white.withOpacity(0.9),
                             ),
@@ -318,26 +320,6 @@ class ConversationScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildIncomingBubble(TextTheme textTheme, String text) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 280),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF8ED966),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Text(
-          text,
-          style: textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF1A2E35),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildOutgoingBubble(TextTheme textTheme, String text) {
     return Align(
       alignment: Alignment.centerRight,
@@ -358,110 +340,141 @@ class ConversationScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTypingIndicatorRow() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        width: 48,
-        height: 28,
-        decoration: BoxDecoration(
-          color: const Color(0xFF8ED966),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            _Dot(),
-            _Dot(),
-            _Dot(),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildComposer(BuildContext context, TextTheme textTheme) {
+    const panelBg = Color(0xFF1A2E35);
+    const accentGreen = Color(0xFF8ED966);
+    const hintColor = Color(0xFF9CA5A8);
 
-  Widget _buildComposer(TextTheme textTheme) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: Row(
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Switch(
-                  value: false,
-                  onChanged: (_) {},
-                  activeColor: const Color(0xFF8ED966),
-                ),
-                Text(
-                  'Live-Translate',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF1A2E35),
+    return Container(
+      color: panelBg,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Translate',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFF9CA5A8)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Type something...',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF9CA5A8),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _liveTranslateEnabled = !_liveTranslateEnabled;
+                      });
+                    },
+                    child: SizedBox(
+                      width: 64,
+                      height: 24,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeInOut,
+                        decoration: BoxDecoration(
+                          color: _liveTranslateEnabled
+                              ? accentGreen
+                              : hintColor.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Stack(
+                          alignment: Alignment.centerLeft,
+                          children: [
+                            AnimatedAlign(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeInOut,
+                              alignment: _liveTranslateEnabled
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 2),
+                                child: Container(
+                                  width: 18,
+                                  height: 18,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF8ED966),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_upward,
-                        size: 18,
-                        color: Color(0xFF1A2E35),
-                      ),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              // Plus icon button (e.g. for uploads)
+              InkWell(
+                onTap: () {},
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.add,
+                    color: Colors.white,
+                    size: 30,
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF243A42),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: hintColor.withOpacity(0.5),
+                      width: 1,
+                    ),
+                  ),
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          style: textTheme.bodyMedium
+                              ?.copyWith(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Type something...',
+                            hintStyle: textTheme.bodyMedium?.copyWith(
+                              color: hintColor,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () {},
+                        child: const Icon(
+                          Icons.send_rounded,
+                          color: Color(0xFF8ED966),
+                          size: 22,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-
-class _Dot extends StatelessWidget {
-  const _Dot();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 4,
-      height: 4,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A2E35),
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-}
-
 
