@@ -16,9 +16,6 @@ class LandlordHomeScreen extends StatefulWidget {
   State<LandlordHomeScreen> createState() => _LandlordHomeScreenState();
 }
 
-final GlobalKey<NavigatorState> _landlordNavigatorKey =
-    GlobalKey<NavigatorState>();
-
 class _LandlordHomeColors {
   static const Color primaryDark = Color(0xFF1A2E35);
   static const Color accentGreen = Color(0xFF8ED966);
@@ -80,7 +77,6 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      key: _landlordNavigatorKey,
       backgroundColor: Colors.white,
       body: Column(
         children: [
@@ -217,7 +213,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final agent = matches[index];
-          return _buildAgentCard(agent, textTheme);
+          return _buildAgentCard(context, agent, textTheme);
         },
       );
     }
@@ -356,10 +352,14 @@ class _AgentSummary {
   final int ratingCount;
 }
 
-Widget _buildAgentCard(_AgentSummary agent, TextTheme textTheme) {
+Widget _buildAgentCard(
+  BuildContext context,
+  _AgentSummary agent,
+  TextTheme textTheme,
+) {
   return InkWell(
     onTap: () {
-      Navigator.of(_landlordNavigatorKey.currentContext!).push(
+      Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (context) => AgentProfileScreen(
             agentName: agent.name,
