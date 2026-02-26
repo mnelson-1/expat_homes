@@ -341,6 +341,10 @@ class _LandlordAssignPropertyScreenState
       agentName: widget.agentName,
       agentId: widget.agentId,
       message: message,
+      listingTitle: estate.title,
+      location: estate.location,
+      price: priceWithSuffix,
+      imagePath: estate.imagePath,
     );
 
     showDialog<void>(

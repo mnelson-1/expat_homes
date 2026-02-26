@@ -330,7 +330,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute<void>(
                       builder: (_) => const LandlordHomeScreen(
-                        initialIndex: 3,
+                        initialIndex: 2,
                       ),
                     ),
                   );
