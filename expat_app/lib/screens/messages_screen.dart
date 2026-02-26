@@ -1,12 +1,55 @@
 import 'package:flutter/material.dart';
 
 import 'agent_profile_screen.dart';
+import 'landlord_home_screen.dart';
 
 /// Empty-state view for the Messages tab.
 ///
 /// When messages are populated and the list becomes scrollable,
 /// a drop shadow appears under the Messages header while any
 /// part of the list is scrolled beneath it.
+class _ChatThread {
+  _ChatThread({
+    required this.contactName,
+    required this.contactSubtitle,
+    required this.lastMessage,
+    required this.lastUpdated,
+  });
+
+  final String contactName;
+  final String contactSubtitle;
+  final String lastMessage;
+  final DateTime lastUpdated;
+}
+
+final List<_ChatThread> _chatThreads = [];
+
+void addOrUpdateChatThread(_ChatThread thread) {
+  final index = _chatThreads.indexWhere((t) =>
+      t.contactName == thread.contactName &&
+      t.contactSubtitle == thread.contactSubtitle);
+  if (index >= 0) {
+    _chatThreads[index] = thread;
+  } else {
+    _chatThreads.add(thread);
+  }
+}
+
+void addOrUpdateChatThreadForAgent({
+  required String agentName,
+  required String agentId,
+  required String message,
+}) {
+  addOrUpdateChatThread(
+    _ChatThread(
+      contactName: agentName,
+      contactSubtitle: agentId,
+      lastMessage: message,
+      lastUpdated: DateTime.now(),
+    ),
+  );
+}
+
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
 
@@ -72,26 +115,126 @@ class _MessagesScreenState extends State<MessagesScreen> {
         ),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
         Expanded(
-          child: ListView(
-            controller: _scrollController,
-            padding: const EdgeInsets.only(bottom: 56),
-            children: [
-              const SizedBox(height: 200),
-              Center(
-                child: Text(
-                  'You have no messages yet. Make enquiries\non listings and watch the magic happen.',
-                  textAlign: TextAlign.center,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF9CA5A8),
-                  ),
+          child: _chatThreads.isEmpty
+              ? ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(bottom: 56),
+                  children: [
+                    const SizedBox(height: 200),
+                    Center(
+                      child: Text(
+                        'You have no messages yet. Make enquiries\non listings and watch the magic happen.',
+                        textAlign: TextAlign.center,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF9CA5A8),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(bottom: 56),
+                  itemCount: _chatThreads.length,
+                  itemBuilder: (context, index) {
+                    final thread = _chatThreads[index];
+                    return _buildThreadRow(context, textTheme, thread);
+                  },
                 ),
-              ),
-            ],
-          ),
         ),
       ],
     );
   }
+
+  Widget _buildThreadRow(
+    BuildContext context,
+    TextTheme textTheme,
+    _ChatThread thread,
+  ) {
+    final now = DateTime.now();
+    final diff = now.difference(thread.lastUpdated);
+    final timeLabel = diff.inMinutes == 0 ? 'now' : _formatTime(thread.lastUpdated);
+
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ConversationScreen(
+              listingTitle: '', // Placeholder until backed by real data
+              location: '',
+              price: '',
+              imagePath: '',
+              contactName: thread.contactName,
+              contactSubtitle: thread.contactSubtitle,
+              initialMessage: thread.lastMessage,
+            ),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.grey.shade300,
+              child: const Icon(Icons.person, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    thread.contactName,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF1A2E35),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'You: ${thread.lastMessage}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF1A2E35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  timeLabel,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF9CA5A8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Icon(
+                  Icons.more_vert,
+                  size: 18,
+                  color: Color(0xFF9CA5A8),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatTime(DateTime dt) {
+  final h = dt.hour;
+  final m = dt.minute;
+  final hh = h.toString().padLeft(2, '0');
+  final mm = m.toString().padLeft(2, '0');
+  return '$hh:$mm';
 }
 
 /// Conversation thread screen opened after tapping "Inquire".
@@ -104,6 +247,7 @@ class ConversationScreen extends StatefulWidget {
     required this.imagePath,
     this.contactName = 'Jean Claude',
     this.contactSubtitle = 'Agent of Elizabeth G. Apartments',
+    this.initialMessage,
   });
 
   final String listingTitle;
@@ -112,6 +256,7 @@ class ConversationScreen extends StatefulWidget {
   final String imagePath;
   final String contactName;
   final String contactSubtitle;
+  final String? initialMessage;
 
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
@@ -139,7 +284,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 const SizedBox(height: 12),
                 _buildOutgoingBubble(
                   textTheme,
-                  'Hey there! I would like to get more\ninformation on this Listing.',
+                  widget.initialMessage ??
+                      'Hey there! I would like to get more\ninformation on this Listing.',
                 ),
               ],
             ),
@@ -163,7 +309,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
             IconButton(
               icon: const Icon(Icons.arrow_back_ios_new,
                   color: Colors.white, size: 18),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                if (widget.initialMessage != null) {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const LandlordHomeScreen(
+                        initialIndex: 3,
+                      ),
+                    ),
+                  );
+                } else {
+                  Navigator.of(context).pop();
+                }
+              },
             ),
             Expanded(
               child: InkWell(
@@ -221,10 +379,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildDateAndEncryption(TextTheme textTheme) {
+    final now = DateTime.now();
+    final day = now.day.toString().padLeft(2, '0');
+    final month = now.month.toString().padLeft(2, '0');
+    final year = now.year.toString();
+    final dateLabel = '$day/$month/$year';
     return Column(
       children: [
         Text(
-          '09/02/2026',
+          dateLabel,
           style: textTheme.bodySmall?.copyWith(
             color: const Color(0xFF1A2E35),
           ),

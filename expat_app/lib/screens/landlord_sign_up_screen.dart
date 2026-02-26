@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'landlord_home_screen.dart';
+
 /// Palette for Landlord signup (mirrors Expat signup).
 class _LandlordSignUpColors {
   static const Color primaryDark = Color(0xFF1A2E35);
@@ -307,7 +309,14 @@ class _LandlordSignUpScreenState extends State<LandlordSignUpScreen> {
 
   Widget _buildAgreeButton(TextTheme textTheme) {
     return FilledButton(
-      onPressed: () {},
+      onPressed: () {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute<void>(
+            builder: (_) => const LandlordHomeScreen(),
+          ),
+          (route) => false,
+        );
+      },
       style: FilledButton.styleFrom(
         backgroundColor: _LandlordSignUpColors.accentGreen,
         foregroundColor: _LandlordSignUpColors.primaryDark,

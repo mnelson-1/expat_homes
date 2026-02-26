@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'landlord_assign_property_screen.dart';
+
 /// Agent profile screen shown when the user taps the agent's profile
 /// in the chat view (when the listing representative is an agent).
 class AgentProfileScreen extends StatelessWidget {
@@ -15,6 +17,7 @@ class AgentProfileScreen extends StatelessWidget {
     this.ratingCount = 10,
     this.bannerImagePath,
     this.reviews = const [],
+    this.showAssignProperty = false,
   });
 
   final String agentName;
@@ -27,6 +30,7 @@ class AgentProfileScreen extends StatelessWidget {
   final int ratingCount;
   final String? bannerImagePath;
   final List<AgentProfileReview> reviews;
+  final bool showAssignProperty;
 
   static const Color _headerDark = Color(0xFF1A2E35);
   static const Color _bodyText = Color(0xFF1A2E35);
@@ -129,7 +133,7 @@ class AgentProfileScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   _buildTapToRate(textTheme),
                   const SizedBox(height: 24),
-                  _buildActionButtons(context, textTheme),
+                  _buildActionButtons(context, textTheme, showAssignProperty),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -364,44 +368,133 @@ class AgentProfileScreen extends StatelessWidget {
   }
 
   Widget _buildTapToRate(TextTheme textTheme) {
-    return Center(
-      child: Column(
-        children: [
-          Text(
-            'Tap to Rate',
-            style: textTheme.bodyMedium?.copyWith(
-              color: _hint,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              5,
-              (i) => Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Icon(
-                  Icons.star_border,
-                  size: 28,
+    int currentRating = 0;
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Center(
+          child: Column(
+            children: [
+              Text(
+                'Tap to Rate',
+                style: textTheme.bodyMedium?.copyWith(
                   color: _hint,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  final starIndex = index + 1;
+                  final isFilled = starIndex <= currentRating;
+
+                  return IconButton(
+                    padding: const EdgeInsets.only(right: 4),
+                    constraints: const BoxConstraints(),
+                    icon: Icon(
+                      isFilled ? Icons.star : Icons.star_border,
+                      size: 28,
+                      color: isFilled ? _bodyText : _hint,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        currentRating = starIndex;
+                      });
+                      _showRatingSuccessDialog(context, textTheme);
+                    },
+                  );
+                }),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildActionButtons(BuildContext context, TextTheme textTheme) {
+  void _showRatingSuccessDialog(
+      BuildContext context, TextTheme textTheme) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (dialogContext) {
+        return Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            decoration: BoxDecoration(
+              color: _verifiedGreen,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: _bodyText,
+                      size: 22,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Rating Successful',
+                  style: textTheme.titleLarge?.copyWith(
+                    color: _bodyText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'This helps the agent improve, and also lets us know areas to improve on.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: _bodyText,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: const BoxDecoration(
+                    color: _bodyText,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildActionButtons(
+      BuildContext context, TextTheme textTheme, bool showAssignProperty) {
     return Column(
       children: [
         SizedBox(
           width: double.infinity,
           height: 52,
           child: FilledButton(
-            onPressed: () {},
+            onPressed: () {
+              // Placeholder for future review flow.
+            },
             style: FilledButton.styleFrom(
               backgroundColor: _headerDark,
               foregroundColor: Colors.white,
@@ -415,25 +508,36 @@ class AgentProfileScreen extends StatelessWidget {
             child: const Text('Write a Review'),
           ),
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: FilledButton(
-            onPressed: () {},
-            style: FilledButton.styleFrom(
-              backgroundColor: _verifiedGreen,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+        if (showAssignProperty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: FilledButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => LandlordAssignPropertyScreen(
+                      agentName: agentFullName,
+                      agentId: agentId,
+                    ),
+                  ),
+                );
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: _verifiedGreen,
+                foregroundColor: _bodyText,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                textStyle: textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              textStyle: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              child: const Text('Assign Property'),
             ),
-            child: const Text('Assign Property'),
           ),
-        ),
+        ],
       ],
     );
   }
