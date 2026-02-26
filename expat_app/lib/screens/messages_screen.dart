@@ -14,12 +14,20 @@ class _ChatThread {
     required this.contactSubtitle,
     required this.lastMessage,
     required this.lastUpdated,
+    required this.listingTitle,
+    required this.location,
+    required this.price,
+    required this.imagePath,
   });
 
   final String contactName;
   final String contactSubtitle;
   final String lastMessage;
   final DateTime lastUpdated;
+  final String listingTitle;
+  final String location;
+  final String price;
+  final String imagePath;
 }
 
 final List<_ChatThread> _chatThreads = [];
@@ -39,6 +47,10 @@ void addOrUpdateChatThreadForAgent({
   required String agentName,
   required String agentId,
   required String message,
+  required String listingTitle,
+  required String location,
+  required String price,
+  required String imagePath,
 }) {
   addOrUpdateChatThread(
     _ChatThread(
@@ -46,6 +58,10 @@ void addOrUpdateChatThreadForAgent({
       contactSubtitle: agentId,
       lastMessage: message,
       lastUpdated: DateTime.now(),
+      listingTitle: listingTitle,
+      location: location,
+      price: price,
+      imagePath: imagePath,
     ),
   );
 }
@@ -160,10 +176,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => ConversationScreen(
-              listingTitle: '', // Placeholder until backed by real data
-              location: '',
-              price: '',
-              imagePath: '',
+              listingTitle: thread.listingTitle,
+              location: thread.location,
+              price: thread.price,
+              imagePath: thread.imagePath,
               contactName: thread.contactName,
               contactSubtitle: thread.contactSubtitle,
               initialMessage: thread.lastMessage,
