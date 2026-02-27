@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'landlord_make_listing_screen.dart';
 import 'messages_screen.dart';
 
 /// Detail page for a single estate listing.
@@ -13,8 +14,10 @@ class ListingDetailScreen extends StatelessWidget {
     required this.typeLabel,
     required this.imagePaths,
     required this.description,
+    this.upi,
     this.isVerifiedByRdb = true,
     this.representativeName,
+    this.showRequestEditOnly = false,
   });
 
   final String title;
@@ -23,9 +26,13 @@ class ListingDetailScreen extends StatelessWidget {
   final String typeLabel; // e.g. "Apartment", "House", "Short-Stay"
   final List<String> imagePaths;
   final String description;
+  /// Optional house UPI (placeholder for now in Expat flow).
+  final String? upi;
   final bool isVerifiedByRdb;
   /// Optional agent/landlord representative; when null, the section is hidden.
   final String? representativeName;
+  /// When true (landlord view), bottom bar shows only a single "Request Edit" button.
+  final bool showRequestEditOnly;
 
   // Tracks whether content has been scrolled to show a drop shadow above buttons.
   final ValueNotifier<bool> _showBottomShadow = ValueNotifier<bool>(false);
@@ -247,6 +254,15 @@ class ListingDetailScreen extends StatelessWidget {
                 ),
               ],
             ),
+          if (upi != null && upi!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'House UPI: $upi',
+              style: textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF9CA5A8),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -321,6 +337,66 @@ class ListingDetailScreen extends StatelessWidget {
     TextTheme textTheme, {
     required bool showShadow,
   }) {
+    if (showRequestEditOnly) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: showShadow
+              ? const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    offset: Offset(0, -6),
+                    blurRadius: 12,
+                  ),
+                ]
+              : null,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => LandlordMakeListingScreen(
+                        isEdit: true,
+                        initialTitle: title,
+                        initialPrice: price,
+                        initialLocation: location,
+                        initialDescription: description,
+                        // UPI and owner name will be provided later
+                        // when backend data is available.
+                        initialUpi: null,
+                        initialOwnerName: representativeName,
+                      ),
+                    ),
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A2E35),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                ),
+                child: Text(
+                  'Request Edit',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,

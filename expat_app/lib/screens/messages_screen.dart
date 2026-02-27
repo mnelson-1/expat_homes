@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'agent_profile_screen.dart';
 import 'landlord_home_screen.dart';
+import 'listing_detail_screen.dart';
 
 /// Empty-state view for the Messages tab.
 ///
@@ -424,98 +425,132 @@ class _ConversationScreenState extends State<ConversationScreen> {
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 240),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                color: const Color(0xFF8ED966),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Center(
-                  child: Text(
-                    widget.listingTitle,
-                    style: textTheme.titleSmall?.copyWith(
-                      color: const Color(0xFF1A2E35),
-                      fontWeight: FontWeight.w600,
+        child: InkWell(
+          onTap: () => _onListingCardTap(context),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  color: const Color(0xFF8ED966),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Center(
+                    child: Text(
+                      widget.listingTitle,
+                      style: textTheme.titleSmall?.copyWith(
+                        color: const Color(0xFF1A2E35),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-              AspectRatio(
-                aspectRatio: 4 / 3,
-                child: Image.asset(
-                  widget.imagePath,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      Container(color: Colors.grey.shade300),
+                AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: Image.asset(
+                    widget.imagePath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: Colors.grey.shade300),
+                  ),
                 ),
-              ),
-              Container(
-                color: const Color(0xFF1A2E35),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.price,
-                            style: textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                Container(
+                  color: const Color(0xFF1A2E35),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.price,
+                              style: textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            widget.location,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withOpacity(0.9),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.location,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: Colors.white.withOpacity(0.9),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).pop(); // back to detail screen
-                      },
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFFD54F),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.arrow_outward,
-                          size: 18,
-                          color: Color(0xFF1A2E35),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _onListingCardTap(context),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFFD54F),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.arrow_outward,
+                            size: 18,
+                            color: Color(0xFF1A2E35),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _onListingCardTap(BuildContext context) {
+    // When initialMessage is present, this is the landlord flow.
+    // Navigate to the detailed listing view; in the Expat flow,
+    // keep the existing pop-to-detail behaviour.
+    if (widget.initialMessage == null) {
+      // Expat: conversation was opened from a detail page.
+      Navigator.of(context).pop();
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ListingDetailScreen(
+          title: widget.listingTitle,
+          location: widget.location,
+          price: widget.price,
+          typeLabel: 'Apartment',
+          imagePaths: [widget.imagePath],
+          description:
+              'Detailed information about this listing will appear here once connected to the backend.',
+          upi: 'RHA Land UPI (placeholder)',
+          isVerifiedByRdb: true,
+          representativeName: widget.contactName,
+          showRequestEditOnly: true,
         ),
       ),
     );

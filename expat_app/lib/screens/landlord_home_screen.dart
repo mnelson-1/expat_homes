@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'agent_profile_screen.dart';
+import 'landlord_estates_screen.dart';
+import 'landlord_make_listing_screen.dart';
+import 'landlord_payments_screen.dart';
 import 'messages_screen.dart';
 
 /// Landlord home screen – landing view after signup/login.
@@ -81,12 +84,16 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
       body: Column(
         children: [
           _buildHeader(textTheme),
-          _buildSearchSection(textTheme),
+          if (_selectedBottomIndex == 0) _buildSearchSection(textTheme),
           Expanded(
             child: _buildBodyForIndex(textTheme),
           ),
         ],
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
+      floatingActionButton: _selectedBottomIndex == 1
+          ? _buildMakeListingButton(context, textTheme)
+          : null,
       bottomNavigationBar: _buildBottomNav(textTheme),
     );
   }
@@ -219,29 +226,15 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     }
 
     if (_selectedBottomIndex == 1) {
-      return Center(
-        child: Text(
-          'Landlord Estates view will live here.',
-          style: textTheme.bodyMedium?.copyWith(
-            color: _LandlordHomeColors.helper,
-          ),
-        ),
-      );
+      return const LandlordEstatesScreen();
     }
 
     if (_selectedBottomIndex == 2) {
       return const MessagesScreen();
     }
 
-    // Payments tab placeholder.
-    return Center(
-      child: Text(
-        'Payments will live here.',
-        style: textTheme.bodyMedium?.copyWith(
-          color: _LandlordHomeColors.helper,
-        ),
-      ),
-    );
+    // Payments tab.
+    return const LandlordPaymentsScreen();
   }
 
   Widget _buildBottomNav(TextTheme textTheme) {
@@ -334,6 +327,66 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
       ),
     );
   }
+}
+
+Widget _buildMakeListingButton(BuildContext context, TextTheme textTheme) {
+  const bodyText = _LandlordHomeColors.bodyText;
+  const accentGreen = _LandlordHomeColors.accentGreen;
+  final width = MediaQuery.of(context).size.width;
+
+  // Match the position of the Expat "Share your experience" button:
+  // slightly raised above the bottom navigation bar, end-docked.
+  return Transform.translate(
+    offset: const Offset(0, -48),
+    child: SizedBox(
+      height: 56,
+      width: width * 0.45,
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const LandlordMakeListingScreen(),
+            ),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: accentGreen,
+          foregroundColor: bodyText,
+          elevation: 6,
+          side: const BorderSide(
+            color: Colors.black,
+            width: 2,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(32),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                'Make a Listing',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleMedium?.copyWith(
+                  color: bodyText,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.add,
+              size: 26,
+              color: bodyText,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _AgentSummary {

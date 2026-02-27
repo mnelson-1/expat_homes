@@ -781,6 +781,9 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
               typeLabel: typeLabel,
               imagePaths: [estate.imagePath],
               description: estate.description,
+              // Placeholder UPI for Expat workflow; real UPI
+              // will only be shown to landlords/agents later.
+              upi: 'RHA Land UPI (placeholder)',
             ),
           ),
         );
