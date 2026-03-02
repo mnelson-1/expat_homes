@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'agent_assigned_listings_screen.dart';
+import 'agent_bio_view_screen.dart';
 import 'agent_payments_screen.dart';
 import 'agent_profile_screen.dart';
 import 'messages_screen.dart';
@@ -91,22 +92,16 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
 
   Widget _buildBody(TextTheme textTheme) {
     if (_selectedBottomIndex == 0) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Text(
-            'Bio-View: Your profile and documents (placeholder).',
-            textAlign: TextAlign.center,
-            style: textTheme.bodyMedium?.copyWith(color: const Color(0xFF1A2E35)),
-          ),
-        ),
-      );
+      return const AgentBioViewScreen();
     }
     if (_selectedBottomIndex == 1) {
       return const AgentAssignedListingsScreen();
     }
     if (_selectedBottomIndex == 2) {
-      return const MessagesScreen();
+      return const MessagesScreen(
+        emptyStateMessage:
+            'You have no messages yet. Either no Landlord has assigned you a Listing, or no Expat has made inquiries.',
+      );
     }
     // Payments tab
     return const AgentPaymentsScreen();

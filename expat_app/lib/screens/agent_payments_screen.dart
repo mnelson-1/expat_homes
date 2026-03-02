@@ -45,6 +45,14 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
 
+  static const List<BoxShadow> _headerShadow = [
+    BoxShadow(
+      color: Color(0x33000000),
+      offset: Offset(0, 6),
+      blurRadius: 10,
+    ),
+  ];
+
   final TextEditingController _commissionIdController = TextEditingController();
   final TextEditingController _landlordNameController = TextEditingController();
   final TextEditingController _estateNameController = TextEditingController();
@@ -81,13 +89,6 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     ),
   ];
 
-  static const List<BoxShadow> _headerShadow = [
-    BoxShadow(
-      color: Color(0x33000000),
-      offset: Offset(0, 6),
-      blurRadius: 10,
-    ),
-  ];
 
   @override
   void initState() {
@@ -294,6 +295,13 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: const Color(0xFFE0E0E0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                offset: Offset(0, 4),
+                blurRadius: 8,
+              ),
+            ],
           ),
           padding: const EdgeInsets.all(16),
           child: Column(

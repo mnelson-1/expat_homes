@@ -57,6 +57,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
     ),
   ];
 
+
   final TextEditingController _commissionIdController = TextEditingController();
   final TextEditingController _agentNameController = TextEditingController();
   final TextEditingController _agentIdController = TextEditingController();
@@ -299,6 +300,13 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: const Color(0xFFE0E0E0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                offset: Offset(0, 4),
+                blurRadius: 8,
+              ),
+            ],
           ),
           padding: const EdgeInsets.all(16),
           child: Column(

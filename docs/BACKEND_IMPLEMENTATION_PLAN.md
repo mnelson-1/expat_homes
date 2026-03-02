@@ -432,6 +432,42 @@ Agents create **commission slips** and later **confirm** when landlords have pai
 
 *(Further Agent workflow sections — inbox, deeper reporting, reconciliation — to be added as screens and flows are designed.)*
 
+### 3.4 Agent Bio-View, profile & reviews
+
+The Agent **Bio-View** page (and related edit screens) expose the agent’s public profile to landlords and expats: profile picture, name / ID, bio, phone number, rating, and reviews.
+
+| Term / Concept | Definition |
+|----------------|------------|
+| **Agent profile** | Canonical record of the agent’s identity and contact info (name, institution-issued ID, phone number, bio, languages, etc.). Used by both the internal Agent profile screen and the public Bio-View. |
+| **Profile picture** | Single avatar image for the agent. Shown in the app header, chat avatars, Bio-View, and anywhere the agent is represented. Changing it in one place updates everywhere. |
+| **Bio** | Short free-text description the agent writes about themselves (languages, experience, commission rates, etc.). Editable from the Bio-View edit screens. |
+| **Phone for payments** | Phone number used when creating commission slips and receiving payments (e.g. MTN Momo). Comes from the agent profile and is editable from the Bio-View. |
+| **Reviews** | List of reviews left by expats/landlords about the agent, including rating, title, text, and timestamp. Shown as a highlight card on Bio-View and as a vertical list on the “Your Reviews” page. |
+
+**Backend scope**
+
+- **Profile read/write**  \\
+  - Provide APIs for fetching and updating the agent’s profile (`GET /agent/profile`, `PUT /agent/profile`).  \\
+  - Fields include: profile image URL, first/last name, agent_id, bio, phone number for payments, languages, etc.  \\
+  - Changes made via the Bio-View edit screens (name, bio, phone) should **persist** to this profile and be reflected anywhere the agent appears (e.g. chat header, profile cards).
+- **Profile image storage**  \\
+  - Store a single profile image per agent (e.g. in object storage with URL in the profile record).  \\
+  - Changing the image in the app updates this URL; all consumers (Bio-View, chat avatars, listings where the agent is shown) use the same source.
+- **Reviews**  \\
+  - Expose an endpoint like `GET /agent/reviews` to return paginated reviews for the current agent (for Bio-View carousel and “Your Reviews” page).  \\
+  - Each review contains: rating (1–5), title, body text, author (optional for display), time_ago/created_at.  \\
+  - “Tap to Rate” in the profile should eventually post a new review (`POST /agent/reviews`) and update the agent’s aggregate rating.
+- **Rating aggregates**  \\
+  - Agent profile stores aggregate `rating` and `rating_count`; these are derived from the `agent_reviews` table (or equivalent) and displayed in both Bio-View and Agent profile header.
+
+**Database / storage directives**
+
+- **Table: `agent_profiles`** (or extend `users`)  \\
+  Fields: `user_id`, `agent_id` (FK to `licensed_agents`), `first_name`, `last_name`, `profile_image_url`, `bio`, `phone_for_payments`, `languages`, `rating`, `rating_count`, `created_at`, `updated_at`.
+- **Table: `agent_reviews`**  \\
+  Fields: `id`, `agent_id` (FK), `author_user_id` (FK, optional), `rating` (1–5), `title`, `body`, `created_at`. Used to compute `rating` and `rating_count` and populate Bio-View / “Your Reviews”.
+
+
 ---
 
 ## 4. Super Admin — Verification & Regulation of Listings

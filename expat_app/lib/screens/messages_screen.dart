@@ -90,6 +90,15 @@ void addOrUpdateChatThreadForAgentLandlordChat({
   required String imagePath,
   String lastMessage = 'Chat with landlord about this listing.',
 }) {
+  // If a thread with this landlord + listing already exists, do not
+  // override the lastMessage (it may be the landlord's assignment text).
+  final existingIndex = _chatThreads.indexWhere(
+    (t) => t.contactName == contactName && t.listingTitle == listingTitle,
+  );
+  if (existingIndex >= 0) {
+    return;
+  }
+
   addOrUpdateChatThread(
     _ChatThread(
       contactName: contactName,
@@ -102,6 +111,22 @@ void addOrUpdateChatThreadForAgentLandlordChat({
       imagePath: imagePath,
     ),
   );
+}
+
+/// Returns the last message text for a given landlord/listing thread,
+/// or null if no such thread exists.
+String? getLastMessageForAgentLandlordChat({
+  required String contactName,
+  required String listingTitle,
+}) {
+  for (final thread in _chatThreads) {
+    if (thread.contactName == contactName &&
+        thread.listingTitle == listingTitle &&
+        thread.contactSubtitle == 'Landlord') {
+      return thread.lastMessage;
+    }
+  }
+  return null;
 }
 
 /// Call when an Expat inquires on a listing so the conversation appears
@@ -131,7 +156,12 @@ void addOrUpdateChatThreadForExpatInquiry({
 }
 
 class MessagesScreen extends StatefulWidget {
-  const MessagesScreen({super.key});
+  const MessagesScreen({
+    super.key,
+    this.emptyStateMessage,
+  });
+
+  final String? emptyStateMessage;
 
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
@@ -206,7 +236,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     const SizedBox(height: 200),
                     Center(
                       child: Text(
-                        'You have no messages yet. Make enquiries\non listings and watch the magic happen.',
+                        widget.emptyStateMessage ??
+                            'You have no messages yet. Make enquiries\non listings and watch the magic happen.',
                         textAlign: TextAlign.center,
                         style: textTheme.bodySmall?.copyWith(
                           color: const Color(0xFF9CA5A8),
@@ -280,7 +311,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'You: ${thread.lastMessage}',
+                    thread.lastMessage,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.bodySmall?.copyWith(
@@ -351,6 +382,7 @@ class ConversationScreen extends StatefulWidget {
     this.contactSubtitle = 'Agent of Elizabeth G. Apartments',
     this.initialMessage,
     this.returnToLandlordOnBack = false,
+    this.showInitialAsIncoming = false,
   });
 
   final String listingTitle;
@@ -363,6 +395,9 @@ class ConversationScreen extends StatefulWidget {
   /// When true (Landlord flow), back button goes to Landlord home Messages tab.
   /// When false (Expat flow), back button pops to previous screen.
   final bool returnToLandlordOnBack;
+  /// When true, the [initialMessage] is rendered as an incoming (green) bubble
+  /// instead of an outgoing (blue) one.
+  final bool showInitialAsIncoming;
 
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
@@ -387,12 +422,20 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 _buildDateAndEncryption(textTheme),
                 const SizedBox(height: 24),
                 _buildListingCard(context, textTheme),
-                const SizedBox(height: 12),
-                _buildOutgoingBubble(
-                  textTheme,
-                  widget.initialMessage ??
-                      'Hey there! I would like to get more\ninformation on this Listing.',
-                ),
+                if (widget.initialMessage != null) ...[
+                  const SizedBox(height: 12),
+                  widget.showInitialAsIncoming
+                      ? _buildIncomingBubble(
+                          textTheme,
+                          widget.initialMessage ??
+                              'Hey there! I would like to get more\ninformation on this Listing.',
+                        )
+                      : _buildOutgoingBubble(
+                          textTheme,
+                          widget.initialMessage ??
+                              'Hey there! I would like to get more\ninformation on this Listing.',
+                        ),
+                ],
               ],
             ),
           ),
@@ -654,6 +697,26 @@ class _ConversationScreenState extends State<ConversationScreen> {
           text,
           style: textTheme.bodyMedium?.copyWith(
             color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIncomingBubble(TextTheme textTheme, String text) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 280),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF8ED966),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Text(
+          text,
+          style: textTheme.bodyMedium?.copyWith(
+            color: const Color(0xFF1A2E35),
           ),
         ),
       ),

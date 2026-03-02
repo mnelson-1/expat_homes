@@ -387,6 +387,7 @@ class _LandlordAssignPropertyScreenState
                             contactSubtitle: widget.agentId,
                             initialMessage: message,
                             returnToLandlordOnBack: true,
+                            showInitialAsIncoming: false,
                           ),
                         ),
                       );

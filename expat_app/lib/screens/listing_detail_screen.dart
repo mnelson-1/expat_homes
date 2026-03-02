@@ -525,6 +525,11 @@ class ListingDetailScreen extends StatelessWidget {
                             ? imagePaths.first
                             : '',
                       );
+                      final initialMessage =
+                          getLastMessageForAgentLandlordChat(
+                        contactName: contactName,
+                        listingTitle: title,
+                      );
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => ConversationScreen(
@@ -536,7 +541,8 @@ class ListingDetailScreen extends StatelessWidget {
                                 : '',
                             contactName: contactName,
                             contactSubtitle: 'Landlord',
-                            initialMessage: null,
+                            initialMessage: initialMessage,
+                            showInitialAsIncoming: true,
                             returnToLandlordOnBack: false,
                           ),
                         ),

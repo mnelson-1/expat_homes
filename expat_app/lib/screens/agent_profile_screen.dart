@@ -346,7 +346,7 @@ class AgentProfileScreen extends StatelessWidget {
               Text(
                 r.timeAgo,
                 style: textTheme.bodySmall?.copyWith(
-                  color: _hint,
+                  color: const Color(0xFF1A2E35),
                 ),
               ),
             ],

@@ -1054,7 +1054,7 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
                     Text(
                       comment.timeAgo,
                       style: textTheme.bodySmall?.copyWith(
-                        color: _ExpatHomeColors.helper,
+                        color: const Color(0xFF1A2E35),
                       ),
                     ),
                   ],
