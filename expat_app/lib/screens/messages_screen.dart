@@ -4,6 +4,17 @@ import 'agent_profile_screen.dart';
 import 'landlord_home_screen.dart';
 import 'listing_detail_screen.dart';
 
+/// Normalizes price string for display: "/per month" -> "/mo", "/per night" -> "/night".
+String _normalizePriceForDisplay(String price) {
+  if (!price.contains('/')) return price;
+  final parts = price.split('/');
+  final amount = parts[0];
+  final suffix = parts.length > 1 ? parts[1].trim().toLowerCase() : '';
+  if (suffix == 'per month') return '$amount/mo';
+  if (suffix == 'per night') return '$amount/night';
+  return price;
+}
+
 /// Empty-state view for the Messages tab.
 ///
 /// When messages are populated and the list becomes scrollable,
@@ -32,6 +43,8 @@ class _ChatThread {
 }
 
 final List<_ChatThread> _chatThreads = [];
+final ValueNotifier<List<_ChatThread>> chatThreadsNotifier =
+    ValueNotifier<List<_ChatThread>>([]);
 
 void addOrUpdateChatThread(_ChatThread thread) {
   final index = _chatThreads.indexWhere((t) =>
@@ -42,6 +55,7 @@ void addOrUpdateChatThread(_ChatThread thread) {
   } else {
     _chatThreads.add(thread);
   }
+  chatThreadsNotifier.value = List.from(_chatThreads);
 }
 
 void addOrUpdateChatThreadForAgent({
@@ -58,6 +72,55 @@ void addOrUpdateChatThreadForAgent({
       contactName: agentName,
       contactSubtitle: agentId,
       lastMessage: message,
+      lastUpdated: DateTime.now(),
+      listingTitle: listingTitle,
+      location: location,
+      price: price,
+      imagePath: imagePath,
+    ),
+  );
+}
+
+/// Call when an Agent taps "Chat Landlord" so the conversation appears in the Messages tab.
+void addOrUpdateChatThreadForAgentLandlordChat({
+  required String contactName,
+  required String listingTitle,
+  required String location,
+  required String price,
+  required String imagePath,
+  String lastMessage = 'Chat with landlord about this listing.',
+}) {
+  addOrUpdateChatThread(
+    _ChatThread(
+      contactName: contactName,
+      contactSubtitle: 'Landlord',
+      lastMessage: lastMessage,
+      lastUpdated: DateTime.now(),
+      listingTitle: listingTitle,
+      location: location,
+      price: price,
+      imagePath: imagePath,
+    ),
+  );
+}
+
+/// Call when an Expat inquires on a listing so the conversation appears
+/// in the Messages tab with timestamp and preview (parity with Landlord).
+void addOrUpdateChatThreadForExpatInquiry({
+  required String contactName,
+  required String contactSubtitle,
+  required String listingTitle,
+  required String location,
+  required String price,
+  required String imagePath,
+  String lastMessage =
+      'Hey there! I would like to get more\ninformation on this Listing.',
+}) {
+  addOrUpdateChatThread(
+    _ChatThread(
+      contactName: contactName,
+      contactSubtitle: contactSubtitle,
+      lastMessage: lastMessage,
       lastUpdated: DateTime.now(),
       listingTitle: listingTitle,
       location: location,
@@ -132,8 +195,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
         ),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
         Expanded(
-          child: _chatThreads.isEmpty
-              ? ListView(
+          child: ValueListenableBuilder<List<_ChatThread>>(
+            valueListenable: chatThreadsNotifier,
+            builder: (context, threads, _) {
+              if (threads.isEmpty) {
+                return ListView(
                   controller: _scrollController,
                   padding: const EdgeInsets.only(bottom: 56),
                   children: [
@@ -148,16 +214,19 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       ),
                     ),
                   ],
-                )
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(bottom: 56),
-                  itemCount: _chatThreads.length,
-                  itemBuilder: (context, index) {
-                    final thread = _chatThreads[index];
-                    return _buildThreadRow(context, textTheme, thread);
-                  },
-                ),
+                );
+              }
+              return ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.only(bottom: 56),
+                itemCount: threads.length,
+                itemBuilder: (context, index) {
+                  final thread = threads[index];
+                  return _buildThreadRow(context, textTheme, thread);
+                },
+              );
+            },
+          ),
         ),
       ],
     );
@@ -170,7 +239,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   ) {
     final now = DateTime.now();
     final diff = now.difference(thread.lastUpdated);
-    final timeLabel = diff.inMinutes == 0 ? 'now' : _formatTime(thread.lastUpdated);
+    final timeLabel = _formatThreadTime(thread.lastUpdated, now, diff);
 
     return InkWell(
       onTap: () {
@@ -254,7 +323,23 @@ String _formatTime(DateTime dt) {
   return '$hh:$mm';
 }
 
-/// Conversation thread screen opened after tapping "Inquire".
+/// Timestamp for the Messages tab thread list: "now", "Today", "Yesterday", or time.
+String _formatThreadTime(DateTime then, DateTime now, Duration diff) {
+  if (diff.inMinutes < 1) return 'now';
+  final sameDay = then.year == now.year &&
+      then.month == now.month &&
+      then.day == now.day;
+  if (sameDay) return _formatTime(then);
+  final yesterday = now.subtract(const Duration(days: 1));
+  final isYesterday = then.year == yesterday.year &&
+      then.month == yesterday.month &&
+      then.day == yesterday.day;
+  if (isYesterday) return 'Yesterday';
+  return _formatTime(then);
+}
+
+/// Conversation thread screen opened after tapping "Inquire" (Expat) or
+/// after assigning a property (Landlord).
 class ConversationScreen extends StatefulWidget {
   const ConversationScreen({
     super.key,
@@ -265,6 +350,7 @@ class ConversationScreen extends StatefulWidget {
     this.contactName = 'Jean Claude',
     this.contactSubtitle = 'Agent of Elizabeth G. Apartments',
     this.initialMessage,
+    this.returnToLandlordOnBack = false,
   });
 
   final String listingTitle;
@@ -274,6 +360,9 @@ class ConversationScreen extends StatefulWidget {
   final String contactName;
   final String contactSubtitle;
   final String? initialMessage;
+  /// When true (Landlord flow), back button goes to Landlord home Messages tab.
+  /// When false (Expat flow), back button pops to previous screen.
+  final bool returnToLandlordOnBack;
 
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
@@ -327,7 +416,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               icon: const Icon(Icons.arrow_back_ios_new,
                   color: Colors.white, size: 18),
               onPressed: () {
-                if (widget.initialMessage != null) {
+                if (widget.returnToLandlordOnBack) {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute<void>(
                       builder: (_) => const LandlordHomeScreen(
@@ -483,7 +572,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              widget.price,
+                              _normalizePriceForDisplay(widget.price),
                               style: textTheme.titleMedium?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -528,29 +617,24 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   void _onListingCardTap(BuildContext context) {
-    // When initialMessage is present, this is the landlord flow.
-    // Navigate to the detailed listing view; in the Expat flow,
-    // keep the existing pop-to-detail behaviour.
-    if (widget.initialMessage == null) {
-      // Expat: conversation was opened from a detail page.
-      Navigator.of(context).pop();
-      return;
-    }
+    // Expat: open the listing detail with Get a Ride, Explore Area, Inquire (no Request Edit).
+    // Landlord: open the listing detail with Request Edit.
+    final isLandlordFlow = widget.returnToLandlordOnBack;
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ListingDetailScreen(
           title: widget.listingTitle,
           location: widget.location,
-          price: widget.price,
+          price: _normalizePriceForDisplay(widget.price),
           typeLabel: 'Apartment',
-          imagePaths: [widget.imagePath],
+          imagePaths: widget.imagePath.isNotEmpty ? [widget.imagePath] : [],
           description:
               'Detailed information about this listing will appear here once connected to the backend.',
-          upi: 'RHA Land UPI (placeholder)',
+          upi: isLandlordFlow ? null : 'RHA Land UPI (placeholder)',
           isVerifiedByRdb: true,
           representativeName: widget.contactName,
-          showRequestEditOnly: true,
+          showRequestEditOnly: isLandlordFlow,
         ),
       ),
     );

@@ -77,18 +77,29 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget _buildHeader(TextTheme textTheme) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 56, 24, 24),
+      padding: const EdgeInsets.fromLTRB(8, 56, 24, 24),
       color: _SignInColors.primaryDark,
       child: SafeArea(
         bottom: false,
-        child: Text(
-          'Sign In',
-          style: textTheme.headlineMedium?.copyWith(
-            color: Colors.white,
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-          ),
-          textAlign: TextAlign.center,
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            Expanded(
+              child: Text(
+                'Sign In',
+                style: textTheme.headlineMedium?.copyWith(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(width: 48),
+          ],
         ),
       ),
     );

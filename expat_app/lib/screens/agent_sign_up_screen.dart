@@ -1,5 +1,29 @@
 import 'package:flutter/material.dart';
 
+import 'agent_home_screen.dart';
+
+/// Seed data: agents issued by RWAREB (or app's copy of that database).
+/// In production the backend will validate against the institution's data.
+class _SeedAgent {
+  const _SeedAgent({
+    required this.agentId,
+    required this.firstName,
+    required this.lastName,
+  });
+  final String agentId;
+  final String firstName;
+  final String lastName;
+}
+
+const List<_SeedAgent> _seedAgents = [
+  _SeedAgent(agentId: 'KM-201903', firstName: 'Jean', lastName: 'Claude'),
+  _SeedAgent(agentId: 'KM-202005', firstName: 'Eric', lastName: 'Niyonsenga'),
+  _SeedAgent(agentId: 'KM-201940', firstName: 'Jean', lastName: 'Claude'),
+  _SeedAgent(agentId: 'RM-204112', firstName: 'Aline', lastName: 'Uwase'),
+  _SeedAgent(agentId: 'KG-198745', firstName: 'Eric', lastName: 'Niyonzima'),
+  _SeedAgent(agentId: 'KG-205678', firstName: 'Linda', lastName: 'Mukamana'),
+];
+
 /// Palette for Agent signup (mirrors Expat / Landlord signup).
 class _AgentSignUpColors {
   static const Color primaryDark = Color(0xFF1A2E35);
@@ -9,6 +33,7 @@ class _AgentSignUpColors {
   static const Color helper = Color(0xFF9CA5A8);
   static const Color bodyText = Color(0xFF1A2E35);
   static const Color link = Color(0xFF157A88);
+  static const Color invalidRed = Color(0xFFC62828);
 
   static const double fieldFontSize = 14;
   static const double helperFontSize = 12;
@@ -29,9 +54,24 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   final _agentIdController = TextEditingController();
   String _selectedLanguage = 'English';
+  /// null = default message, 'valid' = Valid ID, 'invalid' = Invalid ID
+  String? _idValidationStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _agentIdController.addListener(_onAgentIdChanged);
+    _passwordController.addListener(_onFormChanged);
+    _confirmPasswordController.addListener(_onFormChanged);
+  }
+
+  void _onFormChanged() => setState(() {});
 
   @override
   void dispose() {
+    _agentIdController.removeListener(_onAgentIdChanged);
+    _passwordController.removeListener(_onFormChanged);
+    _confirmPasswordController.removeListener(_onFormChanged);
     _firstNameController.dispose();
     _lastNameController.dispose();
     _passwordController.dispose();
@@ -46,6 +86,40 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
     'French',
     'Swahili',
   ];
+
+  void _onAgentIdChanged() {
+    final id = _agentIdController.text.trim();
+    if (id.isEmpty) {
+      setState(() {
+        _idValidationStatus = null;
+        _firstNameController.text = '';
+        _lastNameController.text = '';
+      });
+      return;
+    }
+    _SeedAgent? agent;
+    for (final a in _seedAgents) {
+      if (a.agentId.toUpperCase() == id.toUpperCase()) {
+        agent = a;
+        break;
+      }
+    }
+    if (agent == null) {
+      setState(() {
+        _idValidationStatus = 'invalid';
+        _firstNameController.text = '';
+        _lastNameController.text = '';
+      });
+      return;
+    }
+    final first = agent.firstName;
+    final last = agent.lastName;
+    setState(() {
+      _idValidationStatus = 'valid';
+      _firstNameController.text = first;
+      _lastNameController.text = last;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +137,25 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 24),
+                  _buildSectionLabel(textTheme, 'Agent-ID Number'),
+                  const SizedBox(height: 8),
+                  _buildSingleField(
+                    context,
+                    controller: _agentIdController,
+                    hint: 'Agent-ID Number',
+                  ),
+                  const SizedBox(height: 4),
+                  _buildAgentIdHelper(textTheme),
+                  const SizedBox(height: 20),
+                  _buildSectionLabel(textTheme, 'Preferred language'),
+                  const SizedBox(height: 8),
+                  _buildLanguageDropdown(),
+                  const SizedBox(height: 4),
+                  _buildHelper(
+                    textTheme,
+                    "We'll use this to personalise your experience and translate messages.",
+                  ),
+                  const SizedBox(height: 20),
                   _buildSectionLabel(textTheme, 'Legal name'),
                   const SizedBox(height: 8),
                   _buildStackedFields(
@@ -75,29 +168,7 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
                   const SizedBox(height: 4),
                   _buildHelper(
                     textTheme,
-                    'Make sure this matches the name on your Broker ID.',
-                  ),
-                  const SizedBox(height: 20),
-                  _buildSectionLabel(textTheme, 'Preferred language'),
-                  const SizedBox(height: 8),
-                  _buildLanguageDropdown(),
-                  const SizedBox(height: 4),
-                  _buildHelper(
-                    textTheme,
-                    "We'll use this to personalise your experience and translate messages.",
-                  ),
-                  const SizedBox(height: 20),
-                  _buildSectionLabel(textTheme, 'Agent-ID Number'),
-                  const SizedBox(height: 8),
-                  _buildSingleField(
-                    context,
-                    controller: _agentIdController,
-                    hint: 'Agent-ID Number',
-                  ),
-                  const SizedBox(height: 4),
-                  _buildHelper(
-                    textTheme,
-                    'You must have been issued a Real Estate Broker ID by the RWAREB first.',
+                    'Pulled from RWAREB Database',
                   ),
                   const SizedBox(height: 20),
                   _buildSectionLabel(textTheme, 'Create your password'),
@@ -110,6 +181,8 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
                     secondController: _confirmPasswordController,
                     obscureText: true,
                   ),
+                  const SizedBox(height: 4),
+                  _buildPasswordFeedback(textTheme),
                   const SizedBox(height: 24),
                   _buildTermsText(textTheme),
                   const SizedBox(height: 28),
@@ -127,18 +200,29 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
   Widget _buildHeader(TextTheme textTheme) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 56, 24, 24),
+      padding: const EdgeInsets.fromLTRB(8, 56, 24, 24),
       color: _AgentSignUpColors.primaryDark,
       child: SafeArea(
         bottom: false,
-        child: Text(
-          'Verification',
-          style: textTheme.headlineMedium?.copyWith(
-            color: Colors.white,
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-          ),
-          textAlign: TextAlign.center,
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            Expanded(
+              child: Text(
+                'Verification',
+                style: textTheme.headlineMedium?.copyWith(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(width: 48),
+          ],
         ),
       ),
     );
@@ -159,6 +243,66 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
       text,
       style: textTheme.bodySmall?.copyWith(
         color: _AgentSignUpColors.helper,
+        fontSize: _AgentSignUpColors.helperFontSize,
+      ),
+    );
+  }
+
+  String get _agentIdHelperText {
+    if (_idValidationStatus == 'valid') return 'Valid ID';
+    if (_idValidationStatus == 'invalid') return 'Invalid ID';
+    return 'You must have been issued a Real Estate Broker ID by the RWAREB first.';
+  }
+
+  Color get _agentIdHelperColor {
+    if (_idValidationStatus == 'valid') return _AgentSignUpColors.accentGreen;
+    if (_idValidationStatus == 'invalid') return _AgentSignUpColors.invalidRed;
+    return _AgentSignUpColors.helper;
+  }
+
+  /// Strong = 8+ chars and mix of letters and digits. Backend can enforce a stricter regex (e.g. upper + lower + digit + symbol).
+  static bool _isStrongPassword(String s) {
+    if (s.length < 8) return false;
+    return RegExp(r'[a-zA-Z]').hasMatch(s) && RegExp(r'[0-9]').hasMatch(s);
+  }
+
+  Widget _buildAgentIdHelper(TextTheme textTheme) {
+    return Text(
+      _agentIdHelperText,
+      style: textTheme.bodySmall?.copyWith(
+        color: _agentIdHelperColor,
+        fontSize: _AgentSignUpColors.helperFontSize,
+      ),
+    );
+  }
+
+  /// Password feedback: only visible once the user has started typing.
+  /// Strength uses length + mix of letters and digits; backend can enforce a stricter regex.
+  Widget _buildPasswordFeedback(TextTheme textTheme) {
+    final password = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
+    final hasTyped = password.isNotEmpty || confirm.isNotEmpty;
+    if (!hasTyped) return const SizedBox.shrink();
+
+    String message = 'Use 8+ characters with letters and numbers';
+    Color color = _AgentSignUpColors.helper;
+    if (confirm.isNotEmpty && password != confirm) {
+      message = 'Passwords do not match';
+      color = _AgentSignUpColors.invalidRed;
+    } else if (password.isNotEmpty && !_isStrongPassword(password)) {
+      message = 'Weak password';
+      color = _AgentSignUpColors.invalidRed;
+    } else if (_isStrongPassword(password) && password == confirm) {
+      message = 'Passwords match';
+      color = _AgentSignUpColors.accentGreen;
+    } else if (_isStrongPassword(password)) {
+      message = 'Strong password';
+      color = _AgentSignUpColors.accentGreen;
+    }
+    return Text(
+      message,
+      style: textTheme.bodySmall?.copyWith(
+        color: color,
         fontSize: _AgentSignUpColors.helperFontSize,
       ),
     );
@@ -347,12 +491,23 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
   }
 
   Widget _buildSignUpButton(TextTheme textTheme) {
+    // TODO: Re-enable when backend is ready. For testing, Sign Up is always enabled.
+    // final canSignUp = _idValidationStatus == 'valid' &&
+    //     _passwordController.text.isNotEmpty &&
+    //     _passwordController.text == _confirmPasswordController.text;
     return FilledButton(
-      onPressed: () {},
+      onPressed: () {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (_) => const AgentHomeScreen(initialIndex: 1),
+          ),
+        );
+      },
       style: FilledButton.styleFrom(
         backgroundColor: _AgentSignUpColors.accentGreen,
-        foregroundColor: _AgentSignUpColors.primaryDark,
+        foregroundColor: _AgentSignUpColors.bodyText,
         padding: const EdgeInsets.symmetric(vertical: 16),
+        elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
@@ -360,7 +515,7 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
       child: Text(
         'Sign Up',
         style: textTheme.titleMedium?.copyWith(
-          color: _AgentSignUpColors.primaryDark,
+          color: _AgentSignUpColors.bodyText,
           fontWeight: FontWeight.bold,
           fontSize: 17,
         ),

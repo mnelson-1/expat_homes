@@ -18,6 +18,10 @@ class ListingDetailScreen extends StatelessWidget {
     this.isVerifiedByRdb = true,
     this.representativeName,
     this.showRequestEditOnly = false,
+    this.showAgentActions = false,
+    this.listingId,
+    this.onListingAccepted,
+    this.onListingDeclined,
   });
 
   final String title;
@@ -33,6 +37,14 @@ class ListingDetailScreen extends StatelessWidget {
   final String? representativeName;
   /// When true (landlord view), bottom bar shows only a single "Request Edit" button.
   final bool showRequestEditOnly;
+  /// When true (agent view), bottom bar shows Decline, Accept, and Chat Landlord.
+  final bool showAgentActions;
+  /// When opening from agent Listings; used to notify when listing is accepted.
+  final String? listingId;
+  /// Called when agent taps Accept (so the listing can move to Accepted tab).
+  final void Function(String listingId)? onListingAccepted;
+  /// Called when agent taps Decline (so the listing is removed from Pending).
+  final void Function(String listingId)? onListingDeclined;
 
   // Tracks whether content has been scrolled to show a drop shadow above buttons.
   final ValueNotifier<bool> _showBottomShadow = ValueNotifier<bool>(false);
@@ -175,7 +187,20 @@ class ListingDetailScreen extends StatelessWidget {
     );
   }
 
+  /// Normalizes price suffix for display: "per month" -> "mo", "per night" -> "night".
+  static String _normalizePriceSuffix(String suffix) {
+    final s = suffix.trim().toLowerCase();
+    if (s == 'per month') return 'mo';
+    if (s == 'per night') return 'night';
+    return suffix;
+  }
+
   Widget _buildPriceAndType(TextTheme textTheme) {
+    final parts = price.split('/');
+    final amount = parts.isNotEmpty ? parts[0] : price;
+    final rawSuffix = parts.length > 1 ? parts[1] : '';
+    final suffix = rawSuffix.isEmpty ? '' : '/${_normalizePriceSuffix(rawSuffix)}';
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(
@@ -191,14 +216,14 @@ class ListingDetailScreen extends StatelessWidget {
                   ),
                   children: [
                     TextSpan(
-                      text: price.split('/').first,
+                      text: amount,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (price.contains('/'))
+                    if (suffix.isNotEmpty)
                       TextSpan(
-                        text: '/${price.split('/')[1]}',
+                        text: suffix,
                         style: textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFF1A2E35),
                           fontWeight: FontWeight.normal,
@@ -397,6 +422,150 @@ class ListingDetailScreen extends StatelessWidget {
       );
     }
 
+    if (showAgentActions) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: showShadow
+              ? const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    offset: Offset(0, -6),
+                    blurRadius: 12,
+                  ),
+                ]
+              : null,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          ListingDetailScreen.showListingDeclinedDialog(
+                            context,
+                            textTheme,
+                            () {
+                              if (listingId != null) {
+                                onListingDeclined?.call(listingId!);
+                              }
+                              Navigator.of(context).pop();
+                            },
+                          );
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFC62828),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                        ),
+                        child: Text(
+                          'Decline',
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          ListingDetailScreen.showListingAcceptedDialog(
+                            context,
+                            textTheme,
+                            () {
+                              if (listingId != null) {
+                                onListingAccepted?.call(listingId!);
+                              }
+                              Navigator.of(context).pop();
+                            },
+                          );
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF8ED966),
+                          foregroundColor: const Color(0xFF1A2E35),
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                        ),
+                        child: Text(
+                          'Accept',
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A2E35),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      final contactName = representativeName ?? 'Landlord';
+                      addOrUpdateChatThreadForAgentLandlordChat(
+                        contactName: contactName,
+                        listingTitle: title,
+                        location: location,
+                        price: price,
+                        imagePath: imagePaths.isNotEmpty
+                            ? imagePaths.first
+                            : '',
+                      );
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ConversationScreen(
+                            listingTitle: title,
+                            location: location,
+                            price: price,
+                            imagePath: imagePaths.isNotEmpty
+                                ? imagePaths.first
+                                : '',
+                            contactName: contactName,
+                            contactSubtitle: 'Landlord',
+                            initialMessage: null,
+                            returnToLandlordOnBack: false,
+                          ),
+                        ),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD54F),
+                      foregroundColor: const Color(0xFF1A2E35),
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                    ),
+                    child: Text(
+                      'Chat Landlord',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A2E35),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -466,8 +635,23 @@ class ListingDetailScreen extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () {
+                    const defaultInquiryMessage =
+                        'Hey there! I would like to get more\ninformation on this Listing.';
+                    final contactName = representativeName ?? 'Representative';
+                    final contactSubtitle = 'Representative';
+                    addOrUpdateChatThreadForExpatInquiry(
+                      contactName: contactName,
+                      contactSubtitle: contactSubtitle,
+                      listingTitle: title,
+                      location: location,
+                      price: price,
+                      imagePath: imagePaths.isNotEmpty
+                          ? imagePaths.first
+                          : '',
+                      lastMessage: defaultInquiryMessage,
+                    );
                     Navigator.of(context).push(
-                      MaterialPageRoute(
+                      MaterialPageRoute<void>(
                         builder: (_) => ConversationScreen(
                           listingTitle: title,
                           location: location,
@@ -475,6 +659,10 @@ class ListingDetailScreen extends StatelessWidget {
                           imagePath: imagePaths.isNotEmpty
                               ? imagePaths.first
                               : '',
+                          contactName: contactName,
+                          contactSubtitle: contactSubtitle,
+                          initialMessage: defaultInquiryMessage,
+                          returnToLandlordOnBack: false,
                         ),
                       ),
                     );
@@ -501,6 +689,160 @@ class ListingDetailScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  static const Color _agentAcceptGreen = Color(0xFF8ED966);
+  static const Color _agentDeclineRed = Color(0xFFC62828);
+  /// Body text blue used in Assignment Successful and other modals.
+  static const Color _agentDialogBodyBlue = Color(0xFF1A2E35);
+
+  /// Shows the "Listing Accepted" pop-up. [onClose] is called after the dialog
+  /// is dismissed (e.g. pass () => Navigator.pop(context) when opened from
+  /// listing detail so the detail is closed too).
+  static void showListingAcceptedDialog(
+    BuildContext context,
+    TextTheme textTheme, [
+    void Function()? onClose,
+  ]) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (dialogContext) {
+        return Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            decoration: BoxDecoration(
+              color: _agentAcceptGreen,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: _agentDialogBodyBlue,
+                      size: 22,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      onClose?.call();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Listing Accepted',
+                  style: textTheme.titleLarge?.copyWith(
+                    color: _agentDialogBodyBlue,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Any and all enquiries for this listing will be redirected to you.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: _agentDialogBodyBlue,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: const BoxDecoration(
+                    color: _agentDialogBodyBlue,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check, color: Colors.white, size: 32),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Shows the "Listing Declined" pop-up. [onClose] is called after the
+  /// dialog is dismissed.
+  static void showListingDeclinedDialog(
+    BuildContext context,
+    TextTheme textTheme, [
+    void Function()? onClose,
+  ]) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (dialogContext) {
+        return Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            decoration: BoxDecoration(
+              color: _agentDeclineRed,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      onClose?.call();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Listing Declined',
+                  style: textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Any and all other related Listings will be removed from your feed.',
+                  style: textTheme.bodyMedium?.copyWith(color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: const BoxDecoration(
+                    color: _agentDialogBodyBlue,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 32),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

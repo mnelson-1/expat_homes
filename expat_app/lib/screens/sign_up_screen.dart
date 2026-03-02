@@ -10,6 +10,7 @@ class _SignUpColors {
   static const Color helper = Color(0xFF9CA5A8);
   static const Color bodyText = Color(0xFF1A2E35);
   static const Color link = Color(0xFF157A88);
+  static const Color invalidRed = Color(0xFFC62828);
 
   static const double fieldFontSize = 14;
   static const double helperFontSize = 12;
@@ -31,8 +32,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
   DateTime? _dateOfBirth;
   String _country = 'Nigeria';
 
+  void _onPasswordFieldChanged() => setState(() {});
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_onPasswordFieldChanged);
+    _confirmPasswordController.addListener(_onPasswordFieldChanged);
+  }
+
   @override
   void dispose() {
+    _passwordController.removeListener(_onPasswordFieldChanged);
+    _confirmPasswordController.removeListener(_onPasswordFieldChanged);
     _firstNameController.dispose();
     _lastNameController.dispose();
     _passwordController.dispose();
@@ -101,6 +113,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     secondController: _confirmPasswordController,
                     obscureText: true,
                   ),
+                  const SizedBox(height: 4),
+                  _buildPasswordFeedback(textTheme),
                   const SizedBox(height: 20),
                   _buildSectionLabel(textTheme, 'Country of Citizenship'),
                   const SizedBox(height: 8),
@@ -136,18 +150,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget _buildHeader(TextTheme textTheme) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 56, 24, 24),
+      padding: const EdgeInsets.fromLTRB(8, 56, 24, 24),
       color: _SignUpColors.primaryDark,
       child: SafeArea(
         bottom: false,
-        child: Text(
-          'Few More Steps',
-          style: textTheme.headlineMedium?.copyWith(
-            color: Colors.white,
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-          ),
-          textAlign: TextAlign.center,
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            Expanded(
+              child: Text(
+                'Few More Steps',
+                style: textTheme.headlineMedium?.copyWith(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(width: 48),
+          ],
         ),
       ),
     );
@@ -168,6 +193,41 @@ class _SignUpScreenState extends State<SignUpScreen> {
       text,
       style: textTheme.bodySmall?.copyWith(
         color: _SignUpColors.helper,
+        fontSize: _SignUpColors.helperFontSize,
+      ),
+    );
+  }
+
+  static bool _isStrongPassword(String s) {
+    if (s.length < 8) return false;
+    return RegExp(r'[a-zA-Z]').hasMatch(s) && RegExp(r'[0-9]').hasMatch(s);
+  }
+
+  Widget _buildPasswordFeedback(TextTheme textTheme) {
+    final password = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
+    final hasTyped = password.isNotEmpty || confirm.isNotEmpty;
+    if (!hasTyped) return const SizedBox.shrink();
+
+    String message = 'Use 8+ characters with letters and numbers';
+    Color color = _SignUpColors.helper;
+    if (confirm.isNotEmpty && password != confirm) {
+      message = 'Passwords do not match';
+      color = _SignUpColors.invalidRed;
+    } else if (password.isNotEmpty && !_isStrongPassword(password)) {
+      message = 'Weak password';
+      color = _SignUpColors.invalidRed;
+    } else if (_isStrongPassword(password) && password == confirm) {
+      message = 'Passwords match';
+      color = _SignUpColors.accentGreen;
+    } else if (_isStrongPassword(password)) {
+      message = 'Strong password';
+      color = _SignUpColors.accentGreen;
+    }
+    return Text(
+      message,
+      style: textTheme.bodySmall?.copyWith(
+        color: color,
         fontSize: _SignUpColors.helperFontSize,
       ),
     );
