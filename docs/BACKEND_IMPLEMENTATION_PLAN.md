@@ -332,19 +332,19 @@ The Landlord front end is fully designed. Backend must support: find agents by r
 |----------------|------------|
 | **Commission slip** | Created by the **agent** (see §3 Agent Workflow). The slip is addressed to the **landlord** (by landlord name or landlord id) and contains payment details (amount, method e.g. Momo, recipient phone, etc.). |
 | **Landlord Payments tab** | Commission slips sent to the landlord appear in the **Payments** tab (Track / Pay). Landlord can **pay via Momo** — **mock simulation** for this stage (no real payment processing). |
-| **Track** | Landlord sees commission slips grouped by date (threaded by timestamp); can see status (e.g. pending, confirmed). |
-| **Pay** | From a slip or from the Pay tab, landlord fills or sees prefilled form and submits “pay via Momo”; backend records payment as completed (mock); status of slip updates to “Payment Confirmed” and success popup is shown (front end already designed). |
+| **Track** | Landlord sees commission slips grouped by date (threaded by timestamp); can see status (e.g. pending, agent-confirmation-pending, confirmed). |
+| **Pay** | From a slip or from the Pay tab, landlord fills or sees prefilled form and submits “pay via Momo”; backend records that the landlord claims to have paid (mock) and waits for **agent confirmation** before marking the slip as fully confirmed. |
 
 **Backend scope**
 
-- **Commission slips**: Agent creates a slip (amount, payment method, recipient phone, commission reference, agent id, **landlord id or name**). Backend stores slip and **delivers it to the landlord’s Payments stream** (by landlord id). Slips have status: e.g. pending, paid (confirmed). See §3 for agent-side creation.
-- **List slips for landlord**: API returns commission slips for the current landlord (filter by landlord_id), ordered by date; support date-grouping (threaded by timestamp) for Track tab. Include slip details for Pay form prefill when landlord clicks “Pay” from a slip.
-- **Pay (mock)**: When landlord submits “Pay via Momo”, backend updates slip status to paid/confirmed and returns success; no real payment gateway. Optional: store payment timestamp and a “mock transaction id” for audit.
+- **Commission slips**: Agent creates a slip (amount, payment method, recipient phone, commission reference, agent id, **landlord id or name**). Backend stores slip and **delivers it to the landlord’s Payments stream** (by landlord id). Slips have status, for example: `pending` (awaiting landlord payment), `agent_confirmation_pending` (landlord has paid in Momo, waiting for agent to confirm), `confirmed` (agent has confirmed payment). See §3 for agent-side creation and confirmation.
+- **List slips for landlord**: API returns commission slips for the current landlord (filter by landlord_id), ordered by date; support date-grouping (threaded by timestamp) for Track tab. Include slip details for Pay form prefill when landlord clicks “Pay” from a slip; show status so landlord can see when the agent has confirmed.
+- **Pay (mock)**: When landlord submits “Pay via Momo”, backend moves slip to `agent_confirmation_pending` (not fully confirmed yet) and returns success; no real payment gateway. Optional: store payment timestamp and a “mock transaction id” for audit. Final status becomes `confirmed` only when the agent confirms on their side (see §3.3).
 
 **Database / storage directives**
 
 - **Table: `commission_slips`**  
-  Fields: `id`, `agent_id` (FK), `landlord_id` (FK), `listing_id` (FK, optional), reference (e.g. COM-xxx), amount, currency, payment_method (e.g. MTN Momo), recipient_phone, status (pending, confirmed), created_at, paid_at (nullable). Optional: contract_code, agent_name, estate_name for display.
+  Fields: `id`, `agent_id` (FK), `landlord_id` (FK), `listing_id` (FK, optional), reference (e.g. COM-xxx), amount, currency, payment_method (e.g. MTN Momo), recipient_phone, status (`pending`, `agent_confirmation_pending`, `confirmed`), created_at, paid_at (nullable). Optional: contract_code, agent_name, estate_name for display.
 
 ---
 
@@ -409,7 +409,28 @@ Agents see **assigned listings** in two tabs: **Pending** (not yet decided) and 
 - **Assignment/response store**  
   For each agent–listing assignment, persist the agent’s **response**: pending (no response yet), accepted, or declined. This can be a status on an `agent_listing_assignments` (or equivalent) table: e.g. `status` in `{'pending', 'accepted', 'declined'}`. Listings with status **accepted** are shown in the Accepted tab; **declined** are excluded from the feed; **pending** are shown in the Pending tab.
 
-*(Further Agent workflow sections — commission slips, payments, inbox — to be added as screens and flows are designed.)*
+### 3.3 Commission slips & payments (Agent side)
+
+Agents create **commission slips** and later **confirm** when landlords have paid. The actual money movement happens **outside** the app (e.g. MTN Momo SMS on the agent’s phone); the app only simulates and records the state of the slip.
+
+| Term / Concept | Definition |
+|----------------|------------|
+| **Agent Payments tab** | For each agent, shows commission slips in a Track tab (threaded by date) and a Create tab where the agent creates new slips. Mirrors the Landlord Payments UI but from the agent’s perspective. |
+| **Report slip** | Agent reports that a landlord has not paid or that there is an issue with a slip (e.g. wrong amount). Shows a “Report Successful” pop-up; later this will notify support / Super Admin. |
+| **Confirm payment** | Agent confirms that a landlord has paid the commission (after cross-checking their external Momo SMS and any screenshots sent in the in-app Messages thread). This confirmation is what moves a slip to fully **confirmed** for both parties. |
+
+**Backend scope**
+
+- **Create commission slip (agent)**: API for agents to create slips (landlord id, listing id, amount, payment method, recipient phone, etc.). The **commission reference/ID (e.g. COM-xxxx)** is **generated by the backend at runtime** and returned to the client; the agent does **not** type this ID. New slips start in `pending` status and appear in both the agent’s and landlord’s Payments tabs.
+- **Confirm payment (agent)**: When the agent taps **Confirm Payment**, backend updates slip status from `agent_confirmation_pending` to `confirmed`. Landlord’s Track tab reflects this change (status pill updates), but this is **not** tied to blockchain or real-time bank integration — it simply records the agent’s confirmation after they have checked their Momo SMS and any screenshot shared in Messages.
+- **Report slip (agent)**: When the agent taps **Report**, backend records a report entry (e.g. reason, timestamp, who reported) and may notify support / Super Admin for follow-up. Status of the slip may remain `pending` or move into a separate “under_review” state depending on product rules; for now, we just capture the report event.
+
+**Database / storage directives**
+
+- Reuse `commission_slips` (see §2.4) as the single source of truth for slip status and details.
+- Optional: `commission_slip_reports` table with `id`, `slip_id`, `reported_by_agent_id`, optional `reason`, `created_at`, and a lightweight review/status field for support.
+
+*(Further Agent workflow sections — inbox, deeper reporting, reconciliation — to be added as screens and flows are designed.)*
 
 ---
 

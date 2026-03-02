@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'agent_assigned_listings_screen.dart';
+import 'agent_payments_screen.dart';
 import 'agent_profile_screen.dart';
 import 'messages_screen.dart';
 
@@ -108,16 +109,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       return const MessagesScreen();
     }
     // Payments tab
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Text(
-          'Payments: Commission slips and history (placeholder).',
-          textAlign: TextAlign.center,
-          style: textTheme.bodyMedium?.copyWith(color: const Color(0xFF1A2E35)),
-        ),
-      ),
-    );
+    return const AgentPaymentsScreen();
   }
 
   Widget _buildBottomNav(TextTheme textTheme) {
