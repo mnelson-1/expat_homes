@@ -160,7 +160,7 @@ This applies to **Expats, Landlords, and Agents** alike. Store `preferred_langua
   Fields: `id`, `listing_id` (FK, nullable), `created_at`, etc. Participants (expat, landlord/agent) can be stored in `conversation_participants` (conversation_id, user_id, role).
 
 - **Table: `messages`**  
-  Fields: `id`, `conversation_id` (FK), `sender_id` (FK), `content` (text), `payload` (e.g. listing card JSON), `created_at`.
+  Fields: `id`, `conversation_id` (FK), `sender_id` (FK), `content` (text), `payload` (e.g. listing card JSON), `created_at`. **All messages are persisted.** When a user opens a conversation, the backend returns the full message history for that conversation so the chat continues from where they left off.
 
 ---
 
@@ -175,6 +175,7 @@ This applies to **Expats, Landlords, and Agents** alike. Store `preferred_langua
 
 - **Conversations**: Create conversation on inquire (expat + representative), or reuse existing conversation for the same listing/user pair.
 - **Messages**: Store and deliver messages; support optional listing card payload for the first (or any) message. API: list conversations for current user, get messages per conversation (paginated).
+- **Message persistence (all parties — Expat, Landlord, Agent)**: Every message sent in any conversation must be **saved** (persisted) on the backend. When a user **closes a chat and reopens it**, the client must load the **full message history** for that conversation from the API so the thread **continues from where they stopped**. The same rule applies to Expat↔representative, Landlord↔agent, and Agent↔landlord conversations.
 - **Real-time or polling**: Decide whether messages are delivered via WebSockets/push or polling; document in this plan when decided.
 - **Translate**: See §1.8; message content may be stored in original language and translated on send/display for users with Translate on.
 
@@ -317,6 +318,7 @@ The Landlord front end is fully designed. Backend must support: find agents by r
 
 - **Auto-conversation on assign**: When `listing_assignments` (or equivalent) is created, create a **conversation** between landlord and agent; post an **automatic first message** and attach **listing card** payload (listing summary, image, price, location, etc.) so the thread is ready for discussion.
 - **Inbox**: List conversations for the landlord (with agent or with expats); include last message and timestamp for thread list (timely threaded list with timestamps when returning to Messages tab — already designed on front end).
+- **Message persistence**: See §1.6 — all messages are saved; when the landlord (or any party) reopens a chat, the full history is loaded so the conversation continues from where they stopped.
 - **Translate**: Store landlord’s `preferred_language` (from sign-up); when a message is sent to the landlord, translate content to that language if the sender has Translate on or if the system sends translated copy. Backend or client implements per chosen approach in §1.7.
 
 **Database / storage directives**

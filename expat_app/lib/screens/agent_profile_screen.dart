@@ -35,8 +35,10 @@ class AgentProfileScreen extends StatelessWidget {
   static const Color _headerDark = Color(0xFF1A2E35);
   static const Color _bodyText = Color(0xFF1A2E35);
   static const Color _hint = Color(0xFF9CA5A8);
-  static const Color _verifiedGreen = Color(0xFF8ED966);
+  /// Verification badge and "RWAREB verified Agent" (blue for contrast on white).
+  static const Color _verifiedBlue = Color(0xFF1976D2);
   static const Color _reviewGreen = Color(0xFFD3F1C5);
+  static const Color _accentGreen = Color(0xFF8ED966);
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +81,7 @@ class AgentProfileScreen extends StatelessWidget {
                   Text(
                     agentId,
                     style: textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -159,7 +161,7 @@ class AgentProfileScreen extends StatelessWidget {
 
   Widget _bannerPlaceholder() {
     return Container(
-      color: _hint.withOpacity(0.3),
+      color: _hint.withValues(alpha: 0.3),
       child: const Center(
         child: Icon(Icons.person, size: 80, color: Color(0xFF9CA5A8)),
       ),
@@ -184,7 +186,7 @@ class AgentProfileScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: _hint.withOpacity(0.3),
+            color: _hint.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
@@ -202,12 +204,12 @@ class AgentProfileScreen extends StatelessWidget {
   Widget _buildVerifiedRow(TextTheme textTheme) {
     return Row(
       children: [
-        Icon(Icons.verified, size: 18, color: _verifiedGreen),
+        Icon(Icons.verified, size: 18, color: _verifiedBlue),
         const SizedBox(width: 6),
         Text(
           'RWAREB verified Agent',
           style: textTheme.bodySmall?.copyWith(
-            color: _verifiedGreen,
+            color: _verifiedBlue,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -418,14 +420,14 @@ class AgentProfileScreen extends StatelessWidget {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
         return Center(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 32),
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
             decoration: BoxDecoration(
-              color: _verifiedGreen,
+              color: _verifiedBlue,
               borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
@@ -525,7 +527,7 @@ class AgentProfileScreen extends StatelessWidget {
                 );
               },
               style: FilledButton.styleFrom(
-                backgroundColor: _verifiedGreen,
+                backgroundColor: _accentGreen,
                 foregroundColor: _bodyText,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

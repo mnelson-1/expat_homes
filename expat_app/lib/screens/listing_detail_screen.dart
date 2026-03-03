@@ -163,7 +163,7 @@ class ListingDetailScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -175,7 +175,7 @@ class ListingDetailScreen extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                   ),
                 ),
@@ -269,12 +269,12 @@ class ListingDetailScreen extends StatelessWidget {
           if (isVerifiedByRdb)
             Row(
               children: [
-                const Icon(Icons.verified, size: 14, color: Color(0xFF1A2E35)),
+                const Icon(Icons.verified, size: 14, color: Color(0xFF1976D2)),
                 const SizedBox(width: 4),
                 Text(
                   'Listing and Location Verified by the RDB',
                   style: textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF9CA5A8),
+                    color: const Color(0xFF1976D2),
                   ),
                 ),
               ],
@@ -515,9 +515,10 @@ class ListingDetailScreen extends StatelessWidget {
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: () {
-                      final contactName = representativeName ?? 'Landlord';
+                      const landlordName = 'Landlord';
+                      final subtitle = 'Landlord of $title';
                       addOrUpdateChatThreadForAgentLandlordChat(
-                        contactName: contactName,
+                        contactName: landlordName,
                         listingTitle: title,
                         location: location,
                         price: price,
@@ -527,7 +528,6 @@ class ListingDetailScreen extends StatelessWidget {
                       );
                       final initialMessage =
                           getLastMessageForAgentLandlordChat(
-                        contactName: contactName,
                         listingTitle: title,
                       );
                       Navigator.of(context).push(
@@ -539,11 +539,16 @@ class ListingDetailScreen extends StatelessWidget {
                             imagePath: imagePaths.isNotEmpty
                                 ? imagePaths.first
                                 : '',
-                            contactName: contactName,
-                            contactSubtitle: 'Landlord',
+                            contactName: landlordName,
+                            contactSubtitle: subtitle,
                             initialMessage: initialMessage,
+                            storedMessages: getStoredMessagesForThread(
+                                landlordName, subtitle, title),
                             showInitialAsIncoming: true,
+                            listingFromOtherParty: true,
                             returnToLandlordOnBack: false,
+                            returnToAgentMessagesOnBack: true,
+                            listingDetailRole: kRoleAgent,
                           ),
                         ),
                       );
@@ -668,7 +673,10 @@ class ListingDetailScreen extends StatelessWidget {
                           contactName: contactName,
                           contactSubtitle: contactSubtitle,
                           initialMessage: defaultInquiryMessage,
+                          storedMessages: getStoredMessagesForThread(
+                              contactName, contactSubtitle, title),
                           returnToLandlordOnBack: false,
+                          listingDetailRole: kRoleExpat,
                         ),
                       ),
                     );
@@ -714,7 +722,7 @@ class ListingDetailScreen extends StatelessWidget {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
         return Center(
           child: Container(
@@ -789,7 +797,7 @@ class ListingDetailScreen extends StatelessWidget {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
         return Center(
           child: Container(

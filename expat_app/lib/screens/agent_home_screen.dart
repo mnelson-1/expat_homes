@@ -4,7 +4,7 @@ import 'agent_assigned_listings_screen.dart';
 import 'agent_bio_view_screen.dart';
 import 'agent_payments_screen.dart';
 import 'agent_profile_screen.dart';
-import 'messages_screen.dart';
+import 'messages_screen.dart' show MessagesScreen, kRoleAgent;
 
 /// Agent home – landing after sign up. Tabs: Bio-View, Estates (Assigned Listings), Messages, Payments.
 class AgentHomeScreen extends StatefulWidget {
@@ -98,7 +98,8 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       return const AgentAssignedListingsScreen();
     }
     if (_selectedBottomIndex == 2) {
-      return const MessagesScreen(
+      return MessagesScreen(
+        currentUserRole: kRoleAgent,
         emptyStateMessage:
             'You have no messages yet. Either no Landlord has assigned you a Listing, or no Expat has made inquiries.',
       );
@@ -113,7 +114,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
         color: _primaryDark,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, -4),
           ),

@@ -17,6 +17,7 @@ class _AgentAssignedListingsColors {
   static const Color hint = Color(0xFF9CA5A8);
   static const Color helper = Color(0xFF9CA5A8);
   static const Color declineRed = Color(0xFFC62828);
+
   /// Accepted tab: single button — blue text, yellow container.
   static const Color acceptedButtonYellow = Color(0xFFFFD54F);
 }
@@ -44,9 +45,11 @@ class _AssignedListing {
   final String upi;
 }
 
-class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScreen> {
+class _AgentAssignedListingsScreenState
+    extends State<AgentAssignedListingsScreen> {
   int _selectedMainTab = 0; // 0 = Pending, 1 = Accepted
-  int _selectedFilter = 0; // 0 = All, 1 = Apartments, 2 = Houses, 3 = Short-Stay
+  int _selectedFilter =
+      0; // 0 = All, 1 = Apartments, 2 = Houses, 3 = Short-Stay
   final Set<String> _acceptedIds = {};
   final Set<String> _declinedIds = {};
   final ScrollController _scrollController = ScrollController();
@@ -115,23 +118,29 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
 
   void _onScroll() {
     setState(() {
-      _scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0;
+      _scrollOffset =
+          _scrollController.hasClients ? _scrollController.offset : 0;
     });
   }
 
   List<_AssignedListing> get _filteredListings {
     // Pending: not yet accepted and not declined; Accepted: accepted by agent.
     // Declined listings disappear from both tabs.
-    final byTab = _selectedMainTab == 0
-        ? _listings
-            .where((e) =>
-                !_acceptedIds.contains(e.id) && !_declinedIds.contains(e.id))
-            .toList()
-        : _listings.where((e) => _acceptedIds.contains(e.id)).toList();
+    final byTab =
+        _selectedMainTab == 0
+            ? _listings
+                .where(
+                  (e) =>
+                      !_acceptedIds.contains(e.id) &&
+                      !_declinedIds.contains(e.id),
+                )
+                .toList()
+            : _listings.where((e) => _acceptedIds.contains(e.id)).toList();
     if (_selectedFilter == 0) return byTab;
-    final key = _selectedFilter == 1
-        ? 'apartment'
-        : _selectedFilter == 2
+    final key =
+        _selectedFilter == 1
+            ? 'apartment'
+            : _selectedFilter == 2
             ? 'house'
             : 'short_stay';
     return byTab.where((e) => e.type == key).toList();
@@ -146,10 +155,7 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 48,
-          child: Center(child: _buildMainTabs(textTheme)),
-        ),
+        SizedBox(height: 48, child: Center(child: _buildMainTabs(textTheme))),
         _buildFilterBar(textTheme),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
         Expanded(
@@ -164,12 +170,20 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
                   children: [
                     const Divider(height: 1, color: Color(0xFFE0E0E0)),
                     _buildListingCard(
-                        context, textTheme, listings[index], isAcceptedTab),
+                      context,
+                      textTheme,
+                      listings[index],
+                      isAcceptedTab,
+                    ),
                   ],
                 );
               }
               return _buildListingCard(
-                  context, textTheme, listings[index], isAcceptedTab);
+                context,
+                textTheme,
+                listings[index],
+                isAcceptedTab,
+              );
             },
           ),
         ),
@@ -197,9 +211,10 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
         child: Text(
           label,
           style: textTheme.titleMedium?.copyWith(
-            color: selected
-                ? _AgentAssignedListingsColors.bodyText
-                : _AgentAssignedListingsColors.hint,
+            color:
+                selected
+                    ? _AgentAssignedListingsColors.bodyText
+                    : _AgentAssignedListingsColors.hint,
             fontWeight: selected ? FontWeight.bold : FontWeight.w500,
           ),
         ),
@@ -253,18 +268,20 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
             Text(
               label,
               style: textTheme.titleMedium?.copyWith(
-                color: selected
-                    ? _AgentAssignedListingsColors.bodyText
-                    : _AgentAssignedListingsColors.hint,
+                color:
+                    selected
+                        ? _AgentAssignedListingsColors.bodyText
+                        : _AgentAssignedListingsColors.hint,
                 fontWeight: selected ? FontWeight.bold : FontWeight.w500,
               ),
             ),
             const SizedBox(height: 2),
             Container(
               height: 2,
-              color: selected
-                  ? _AgentAssignedListingsColors.bodyText
-                  : Colors.transparent,
+              color:
+                  selected
+                      ? _AgentAssignedListingsColors.bodyText
+                      : Colors.transparent,
             ),
           ],
         ),
@@ -286,9 +303,10 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
     _AssignedListing listing,
     bool isAcceptedTab,
   ) {
-    final typeLabel = listing.type == 'apartment'
-        ? 'Apartment'
-        : listing.type == 'house'
+    final typeLabel =
+        listing.type == 'apartment'
+            ? 'Apartment'
+            : listing.type == 'house'
             ? 'House'
             : 'Short-Stay';
 
@@ -296,26 +314,28 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => ListingDetailScreen(
-              title: listing.title,
-              location: listing.location,
-              price: '${listing.price}${_normalizePriceSuffix(listing.priceSuffix)}',
-              typeLabel: typeLabel,
-              imagePaths: [listing.imagePath],
-              description: listing.description,
-              upi: listing.upi,
-              isVerifiedByRdb: true,
-              representativeName: 'Landlord',
-              showRequestEditOnly: false,
-              showAgentActions: !isAcceptedTab,
-              listingId: listing.id,
-              onListingAccepted: (id) {
-                setState(() => _acceptedIds.add(id));
-              },
-              onListingDeclined: (id) {
-                setState(() => _declinedIds.add(id));
-              },
-            ),
+            builder:
+                (_) => ListingDetailScreen(
+                  title: listing.title,
+                  location: listing.location,
+                  price:
+                      '${listing.price}${_normalizePriceSuffix(listing.priceSuffix)}',
+                  typeLabel: typeLabel,
+                  imagePaths: [listing.imagePath],
+                  description: listing.description,
+                  upi: listing.upi,
+                  isVerifiedByRdb: true,
+                  representativeName: 'Landlord of ${listing.title}',
+                  showRequestEditOnly: false,
+                  showAgentActions: !isAcceptedTab,
+                  listingId: listing.id,
+                  onListingAccepted: (id) {
+                    setState(() => _acceptedIds.add(id));
+                  },
+                  onListingDeclined: (id) {
+                    setState(() => _declinedIds.add(id));
+                  },
+                ),
           ),
         );
       },
@@ -331,11 +351,12 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
                 height: 180,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 180,
-                  color: Colors.grey.shade300,
-                  child: const Center(child: Icon(Icons.home, size: 48)),
-                ),
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      height: 180,
+                      color: Colors.grey.shade300,
+                      child: const Center(child: Icon(Icons.home, size: 48)),
+                    ),
               ),
             ),
             const SizedBox(height: 12),
@@ -386,7 +407,8 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
                     RichText(
                       text: TextSpan(
                         style: textTheme.titleSmall?.copyWith(
-                            color: _AgentAssignedListingsColors.bodyText),
+                          color: _AgentAssignedListingsColors.bodyText,
+                        ),
                         children: [
                           TextSpan(
                             text: listing.price,
@@ -409,86 +431,85 @@ class _AgentAssignedListingsScreenState extends State<AgentAssignedListingsScree
             const SizedBox(height: 12),
             isAcceptedTab
                 ? SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () {},
-                      style: FilledButton.styleFrom(
-                        backgroundColor:
-                            _AgentAssignedListingsColors.acceptedButtonYellow,
-                        foregroundColor:
-                            _AgentAssignedListingsColors.bodyText,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(7),
-                        ),
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {},
+                    style: FilledButton.styleFrom(
+                      backgroundColor:
+                          _AgentAssignedListingsColors.acceptedButtonYellow,
+                      foregroundColor: _AgentAssignedListingsColors.bodyText,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
                       ),
-                      child: Text(
-                        'Accepted',
-                        style: textTheme.titleMedium?.copyWith(
-                          color: _AgentAssignedListingsColors.bodyText,
-                          fontWeight: FontWeight.bold,
+                    ),
+                    child: Text(
+                      'Accepted',
+                      style: textTheme.titleMedium?.copyWith(
+                        color: _AgentAssignedListingsColors.bodyText,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                )
+                : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          setState(() => _declinedIds.add(listing.id));
+                          ListingDetailScreen.showListingDeclinedDialog(
+                            context,
+                            textTheme,
+                          );
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor:
+                              _AgentAssignedListingsColors.declineRed,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                        ),
+                        child: Text(
+                          'Decline',
+                          style: textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () {
-                            setState(() => _declinedIds.add(listing.id));
-                            ListingDetailScreen.showListingDeclinedDialog(
-                              context,
-                              textTheme,
-                            );
-                          },
-                          style: FilledButton.styleFrom(
-                            backgroundColor:
-                                _AgentAssignedListingsColors.declineRed,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(7),
-                            ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          setState(() => _acceptedIds.add(listing.id));
+                          ListingDetailScreen.showListingAcceptedDialog(
+                            context,
+                            textTheme,
+                          );
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor:
+                              _AgentAssignedListingsColors.accentGreen,
+                          foregroundColor:
+                              _AgentAssignedListingsColors.bodyText,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(7),
                           ),
-                          child: Text(
-                            'Decline',
-                            style: textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        ),
+                        child: Text(
+                          'Accept',
+                          style: textTheme.titleMedium?.copyWith(
+                            color: _AgentAssignedListingsColors.bodyText,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () {
-                            setState(() => _acceptedIds.add(listing.id));
-                            ListingDetailScreen.showListingAcceptedDialog(
-                              context,
-                              textTheme,
-                            );
-                          },
-                          style: FilledButton.styleFrom(
-                            backgroundColor:
-                                _AgentAssignedListingsColors.accentGreen,
-                            foregroundColor:
-                                _AgentAssignedListingsColors.bodyText,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(7),
-                            ),
-                          ),
-                          child: Text(
-                            'Accept',
-                            style: textTheme.titleMedium?.copyWith(
-                              color: _AgentAssignedListingsColors.bodyText,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
           ],
         ),
       ),

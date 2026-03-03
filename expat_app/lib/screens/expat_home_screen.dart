@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'listing_detail_screen.dart';
-import 'messages_screen.dart';
+import 'messages_screen.dart' show MessagesScreen, kRoleExpat;
+import 'expat_post_thread_screen.dart';
+import 'expat_bowl_thread_screen.dart';
 
 /// Palette for Expat home screen; mirrors auth/signup colors.
 class _ExpatHomeColors {
@@ -14,6 +16,8 @@ class _ExpatHomeColors {
   static const Color commentBackground = Color(0xFFE3E7E9);
   // Explore Area button on estate cards.
   static const Color exploreYellow = Color(0xFFFFD54F);
+  // Role label (e.g. small "Expat" under each name) – blue.
+  static const Color roleBlue = Color(0xFF1976D2);
 }
 
 class ExpatHomeScreen extends StatefulWidget {
@@ -103,7 +107,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                 : _selectedBottomIndex == 2
                     ? _buildEstatesContent(textTheme)
                     : _selectedBottomIndex == 3
-                        ? const MessagesScreen()
+                        ? MessagesScreen(currentUserRole: kRoleExpat)
                         : Center(
                             child: Text(
                               'Content for other tabs will live here.',
@@ -247,24 +251,33 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
       controller: _feedScrollController,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
       children: [
-        _buildPostBlock(
-          textTheme,
-          avatarPath: 'assets/images/avatar_benjamin_nelson.png',
-          name: 'Benjamin Nelson',
-          role: 'Expat',
-          timeAgo: '7m',
-          content:
-              'Hi everyone 👋,\nI just arrived in Kigali last week and I’m still getting used to things. Quick question: what’s the best way to handle short-term housing before committing long-term? Did you start with Airbnb, serviced apartments, or something else?\n\nWould really appreciate advice from people who’ve already been through this.',
-          comments: [
-            _InlineComment(
-              avatarPath: 'assets/images/avatar_ama_boateng.png',
-              name: 'Ama Boateng',
-              role: 'Expat',
-              timeAgo: '7m',
-              text:
-                  'Welcome, Benjamin! I started with a serviced apartment for a month before finding a longer-term place. It gave me time to understand neighborhoods.',
-            ),
-          ],
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ExpatPostThreadScreen(),
+              ),
+            );
+          },
+          child: _buildPostBlock(
+            textTheme,
+            avatarPath: 'assets/images/avatar_benjamin_nelson.png',
+            name: 'Benjamin Nelson',
+            role: 'Expat',
+            timeAgo: '7m',
+            content:
+                'Hi everyone 👋,\nI just arrived in Kigali last week and I’m still getting used to things. Quick question: what’s the best way to handle short-term housing before committing long-term? Did you start with Airbnb, serviced apartments, or something else?\n\nWould really appreciate advice from people who’ve already been through this.',
+            comments: [
+              _InlineComment(
+                avatarPath: 'assets/images/avatar_ama_boateng.png',
+                name: 'Ama Boateng',
+                role: 'Expat',
+                timeAgo: '7m',
+                text:
+                    'Welcome, Benjamin! I started with a serviced apartment for a month before finding a longer-term place. It gave me time to understand neighborhoods.',
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 24),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
@@ -356,39 +369,48 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   }
 
   Widget _buildBowlRow(TextTheme textTheme, _Bowl bowl) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundImage: AssetImage(bowl.imagePath),
-            backgroundColor: Colors.grey.shade200,
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const ExpatBowlThreadScreen(),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  bowl.title,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: _ExpatHomeColors.bodyText,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  bowl.description,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: _ExpatHomeColors.bodyText,
-                  ),
-                ),
-              ],
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundImage: AssetImage(bowl.imagePath),
+              backgroundColor: Colors.grey.shade200,
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    bowl.title,
+                    style: textTheme.titleMedium?.copyWith(
+                      color: _ExpatHomeColors.bodyText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    bowl.description,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: _ExpatHomeColors.bodyText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -946,7 +968,7 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
                     Text(
                       role,
                       style: textTheme.bodySmall?.copyWith(
-                        color: _ExpatHomeColors.accentGreen,
+                        color: _ExpatHomeColors.roleBlue,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1062,7 +1084,7 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
                 Text(
                   comment.role,
                   style: textTheme.bodySmall?.copyWith(
-                    color: _ExpatHomeColors.accentGreen,
+                    color: _ExpatHomeColors.roleBlue,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1137,7 +1159,7 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
         color: _ExpatHomeColors.primaryDark,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, -4),
           ),

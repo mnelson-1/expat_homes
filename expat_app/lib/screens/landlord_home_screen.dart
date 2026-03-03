@@ -4,7 +4,7 @@ import 'agent_profile_screen.dart';
 import 'landlord_estates_screen.dart';
 import 'landlord_make_listing_screen.dart';
 import 'landlord_payments_screen.dart';
-import 'messages_screen.dart';
+import 'messages_screen.dart' show MessagesScreen, kRoleLandlord;
 
 /// Landlord home screen – landing view after signup/login.
 ///
@@ -25,6 +25,8 @@ class _LandlordHomeColors {
   static const Color bodyText = Color(0xFF1A2E35);
   static const Color helper = Color(0xFF9CA5A8);
   static const Color hint = Color(0xFF9CA5A8);
+  /// Verification badge and "RWAREB verified Agent" text (blue for contrast on white).
+  static const Color verifiedBlue = Color(0xFF1976D2);
 }
 
 class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
@@ -230,7 +232,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     }
 
     if (_selectedBottomIndex == 2) {
-      return const MessagesScreen();
+      return MessagesScreen(currentUserRole: kRoleLandlord);
     }
 
     // Payments tab.
@@ -243,7 +245,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
         color: _LandlordHomeColors.primaryDark,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, -4),
           ),
@@ -432,7 +434,7 @@ Widget _buildAgentCard(
         border: Border.all(color: const Color(0xFFE0E0E0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -477,7 +479,7 @@ Widget _buildAgentCard(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _LandlordHomeColors.hint.withOpacity(0.2),
+                  color: _LandlordHomeColors.hint.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -494,12 +496,12 @@ Widget _buildAgentCard(
           Row(
             children: [
               Icon(Icons.verified,
-                  size: 18, color: _LandlordHomeColors.accentGreen),
+                  size: 18, color: _LandlordHomeColors.verifiedBlue),
               const SizedBox(width: 4),
               Text(
                 'RWAREB verified Agent',
                 style: textTheme.bodySmall?.copyWith(
-                  color: _LandlordHomeColors.accentGreen,
+                  color: _LandlordHomeColors.verifiedBlue,
                   fontWeight: FontWeight.w500,
                 ),
               ),

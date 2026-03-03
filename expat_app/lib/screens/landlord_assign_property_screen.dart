@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'messages_screen.dart'
-    show ConversationScreen, addOrUpdateChatThreadForAgent;
+    show ConversationScreen, addOrUpdateChatThreadForAgent,
+        addOrUpdateChatThreadForAgentLandlordChat,
+        getStoredMessagesForThread, kRoleLandlord;
 
 /// Screen where a Landlord selects one of their listings
 /// to assign to a chosen agent.
@@ -346,11 +348,19 @@ class _LandlordAssignPropertyScreenState
       price: priceWithSuffix,
       imagePath: estate.imagePath,
     );
+    addOrUpdateChatThreadForAgentLandlordChat(
+      contactName: 'Landlord',
+      listingTitle: estate.title,
+      location: estate.location,
+      price: priceWithSuffix,
+      imagePath: estate.imagePath,
+      lastMessage: message,
+    );
 
     showDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
         return Center(
           child: Container(
@@ -386,8 +396,12 @@ class _LandlordAssignPropertyScreenState
                             contactName: widget.agentName,
                             contactSubtitle: widget.agentId,
                             initialMessage: message,
+                            storedMessages: getStoredMessagesForThread(
+                                widget.agentName, widget.agentId, estate.title),
                             returnToLandlordOnBack: true,
                             showInitialAsIncoming: false,
+                            listingFromOtherParty: false,
+                            listingDetailRole: kRoleLandlord,
                           ),
                         ),
                       );

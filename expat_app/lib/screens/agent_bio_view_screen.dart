@@ -19,13 +19,13 @@ class _AgentBioViewScreenState extends State<AgentBioViewScreen> {
   // For now we mirror the default Agent profile data; later this will come
   // from the signed-in agent's backend profile so Bio-View and Profile stay in sync.
   String _agentName = 'Jean Claude';
-  String _agentId = 'KM-201903';
+  final String _agentId = 'KM-201903';
   String _bioText =
       'Fluent in Kinyarwanda, English, and French. Commission Rate starts at '
       '5% of sale price. Varies and Negotiable.';
   String _phone = '(+250) 0792106639';
-  double _rating = 4.5;
-  int _ratingCount = 10;
+  final double _rating = 4.5;
+  final int _ratingCount = 10;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +43,7 @@ class _AgentBioViewScreenState extends State<AgentBioViewScreen> {
                 children: [
                   CircleAvatar(
                     radius: 72,
-                    backgroundColor: _hint.withOpacity(0.4),
+                    backgroundColor: _hint.withValues(alpha: 0.4),
                     child: ClipOval(
                       child: Image.asset(
                         'assets/images/agent_profile_placeholder.jpg',

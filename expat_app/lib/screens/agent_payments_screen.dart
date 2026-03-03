@@ -321,7 +321,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -674,7 +674,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
         return Center(
           child: Container(
@@ -793,7 +793,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
         return Center(
           child: Container(
@@ -866,7 +866,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
         return Center(
           child: Container(

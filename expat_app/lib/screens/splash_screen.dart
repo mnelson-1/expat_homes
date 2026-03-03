@@ -72,11 +72,13 @@ class _SplashScreenState extends State<SplashScreen>
     final t = _t;
     if (t < _phase1SweepEnd) return (1, curve.transform(t / _sweepDuration));
     if (t < _phase1HoldEnd) return (1, 1.0);
-    if (t < _phase2SweepEnd)
+    if (t < _phase2SweepEnd) {
       return (2, curve.transform((t - _phase2Start) / _sweepDuration));
+    }
     if (t < _phase2HoldEnd) return (2, 1.0);
-    if (t < _phase3SweepEnd)
+    if (t < _phase3SweepEnd) {
       return (3, curve.transform((t - _phase3Start) / _sweepDuration));
+    }
     if (t < _phase3HoldEnd) return (3, 1.0);
     if (t < _phase4DiagonalEnd) {
       final linear = (t - _phase4Start) / _curtainDuration;
