@@ -93,10 +93,12 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
     ),
   ];
 
-  List<_ThreadComment> _threadComments =
-      List<_ThreadComment>.from(_seedThreadComments);
-  List<_ThreadComment> _topLevelReplies =
-      List<_ThreadComment>.from(_seedTopLevelReplies);
+  List<_ThreadComment> _threadComments = List<_ThreadComment>.from(
+    _seedThreadComments,
+  );
+  List<_ThreadComment> _topLevelReplies = List<_ThreadComment>.from(
+    _seedTopLevelReplies,
+  );
 
   @override
   void dispose() {
@@ -197,8 +199,11 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new,
-                  color: Colors.white, size: 18),
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 18,
+              ),
               onPressed: () => Navigator.of(context).pop(),
             ),
             const SizedBox(width: 4),
@@ -225,7 +230,8 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
             CircleAvatar(
               radius: 18,
               backgroundImage: const AssetImage(
-                  'assets/images/avatar_benjamin_nelson.png'),
+                'assets/images/avatar_benjamin_nelson.png',
+              ),
               backgroundColor: Colors.grey.shade200,
             ),
             const SizedBox(width: 12),
@@ -273,15 +279,16 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
         const SizedBox(height: 8),
         Text(
           'Hi everyone 👋,\nI just arrived in Kigali last week and I’m still getting used to things. Quick question: what’s the best way to handle short-term housing before committing long-term? Did you start with Airbnb, serviced apartments, or something else?\n\nWould really appreciate advice from people who’ve already been through this.',
-          style: textTheme.bodyMedium?.copyWith(
-            color: _ThreadColors.bodyText,
-          ),
+          style: textTheme.bodyMedium?.copyWith(color: _ThreadColors.bodyText),
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            const Icon(Icons.favorite_border,
-                size: 18, color: _ThreadColors.bodyText),
+            const Icon(
+              Icons.favorite_border,
+              size: 18,
+              color: _ThreadColors.bodyText,
+            ),
             const SizedBox(width: 4),
             Text(
               'Like',
@@ -290,8 +297,11 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
               ),
             ),
             const SizedBox(width: 16),
-            const Icon(Icons.chat_bubble_outline,
-                size: 18, color: _ThreadColors.bodyText),
+            const Icon(
+              Icons.chat_bubble_outline,
+              size: 18,
+              color: _ThreadColors.bodyText,
+            ),
             const SizedBox(width: 4),
             Text(
               'Comment',
@@ -309,8 +319,11 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
               },
               child: Row(
                 children: [
-                  const Icon(Icons.reply,
-                      size: 18, color: _ThreadColors.bodyText),
+                  const Icon(
+                    Icons.reply,
+                    size: 18,
+                    color: _ThreadColors.bodyText,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Reply',
@@ -392,12 +405,16 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
           // Align Like / Comment / Reply under the start of the text column
           // (same x-position as the comment text, not the avatar).
           Padding(
-            padding:
-                const EdgeInsets.only(left: 28 + 8), // avatar (28) + gap (8)
+            padding: const EdgeInsets.only(
+              left: 28 + 8,
+            ), // avatar (28) + gap (8)
             child: Row(
               children: [
-                const Icon(Icons.favorite_border,
-                    size: 16, color: _ThreadColors.bodyText),
+                const Icon(
+                  Icons.favorite_border,
+                  size: 16,
+                  color: _ThreadColors.bodyText,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   'Like',
@@ -406,8 +423,11 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                const Icon(Icons.chat_bubble_outline,
-                    size: 16, color: _ThreadColors.bodyText),
+                const Icon(
+                  Icons.chat_bubble_outline,
+                  size: 16,
+                  color: _ThreadColors.bodyText,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   'Comment',
@@ -426,8 +446,11 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
                   },
                   child: Row(
                     children: [
-                      const Icon(Icons.reply,
-                          size: 16, color: _ThreadColors.bodyText),
+                      const Icon(
+                        Icons.reply,
+                        size: 16,
+                        color: _ThreadColors.bodyText,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Reply',
@@ -470,13 +493,12 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
                   alignment: Alignment.centerLeft,
                   child: TextField(
                     controller: _commentController,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: Colors.white,
-                    ),
+                    style: textTheme.bodyMedium?.copyWith(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: _replyTarget == _ReplyTarget.post
-                          ? 'Leave your comment...'
-                          : 'Reply to comment...',
+                      hintText:
+                          _replyTarget == _ReplyTarget.post
+                              ? 'Leave your comment...'
+                              : 'Reply to comment...',
                       hintStyle: textTheme.bodyMedium?.copyWith(
                         color: _ThreadColors.helper,
                       ),

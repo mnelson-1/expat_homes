@@ -1,0 +1,370 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #1a2e35;
+  background-color: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* ----- Login (welcome) ----- */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  padding: 2rem 2.5rem;
+}
+
+.login-card {
+  display: flex;
+  width: 100%;
+  max-width: 1400px;
+  height: 88vh;
+  gap: 2rem;
+}
+
+.login-carousel {
+  position: relative;
+  flex: 0 0 42%;
+  height: 100%;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.login-carousel-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.login-carousel-overlay {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 1.75rem 1.75rem 2.5rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.35), transparent);
+  color: #fff;
+}
+
+.login-carousel-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.login-carousel-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  opacity: 0.95;
+}
+
+.login-carousel-dots {
+  position: absolute;
+  bottom: 1.1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.4rem;
+}
+
+.login-carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+}
+
+.login-carousel-dot.active {
+  width: 18px;
+  background: #8ed966;
+}
+
+.login-form-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 2rem 3rem 2rem 2.5rem;
+  min-width: 0;
+}
+
+.login-form-inner {
+  width: 100%;
+}
+
+.login-title {
+  margin: 0 0 0.5rem;
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1.12;
+  color: #1a2e35;
+}
+
+.login-subtitle {
+  margin: 0 0 1.75rem;
+  font-size: 0.97rem;
+  color: #1a2e35;
+}
+
+.login-subtitle-bottom {
+  margin: 1.35rem 0 0;
+  font-size: 0.87rem;
+  color: #1a2e35;
+  text-align: center;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.login-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.97rem;
+  font-weight: 500;
+  color: #1a2e35;
+}
+
+.login-input {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #ccc;
+  border-radius: 0;
+  font-size: 1.02rem;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: #1a2e35;
+  box-shadow: 0 0 0 2px rgba(26, 46, 53, 0.2);
+}
+
+.login-submit {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.85rem 1.15rem;
+  background: #8ed966;
+  color: #1a2e35;
+  border: none;
+  border-radius: 0;
+  font-size: 1.07rem;
+  font-weight: 600;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.login-submit:hover {
+  filter: brightness(0.96);
+}
+
+.login-error {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #c62828;
+}
+
+@media (max-width: 800px) {
+  .login-card {
+    flex-direction: column;
+  }
+
+  .login-carousel {
+    min-height: 260px;
+  }
+
+  .login-form-wrapper {
+    padding: 2rem 1.75rem 2.5rem;
+  }
+}
+
+/* ----- Admin layout ----- */
+.admin-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: #1a2e35;
+  color: #fff;
+}
+
+.admin-header-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.admin-header-logout {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.admin-header-logout:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.admin-body {
+  display: flex;
+  flex: 1;
+}
+
+.admin-sidebar {
+  width: 220px;
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+  padding: 1rem 0;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-nav-link {
+  padding: 0.6rem 1rem;
+  color: #333;
+  text-decoration: none;
+  font-size: 0.95rem;
+  border-radius: 0 6px 6px 0;
+}
+
+.admin-nav-link:hover {
+  background: #f0f0f0;
+  color: #1a2e35;
+}
+
+.admin-nav-link.active {
+  background: #e8f0ee;
+  color: #1a2e35;
+  font-weight: 500;
+}
+
+.admin-main {
+  flex: 1;
+  padding: 1.5rem;
+  background: #f5f5f5;
+  overflow: auto;
+}
+
+/* ----- Page common ----- */
+.page {
+  max-width: 1200px;
+}
+
+.page-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+  color: #1a2e35;
+}
+
+.page-description {
+  margin: 0 0 1.25rem;
+  color: #555;
+  font-size: 0.95rem;
+}
+
+.placeholder-note {
+  color: #888;
+  font-style: italic;
+}
+
+/* ----- Table ----- */
+.table-wrap {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.admin-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #1a2e35;
+}
+
+.admin-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.btn {
+  padding: 0.4rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-right: 0.5rem;
+}
+
+.btn-approve {
+  background: #8ed966;
+  color: #1a2e35;
+}
+
+.btn-approve:hover {
+  filter: brightness(0.95);
+}
+
+.btn-reject {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.btn-reject:hover {
+  background: #d0d0d0;
+}
