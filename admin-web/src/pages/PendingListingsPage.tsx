@@ -1,13 +1,12 @@
-// Mock data for pending listings (until backend)
-const MOCK_PENDING = [
-  { id: '1', title: 'Charm Nest Apartments', address: 'Kiyovu, Kigali', landlord: 'Jean Claude', submittedAt: '2025-02-20' },
-  { id: '2', title: 'Green View Villa', address: 'Nyarutarama, Kigali', landlord: 'Marie Uwera', submittedAt: '2025-02-19' },
-]
+import { useNavigate } from 'react-router-dom'
+import { MOCK_PENDING_LISTINGS } from '../data/mockListings'
 
 export function PendingListingsPage() {
+  const navigate = useNavigate()
+
   return (
     <div className="page pending-listings-page">
-      <h2 className="page-title">Pending listings</h2>
+      <h2 className="page-title">Pending Verification</h2>
       <p className="page-description">Review and verify listings before they go live.</p>
       <div className="table-wrap">
         <table className="admin-table">
@@ -21,15 +20,24 @@ export function PendingListingsPage() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_PENDING.map((row) => (
-              <tr key={row.id}>
+            {MOCK_PENDING_LISTINGS.map((row) => (
+              <tr
+                key={row.id}
+                className="admin-table-row-clickable"
+                onClick={() => navigate(`/admin/listings/pending/${row.id}`)}
+              >
                 <td>{row.title}</td>
                 <td>{row.address}</td>
                 <td>{row.landlord}</td>
                 <td>{row.submittedAt}</td>
-                <td>
-                  <button type="button" className="btn btn-approve">Approve</button>
-                  <button type="button" className="btn btn-reject">Reject</button>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="btn btn-approve"
+                    onClick={() => navigate(`/admin/listings/pending/${row.id}`)}
+                  >
+                    View
+                  </button>
                 </td>
               </tr>
             ))}

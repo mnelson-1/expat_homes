@@ -93,10 +93,10 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
     ),
   ];
 
-  List<_ThreadComment> _threadComments = List<_ThreadComment>.from(
+  final List<_ThreadComment> _threadComments = List<_ThreadComment>.from(
     _seedThreadComments,
   );
-  List<_ThreadComment> _topLevelReplies = List<_ThreadComment>.from(
+  final List<_ThreadComment> _topLevelReplies = List<_ThreadComment>.from(
     _seedTopLevelReplies,
   );
 
