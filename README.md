@@ -1,4 +1,5 @@
 # ExpatHomes – Expat Support & Settlement Platform (Rwanda)
+-----
 
 ExpatHomes is a mobile-first expat support platform designed to improve the experience of expats, international students, and foreign professionals relocating to Rwanda. The platform focuses on trust, communication, and verified services, addressing common challenges such as housing exploitation, language barriers, arrival logistics, and access to essential local services.
 
