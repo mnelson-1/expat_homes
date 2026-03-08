@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/listing.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/listings_service.dart';
 import 'listing_detail_screen.dart';
 import 'messages_screen.dart' show MessagesScreen, kRoleExpat;
 import 'expat_post_thread_screen.dart';
@@ -32,6 +34,8 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   int _selectedTabIndex = 0; // 0 = Feed, 1 = Bowls
   int _selectedBottomIndex = 0; // 0 = Community, 2 = Estates, etc.
   int _selectedEstateFilter = 0; // 0 = All, 1 = Apartments, 2 = Houses, 3 = Short-Stay
+  String _estateSearchQuery = '';
+  final TextEditingController _estateSearchController = TextEditingController();
 
   final ScrollController _feedScrollController = ScrollController();
   final ScrollController _bowlsScrollController = ScrollController();
@@ -65,6 +69,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     _feedScrollController.dispose();
     _bowlsScrollController.dispose();
     _estatesScrollController.dispose();
+    _estateSearchController.dispose();
     super.dispose();
   }
 
@@ -106,7 +111,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                     ],
                   )
                 : _selectedBottomIndex == 2
-                    ? _buildEstatesContent(textTheme)
+                    ? _buildEstatesContentWithStream(textTheme)
                     : _selectedBottomIndex == 3
                         ? MessagesScreen(currentUserRole: kRoleExpat)
                         : Center(
@@ -445,6 +450,301 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     _EstateFilterOption(label: 'Short-Stay', index: 3),
   ];
 
+  /// Estates tab: stream published listings from Firestore, filter by type + search.
+  Widget _buildEstatesContentWithStream(TextTheme textTheme) {
+    return StreamBuilder<List<Listing>>(
+      stream: ListingsService().publishedListingsStream(),
+      builder: (context, snapshot) {
+        var list = snapshot.data ?? [];
+        if (_selectedEstateFilter == 1) {
+          list = list.where((e) => e.type == ListingType.apartment).toList();
+        } else if (_selectedEstateFilter == 2) {
+          list = list.where((e) => e.type == ListingType.house).toList();
+        } else if (_selectedEstateFilter == 3) {
+          list = list.where((e) => e.type == ListingType.shortStay).toList();
+        }
+        if (_estateSearchQuery.trim().isNotEmpty) {
+          final q = _estateSearchQuery.trim().toLowerCase();
+          list = list.where((l) =>
+              l.title.toLowerCase().contains(q) ||
+              l.location.toLowerCase().contains(q) ||
+              l.description.toLowerCase().contains(q)).toList();
+        }
+        if (_selectedEstateFilter == 0) {
+          list = List.from(list)..sort((a, b) => a.title.compareTo(b.title));
+        }
+        return _buildEstatesContentFromList(textTheme, list, snapshot.connectionState);
+      },
+    );
+  }
+
+  Widget _buildEstatesContentFromList(
+    TextTheme textTheme,
+    List<Listing> estates,
+    ConnectionState connectionState,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              const BoxShadow(
+                color: Color(0x26000000),
+                offset: Offset(0, 4),
+                blurRadius: 8,
+              ),
+              if (_estatesScrollOffset > 0) ..._tabBarShadow,
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _estateSearchController,
+                onChanged: (v) => setState(() => _estateSearchQuery = v),
+                decoration: InputDecoration(
+                  hintText: 'Search by title, location...',
+                  hintStyle: TextStyle(color: _ExpatHomeColors.hint, fontSize: 14),
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: _estateFilterOptions
+                    .map((opt) => _buildEstateFilterItem(textTheme, opt))
+                    .toList(),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: Color(0xFFE0E0E0)),
+        Expanded(
+          child: connectionState == ConnectionState.waiting
+              ? const Center(child: CircularProgressIndicator())
+              : estates.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No published listings yet.\n(Set status to "published" in Firestore to see them here.)',
+                        style: textTheme.bodyMedium?.copyWith(color: _ExpatHomeColors.helper),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _estatesScrollController,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                      itemCount: estates.length,
+                      itemBuilder: (context, index) {
+                        if (index > 0) {
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                              _buildEstateCardFromListing(context, textTheme, estates[index]),
+                            ],
+                          );
+                        }
+                        return _buildEstateCardFromListing(context, textTheme, estates[index]);
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEstateCardFromListing(
+    BuildContext context,
+    TextTheme textTheme,
+    Listing estate,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ListingDetailScreenById(listingId: estate.id),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: _buildListingImage(estate, height: 180),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        estate.title,
+                        style: textTheme.titleMedium?.copyWith(
+                          color: _ExpatHomeColors.bodyText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        estate.location,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: _ExpatHomeColors.bodyText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _ExpatHomeColors.helper,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        estate.typeLabel,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: _ExpatHomeColors.bodyText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _buildPriceText(textTheme, estate.price),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {},
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _ExpatHomeColors.accentGreen,
+                      foregroundColor: _ExpatHomeColors.bodyText,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                    ),
+                    child: Text(
+                      'Get a Ride',
+                      style: textTheme.titleMedium?.copyWith(
+                        color: _ExpatHomeColors.bodyText,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {},
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _ExpatHomeColors.exploreYellow,
+                      foregroundColor: _ExpatHomeColors.bodyText,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                    ),
+                    child: Text(
+                      'Explore Area',
+                      style: textTheme.titleMedium?.copyWith(
+                        color: _ExpatHomeColors.bodyText,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListingImage(Listing estate, {required double height}) {
+    final url = estate.firstImageUrl;
+    if (url == null || url.isEmpty) {
+      return Container(
+        height: height,
+        color: Colors.grey.shade300,
+        child: const Center(child: Icon(Icons.home, size: 48, color: Colors.grey)),
+      );
+    }
+    if (url.startsWith('http')) {
+      return Image.network(
+        url,
+        height: height,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          height: height,
+          color: Colors.grey.shade300,
+          child: const Center(child: Icon(Icons.broken_image)),
+        ),
+      );
+    }
+    return Image.asset(
+      url,
+      height: height,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        height: height,
+        color: Colors.grey.shade300,
+        child: const Center(child: Icon(Icons.home, size: 48)),
+      ),
+    );
+  }
+
+  /// Renders price with currency/amount in bold and suffix (e.g. "/mo") in regular weight.
+  Widget _buildPriceText(TextTheme textTheme, String price) {
+    final parts = price.split('/');
+    final amount = parts.isNotEmpty ? parts[0] : price;
+    final suffix = parts.length > 1 ? '/${parts[1]}' : '';
+    return RichText(
+      text: TextSpan(
+        style: textTheme.titleSmall?.copyWith(color: _ExpatHomeColors.bodyText),
+        children: [
+          TextSpan(
+            text: amount,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: _ExpatHomeColors.bodyText,
+            ),
+          ),
+          TextSpan(
+            text: suffix,
+            style: TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: textTheme.bodySmall?.fontSize,
+              color: _ExpatHomeColors.bodyText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEstatesContent(TextTheme textTheme) {
     var estates = _estateList
         .where((e) {
@@ -465,7 +765,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            // Always show a light shadow for separation; stronger when scrolled
             boxShadow: [
               const BoxShadow(
                 color: Color(0x26000000),
@@ -773,36 +1072,6 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
   //   type: 'short_stay',
   //   imagePath: 'assets/images/Short-Stay/Olympic Hotel/1.jpg',
   // );
-
-  /// Renders price with currency/amount in bold and suffix (e.g. "/mo") in regular weight.
-  Widget _buildPriceText(TextTheme textTheme, String price) {
-    final parts = price.split('/');
-    final amount = parts.isNotEmpty ? parts[0] : price; // e.g. "\$1,200" or "\$45"
-    final suffix = parts.length > 1 ? '/${parts[1]}' : ''; // e.g. "/mo", "/night"
-    return RichText(
-      text: TextSpan(
-        style: textTheme.titleSmall?.copyWith(color: _ExpatHomeColors.bodyText),
-        children: [
-          TextSpan(
-            text: amount,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: textTheme.titleSmall?.fontSize,
-              color: _ExpatHomeColors.bodyText,
-            ),
-          ),
-          TextSpan(
-            text: suffix,
-            style: TextStyle(
-              fontWeight: FontWeight.normal,
-              fontSize: textTheme.bodySmall?.fontSize,
-              color: _ExpatHomeColors.bodyText,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildEstateCard(
     BuildContext context,

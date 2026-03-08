@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/listings_service.dart';
 import 'landlord_make_listing_screen.dart';
 import 'listing_detail_screen.dart';
 
@@ -21,26 +24,6 @@ class _LandlordEstateFilter {
   final int index;
 }
 
-class _LandlordEstate {
-  const _LandlordEstate({
-    required this.title,
-    required this.location,
-    required this.price,
-    required this.type,
-    required this.imagePath,
-    required this.description,
-    required this.upi,
-  });
-
-  final String title;
-  final String location;
-  final String price;
-  final String type; // apartment | house | short_stay
-  final String imagePath;
-  final String description;
-  final String upi;
-}
-
 class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
   int _selectedFilter = 0; // 0 = All
 
@@ -51,44 +34,53 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
     _LandlordEstateFilter(label: 'Short-Stay', index: 3),
   ];
 
-  static const List<_LandlordEstate> _estates = [
-    _LandlordEstate(
-      title: 'Charm Nest Apartments',
-      location: 'KG 286, Kigali Rwanda',
-      price: '\$857/mo',
-      type: 'apartment',
-      imagePath: 'assets/images/Apartments/Charm Nest Apartments/1.jpg',
-      description:
-          'Charm Nest Apartment by Link in Kigali offers a garden, open-air bath, indoor swimming pool, and free WiFi. Guests enjoy a lounge, lift, 24-hour front desk, and free on-site private parking.\n\nThe apartment features a kitchenette, balcony, washing machine, private bathroom, and city views. Additional amenities include a dining area, work desk, and free WiFi.\n\nLocated 7 km from Kigali International Airport, the property is a 12-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.2 km) and Kigali Convention Centre (5 km).',
-      upi: 'KG286-APARTMENT-UPI-001',
-    ),
-    _LandlordEstate(
-      title: 'Green Valley Villa',
-      location: '49 KG 706 Street 1, Kigali',
-      price: '\$2,754/mo',
-      type: 'house',
-      imagePath: 'assets/images/Houses/Green Valley Villa/1.jpg',
-      description:
-          'Green Valley Villa in Kigali offers a spacious home with multiple bedrooms, private bathrooms, and a fully equipped kitchen. Guests can enjoy a quiet neighborhood setting with easy access to local amenities.\n\nThe villa includes a balcony, secure parking, and a comfortable living area suitable for both short and long stays.\n\nLocated within driving distance of Kigali\'s key attractions, it provides a good balance of privacy and convenience for families or groups.',
-      upi: 'KG706-VILLA-UPI-002',
-    ),
-    _LandlordEstate(
-      title: 'Olympic Hotel',
-      location: 'KG 11 AVE, Kigali Rwanda',
-      price: '\$1,796/night',
-      type: 'short_stay',
-      imagePath: 'assets/images/Short-Stay/Olympic Hotel/1.jpg',
-      description:
-          'Olympic Hotel in Kigali provides hotel-style rooms with on-site dining, bar, and conference facilities. Guests benefit from free WiFi, a 24-hour front desk, and secure parking.\n\nRooms feature private bathrooms, work desks, and comfortable bedding suitable for business and leisure travelers.\n\nThe hotel is conveniently located near key city points of interest, offering quick access to major roads and services.',
-      upi: 'KG11-HOTEL-UPI-003',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final uid = AuthService().currentUser?.uid;
+    if (uid == null) {
+      return Center(
+        child: Text(
+          'Sign in as a landlord to see your listings.',
+          style: textTheme.bodyMedium?.copyWith(color: _LandlordEstatesColors.hint),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
 
-    final estates = _filteredEstates;
+    return StreamBuilder<List<Listing>>(
+      stream: ListingsService().landlordListingsStream(uid),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: textTheme.bodySmall?.copyWith(color: Colors.red),
+            ),
+          );
+        }
+        final all = snapshot.data ?? [];
+        final estates = _filterListings(all);
+        return _buildContent(context, textTheme, estates);
+      },
+    );
+  }
+
+  List<Listing> _filterListings(List<Listing> list) {
+    if (_selectedFilter == 0) return list;
+    final type = _selectedFilter == 1
+        ? ListingType.apartment
+        : _selectedFilter == 2
+            ? ListingType.house
+            : ListingType.shortStay;
+    return list.where((e) => e.type == type).toList();
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    TextTheme textTheme,
+    List<Listing> estates,
+  ) {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,36 +99,56 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
         _buildFilters(textTheme),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            itemCount: estates.length,
-            itemBuilder: (context, index) {
-              final estate = estates[index];
-              if (index > 0) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Divider(height: 1, color: Color(0xFFE0E0E0)),
-                    _buildEstateCard(context, textTheme, estate),
-                  ],
-                );
-              }
-              return _buildEstateCard(context, textTheme, estate);
-            },
-          ),
+          child: estates.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'No listings yet.',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: _LandlordEstatesColors.hint,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const LandlordMakeListingScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Create a listing'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF8ED966),
+                          foregroundColor: const Color(0xFF1A2E35),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  itemCount: estates.length,
+                  itemBuilder: (context, index) {
+                    final estate = estates[index];
+                    if (index > 0) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                          _buildEstateCard(context, textTheme, estate),
+                        ],
+                      );
+                    }
+                    return _buildEstateCard(context, textTheme, estate);
+                  },
+                ),
         ),
       ],
     );
-  }
-
-  List<_LandlordEstate> get _filteredEstates {
-    if (_selectedFilter == 0) return _estates;
-    final key = _selectedFilter == 1
-        ? 'apartment'
-        : _selectedFilter == 2
-            ? 'house'
-            : 'short_stay';
-    return _estates.where((e) => e.type == key).toList();
   }
 
   Widget _buildFilters(TextTheme textTheme) {
@@ -195,14 +207,8 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
   Widget _buildEstateCard(
     BuildContext context,
     TextTheme textTheme,
-    _LandlordEstate estate,
+    Listing estate,
   ) {
-    final typeLabel = estate.type == 'apartment'
-        ? 'Apartment'
-        : estate.type == 'house'
-            ? 'House'
-            : 'Short-Stay';
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
@@ -212,16 +218,8 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => ListingDetailScreen(
-                    title: estate.title,
-                    location: estate.location,
-                    price: estate.price,
-                    typeLabel: typeLabel,
-                    imagePaths: [estate.imagePath],
-                    description: estate.description,
-                    upi: estate.upi,
-                    isVerifiedByRdb: true,
-                    representativeName: 'Jean Claude (Agent)',
+                  builder: (_) => ListingDetailScreenById(
+                    listingId: estate.id,
                     showRequestEditOnly: true,
                   ),
                 ),
@@ -232,16 +230,7 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(
-                    estate.imagePath,
-                    height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 180,
-                      color: Colors.grey.shade300,
-                    ),
-                  ),
+                  child: _buildListingImage(estate, height: 180),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -281,7 +270,7 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            typeLabel,
+                            estate.typeLabel,
                             style: textTheme.bodySmall?.copyWith(
                               color: _LandlordEstatesColors.bodyText,
                             ),
@@ -369,5 +358,38 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
     );
   }
 
+  Widget _buildListingImage(Listing estate, {required double height}) {
+    final url = estate.firstImageUrl;
+    if (url == null || url.isEmpty) {
+      return Container(
+        height: height,
+        color: Colors.grey.shade300,
+        child: const Center(child: Icon(Icons.home, size: 48, color: Colors.grey)),
+      );
+    }
+    if (url.startsWith('http')) {
+      return Image.network(
+        url,
+        height: height,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          height: height,
+          color: Colors.grey.shade300,
+          child: const Center(child: Icon(Icons.broken_image)),
+        ),
+      );
+    }
+    return Image.asset(
+      url,
+      height: height,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        height: height,
+        color: Colors.grey.shade300,
+      ),
+    );
+  }
 }
 

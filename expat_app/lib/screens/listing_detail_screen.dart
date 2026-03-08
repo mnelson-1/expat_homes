@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/services/listings_service.dart';
 import 'landlord_make_listing_screen.dart';
 import 'messages_screen.dart';
 
@@ -133,6 +135,7 @@ class ListingDetailScreen extends StatelessWidget {
   }
 
   Widget _buildImageCarousel(PageController controller) {
+    final count = imagePaths.isEmpty ? 1 : imagePaths.length;
     return SizedBox(
       height: 240,
       width: double.infinity,
@@ -140,20 +143,36 @@ class ListingDetailScreen extends StatelessWidget {
         children: [
           PageView.builder(
             controller: controller,
-            itemCount: imagePaths.length,
+            itemCount: count,
             itemBuilder: (context, index) {
+              if (imagePaths.isEmpty) {
+                return Container(
+                  color: Colors.grey.shade300,
+                  child: const Center(
+                    child: Icon(Icons.home, size: 64, color: Colors.grey),
+                  ),
+                );
+              }
               final path = imagePaths[index];
+              final isNetwork = path.startsWith('http');
               return ClipRRect(
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(0),
                   bottomRight: Radius.circular(0),
                 ),
-                child: Image.asset(
-                  path,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      Container(color: Colors.grey.shade300),
-                ),
+                child: isNetwork
+                    ? Image.network(
+                        path,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            Container(color: Colors.grey.shade300),
+                      )
+                    : Image.asset(
+                        path,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            Container(color: Colors.grey.shade300),
+                      ),
               );
             },
           ),
@@ -168,7 +187,7 @@ class ListingDetailScreen extends StatelessWidget {
               ),
               child: Row(
                 children: List.generate(
-                  imagePaths.length,
+                  count,
                   (index) => Container(
                     width: 6,
                     height: 6,
@@ -855,6 +874,65 @@ class ListingDetailScreen extends StatelessWidget {
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+}
+
+/// Loads a listing by id from Firestore and shows [ListingDetailScreen].
+/// Use for landlord "My Listings" and expat Estates when opening by id.
+class ListingDetailScreenById extends StatelessWidget {
+  const ListingDetailScreenById({
+    super.key,
+    required this.listingId,
+    this.showRequestEditOnly = false,
+    this.showAgentActions = false,
+    this.onListingAccepted,
+    this.onListingDeclined,
+  });
+
+  final String listingId;
+  final bool showRequestEditOnly;
+  final bool showAgentActions;
+  final void Function(String listingId)? onListingAccepted;
+  final void Function(String listingId)? onListingDeclined;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Listing?>(
+      future: ListingsService().getListingByIdWithRepresentative(listingId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final listing = snapshot.data;
+        if (listing == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Listing')),
+            body: const Center(child: Text('Listing not found')),
+          );
+        }
+        final imagePaths = listing.mediaUrls.isEmpty
+            ? <String>[]
+            : listing.mediaUrls;
+        return ListingDetailScreen(
+          title: listing.title,
+          location: listing.location,
+          price: listing.price,
+          typeLabel: listing.typeLabel,
+          imagePaths: imagePaths,
+          description: listing.description,
+          upi: listing.upi,
+          isVerifiedByRdb: listing.verifiedBy != null,
+          representativeName: listing.representativeName,
+          showRequestEditOnly: showRequestEditOnly,
+          showAgentActions: showAgentActions,
+          listingId: listingId,
+          onListingAccepted: onListingAccepted,
+          onListingDeclined: onListingDeclined,
         );
       },
     );

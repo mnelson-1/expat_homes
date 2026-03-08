@@ -1,7 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
+import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/listings_service.dart';
 
 class LandlordMakeListingScreen extends StatefulWidget {
   const LandlordMakeListingScreen({
@@ -49,6 +55,122 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
   String _selectedType = 'Apartment';
   final ImagePicker _imagePicker = ImagePicker();
   List<XFile> _selectedImages = [];
+  bool _isLoading = false;
+  String _loadingMessage = '';
+
+  static ListingType _listingTypeFromUi(String uiType) {
+    switch (uiType) {
+      case 'House':
+        return ListingType.house;
+      case 'Short-Stay':
+        return ListingType.shortStay;
+      default:
+        return ListingType.apartment;
+    }
+  }
+
+  Future<void> _submitListing(
+    BuildContext context,
+    bool isEditMode,
+    TextTheme textTheme,
+  ) async {
+    final title = _titleController.text.trim();
+    final price = _priceController.text.trim();
+    final location = _locationController.text.trim();
+    final description = _descriptionController.text.trim();
+    final upi = _upiController.text.trim();
+
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a property title')),
+      );
+      return;
+    }
+    if (price.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter price')),
+      );
+      return;
+    }
+    if (location.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter location')),
+      );
+      return;
+    }
+
+    final user = AuthService().currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to create a listing')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadingMessage = _selectedImages.isEmpty ? 'Saving listing...' : 'Preparing...';
+    });
+    try {
+      if (isEditMode) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Edit will be available after approval flow.')),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final svc = ListingsService();
+      svc.onProgress = (message) {
+        if (mounted) setState(() => _loadingMessage = message);
+      };
+      try {
+        await svc.createListing(
+          landlordId: user.uid,
+          type: _listingTypeFromUi(_selectedType),
+          title: title,
+          description: description.isEmpty ? 'No description.' : description,
+          location: location,
+          price: price,
+          upi: upi.isEmpty ? null : upi,
+          imageFiles: _selectedImages,
+        ).timeout(
+          const Duration(seconds: 120),
+          onTimeout: () => throw TimeoutException(
+            'Request timed out. Check: 1) Firebase Storage is enabled, 2) Storage rules allow uploads, 3) Your internet connection.',
+          ),
+        );
+      } finally {
+        svc.onProgress = null;
+      }
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Listing submitted for verification.')),
+      );
+      Navigator.of(context).pop();
+    } catch (e, st) {
+      if (!context.mounted) return;
+      String message;
+      if (e is FirebaseException) {
+        message = '${e.message ?? e.code}. Check Firebase Console: Storage enabled and rules allow uploads.';
+      } else if (e is TimeoutException) {
+        message = e.message ?? 'Timed out. See docs/FIREBASE_SETUP.md for checklist.';
+      } else {
+        message = '$e';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit: $message'), duration: const Duration(seconds: 8)),
+      );
+      debugPrint('createListing error: $e\n$st');
+    } finally {
+      if (mounted) setState(() {
+        _isLoading = false;
+        _loadingMessage = '';
+      });
+    }
+  }
 
   Future<void> _pickImages() async {
     final images = await _imagePicker.pickMultiImage(
@@ -169,14 +291,7 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
                 width: double.infinity,
                 height: 52,
                 child: FilledButton(
-                  onPressed: () {
-                    final message = isEditMode
-                        ? 'Changes saved (placeholder).'
-                        : 'Listing submitted for verification.';
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(message)),
-                    );
-                  },
+                  onPressed: _isLoading ? null : () => _submitListing(context, isEditMode, textTheme),
                   style: FilledButton.styleFrom(
                     backgroundColor: _MakeListingColors.accentGreen,
                     foregroundColor: _MakeListingColors.bodyText,
@@ -187,9 +302,25 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  child: Text(isEditMode ? 'Save Changes' : 'Verify Listing'),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(isEditMode ? 'Save Changes' : 'Verify Listing'),
                 ),
               ),
+              if (_isLoading && _loadingMessage.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _loadingMessage,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: _MakeListingColors.hint,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ],
           ),
         ),

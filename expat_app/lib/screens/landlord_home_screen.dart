@@ -359,58 +359,61 @@ Widget _buildMakeListingButton(BuildContext context, TextTheme textTheme) {
   const accentGreen = _LandlordHomeColors.accentGreen;
   final width = MediaQuery.of(context).size.width;
 
-  // Match the position of the Expat "Share your experience" button:
-  // slightly raised above the bottom navigation bar, end-docked.
-  return Transform.translate(
-    offset: const Offset(0, -48),
-    child: SizedBox(
-      height: 56,
-      width: width * 0.45,
-      child: ElevatedButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const LandlordMakeListingScreen(),
-            ),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: accentGreen,
-          foregroundColor: bodyText,
-          elevation: 6,
-          side: const BorderSide(
-            color: Colors.black,
-            width: 2,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(32),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Flexible(
-              child: Text(
-                'Make a Listing',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.titleMedium?.copyWith(
-                  color: bodyText,
-                  fontWeight: FontWeight.bold,
+  // Use Builder so Navigator uses the correct context (under MaterialApp).
+  return Builder(
+    builder: (ctx) {
+      return Transform.translate(
+        offset: const Offset(0, -48),
+        child: SizedBox(
+          height: 56,
+          width: width * 0.45,
+          child: ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const LandlordMakeListingScreen(),
                 ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentGreen,
+              foregroundColor: bodyText,
+              elevation: 6,
+              side: const BorderSide(
+                color: Colors.black,
+                width: 2,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(32),
               ),
             ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.add,
-              size: 26,
-              color: bodyText,
+            child: Row(
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    'Make a Listing',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium?.copyWith(
+                      color: bodyText,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.add,
+                  size: 26,
+                  color: bodyText,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
