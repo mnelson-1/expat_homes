@@ -1,6 +1,7 @@
-import 'package:expat_app/screens/expat_home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:expat_app/screens/sign_up_screen.dart';
+import 'package:expat_app/services/auth_service.dart';
 
 /// Palette for Sign In (matches Get Started / Sign Up).
 class _SignInColors {
@@ -10,6 +11,7 @@ class _SignInColors {
   static const Color hint = Color(0xFF9CA5A8);
   static const Color helper = Color(0xFF9CA5A8);
   static const Color bodyText = Color(0xFF1A2E35);
+  static const Color invalidRed = Color(0xFFC62828);
 
   static const double fieldFontSize = 14;
   static const double helperFontSize = 12;
@@ -26,6 +28,8 @@ class SignInScreen extends StatefulWidget {
 class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -50,6 +54,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 24),
+                  _buildErrorBanner(textTheme),
                   _buildStackedFields(context),
                   const SizedBox(height: 4),
                   _buildHelper(
@@ -170,16 +175,34 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
+  Future<void> _handleSignIn() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Please enter email and password');
+      return;
+    }
+    setState(() {
+      _errorMessage = null;
+      _isLoading = true;
+    });
+    try {
+      await AuthService().signIn(email: email, password: password);
+      if (!mounted) return;
+      // Auth state updated; pop to root so _AppEntry rebuilds with new profile
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e is FirebaseAuthException ? e.message : e.toString();
+      });
+    }
+  }
+
   Widget _buildSignInButton(TextTheme textTheme) {
     return FilledButton(
-      onPressed: () {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute<void>(
-            builder: (_) => const ExpatHomeScreen(),
-          ),
-          (route) => false,
-        );
-      },
+      onPressed: _isLoading ? null : _handleSignIn,
       style: FilledButton.styleFrom(
         backgroundColor: _SignInColors.accentGreen,
         foregroundColor: _SignInColors.primaryDark,
@@ -188,13 +211,30 @@ class _SignInScreenState extends State<SignInScreen> {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
-      child: Text(
-        'Sign In',
-        style: textTheme.titleMedium?.copyWith(
+      child: _isLoading
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(
+              'Sign In',
+              style: textTheme.titleMedium?.copyWith(
           color: _SignInColors.primaryDark,
           fontWeight: FontWeight.bold,
           fontSize: 17,
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(TextTheme textTheme) {
+    if (_errorMessage == null || _errorMessage!.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Text(
+        _errorMessage!,
+        style: textTheme.bodySmall?.copyWith(color: _SignInColors.invalidRed),
       ),
     );
   }

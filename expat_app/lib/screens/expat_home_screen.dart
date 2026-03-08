@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/services/auth_service.dart';
 import 'listing_detail_screen.dart';
 import 'messages_screen.dart' show MessagesScreen, kRoleExpat;
 import 'expat_post_thread_screen.dart';
@@ -149,10 +150,32 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
               child: _buildSearchBar(textTheme),
             ),
             const Icon(Icons.notifications_none, color: Colors.white),
-            const Icon(Icons.person_outline, color: Colors.white),
+            _buildProfileMenu(textTheme),
           ],
         ),
       ),
+    );
+  }
+
+  /// Temporary testing: profile menu with Log out. Auth state stream in main will show Get Started.
+  Widget _buildProfileMenu(TextTheme textTheme) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.person_outline, color: Colors.white),
+      color: Colors.white,
+      onSelected: (value) {
+        if (value == 'logout') {
+          AuthService().signOut();
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: ListTile(
+            leading: Icon(Icons.logout),
+            title: Text('Log out'),
+          ),
+        ),
+      ],
     );
   }
 

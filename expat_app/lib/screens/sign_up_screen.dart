@@ -1,5 +1,7 @@
-import 'package:expat_app/screens/expat_home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:expat_app/models/user_profile.dart';
+import 'package:expat_app/services/auth_service.dart';
 
 /// Shared palette for onboarding screens (matches Get Started).
 class _SignUpColors {
@@ -18,7 +20,14 @@ class _SignUpColors {
 
 /// Sign Up screen for Expats: legal name, DOB, password, country, terms, Agree & Continue.
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key});
+  const SignUpScreen({
+    super.key,
+    this.initialEmail,
+    this.preferredLanguage = 'English',
+  });
+
+  final String? initialEmail;
+  final String? preferredLanguage;
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -31,6 +40,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   DateTime? _dateOfBirth;
   String _country = 'Nigeria';
+  bool _isLoading = false;
+  String? _errorMessage;
 
   void _onPasswordFieldChanged() => setState(() {});
 
@@ -134,6 +145,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   _buildHelper(textTheme,
                       'This will be used to automatically assign you to bowls.'),
                   const SizedBox(height: 24),
+                  _buildErrorBanner(textTheme),
                   _buildTermsText(textTheme),
                   const SizedBox(height: 28),
                   _buildAgreeButton(textTheme),
@@ -409,16 +421,53 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  Future<void> _handleAgreeAndContinue() async {
+    final email = widget.initialEmail?.trim() ?? '';
+    if (email.isEmpty) {
+      setState(() => _errorMessage = 'Please go back and enter your email on Get Started.');
+      return;
+    }
+    final password = _passwordController.text;
+    if (password != _confirmPasswordController.text) {
+      setState(() => _errorMessage = 'Passwords do not match');
+      return;
+    }
+    if (password.length < 8 || !RegExp(r'[a-zA-Z]').hasMatch(password) || !RegExp(r'[0-9]').hasMatch(password)) {
+      setState(() => _errorMessage = 'Use 8+ characters with letters and numbers');
+      return;
+    }
+    setState(() {
+      _errorMessage = null;
+      _isLoading = true;
+    });
+    try {
+      await AuthService().register(
+        email: email,
+        password: password,
+        role: UserRole.expat,
+        profile: UserProfile(
+          id: '', email: email, role: UserRole.expat,
+          preferredLanguage: widget.preferredLanguage ?? 'English',
+          legalFirstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
+          legalLastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
+          dateOfBirth: _dateOfBirth,
+          countryOfCitizenship: _country,
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e is FirebaseAuthException ? e.message : e.toString();
+      });
+    }
+  }
+
   Widget _buildAgreeButton(TextTheme textTheme) {
     return FilledButton(
-      onPressed: () {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute<void>(
-            builder: (_) => const ExpatHomeScreen(),
-          ),
-          (route) => false,
-        );
-      },
+      onPressed: _isLoading ? null : _handleAgreeAndContinue,
       style: FilledButton.styleFrom(
         backgroundColor: _SignUpColors.accentGreen,
         foregroundColor: _SignUpColors.primaryDark,
@@ -427,13 +476,30 @@ class _SignUpScreenState extends State<SignUpScreen> {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
-      child: Text(
-        'Agree & Continue',
-        style: textTheme.titleMedium?.copyWith(
+      child: _isLoading
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(
+              'Agree & Continue',
+              style: textTheme.titleMedium?.copyWith(
           color: _SignUpColors.primaryDark,
           fontWeight: FontWeight.bold,
           fontSize: 17,
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(TextTheme textTheme) {
+    if (_errorMessage == null || _errorMessage!.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Text(
+        _errorMessage!,
+        style: textTheme.bodySmall?.copyWith(color: _SignUpColors.invalidRed),
       ),
     );
   }

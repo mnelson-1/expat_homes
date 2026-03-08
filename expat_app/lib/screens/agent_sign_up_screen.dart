@@ -1,6 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
-import 'agent_home_screen.dart';
+import 'package:expat_app/models/user_profile.dart';
+import 'package:expat_app/services/auth_service.dart';
 
 /// Seed data: agents issued by RWAREB (or app's copy of that database).
 /// In production the backend will validate against the institution's data.
@@ -41,7 +42,14 @@ class _AgentSignUpColors {
 
 /// Agent signup screen: legal name, language, agent ID, password, terms, Sign Up.
 class AgentSignUpScreen extends StatefulWidget {
-  const AgentSignUpScreen({super.key});
+  const AgentSignUpScreen({
+    super.key,
+    this.initialEmail,
+    this.preferredLanguage = 'English',
+  });
+
+  final String? initialEmail;
+  final String? preferredLanguage;
 
   @override
   State<AgentSignUpScreen> createState() => _AgentSignUpScreenState();
@@ -56,10 +64,13 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
   String _selectedLanguage = 'English';
   /// null = default message, 'valid' = Valid ID, 'invalid' = Invalid ID
   String? _idValidationStatus;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+    _selectedLanguage = widget.preferredLanguage ?? 'English';
     _agentIdController.addListener(_onAgentIdChanged);
     _passwordController.addListener(_onFormChanged);
     _confirmPasswordController.addListener(_onFormChanged);
@@ -184,6 +195,7 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
                   const SizedBox(height: 4),
                   _buildPasswordFeedback(textTheme),
                   const SizedBox(height: 24),
+                  _buildErrorBanner(textTheme),
                   _buildTermsText(textTheme),
                   const SizedBox(height: 28),
                   _buildSignUpButton(textTheme),
@@ -490,19 +502,61 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
     );
   }
 
+  Future<void> _handleSignUp() async {
+    final email = widget.initialEmail?.trim() ?? '';
+    if (email.isEmpty) {
+      setState(() => _errorMessage = 'Please go back and enter your email on Get Started.');
+      return;
+    }
+    if (_idValidationStatus != 'valid') {
+      setState(() => _errorMessage = 'Please enter a valid Agent ID.');
+      return;
+    }
+    final password = _passwordController.text;
+    if (password != _confirmPasswordController.text) {
+      setState(() => _errorMessage = 'Passwords do not match');
+      return;
+    }
+    if (password.length < 8 || !RegExp(r'[a-zA-Z]').hasMatch(password) || !RegExp(r'[0-9]').hasMatch(password)) {
+      setState(() => _errorMessage = 'Use 8+ characters with letters and numbers');
+      return;
+    }
+    setState(() {
+      _errorMessage = null;
+      _isLoading = true;
+    });
+    try {
+      await AuthService().register(
+        email: email,
+        password: password,
+        role: UserRole.agent,
+        profile: UserProfile(
+          id: '',
+          email: email,
+          role: UserRole.agent,
+          preferredLanguage: widget.preferredLanguage ?? _selectedLanguage,
+          legalFirstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
+          legalLastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
+          agentId: _agentIdController.text.trim(),
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e is FirebaseAuthException ? e.message : e.toString();
+      });
+    }
+  }
+
   Widget _buildSignUpButton(TextTheme textTheme) {
-    // TODO: Re-enable when backend is ready. For testing, Sign Up is always enabled.
-    // final canSignUp = _idValidationStatus == 'valid' &&
-    //     _passwordController.text.isNotEmpty &&
-    //     _passwordController.text == _confirmPasswordController.text;
+    final canSignUp = _idValidationStatus == 'valid' &&
+        _passwordController.text.isNotEmpty &&
+        _passwordController.text == _confirmPasswordController.text;
     return FilledButton(
-      onPressed: () {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(
-            builder: (_) => const AgentHomeScreen(initialIndex: 1),
-          ),
-        );
-      },
+      onPressed: (_isLoading || !canSignUp) ? null : _handleSignUp,
       style: FilledButton.styleFrom(
         backgroundColor: _AgentSignUpColors.accentGreen,
         foregroundColor: _AgentSignUpColors.bodyText,
@@ -512,13 +566,30 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
+      child: _isLoading
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(
+              'Sign Up',
+              style: textTheme.titleMedium?.copyWith(
+                color: _AgentSignUpColors.bodyText,
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
+              ),
+            ),
+    );
+  }
+
+  Widget _buildErrorBanner(TextTheme textTheme) {
+    if (_errorMessage == null || _errorMessage!.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
       child: Text(
-        'Sign Up',
-        style: textTheme.titleMedium?.copyWith(
-          color: _AgentSignUpColors.bodyText,
-          fontWeight: FontWeight.bold,
-          fontSize: 17,
-        ),
+        _errorMessage!,
+        style: textTheme.bodySmall?.copyWith(color: _AgentSignUpColors.invalidRed),
       ),
     );
   }

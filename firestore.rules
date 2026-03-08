@@ -1,0 +1,11 @@
+rules_version = '2';
+// ExpatHomes Firestore rules — starter for auth phase.
+// Deploy: firebase deploy --only firestore:rules (from project root with firebase.json).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users: only the signed-in user can read/write their own profile.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

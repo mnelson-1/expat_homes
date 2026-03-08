@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "348041462667",
+    "project_id": "expat-homes-28b62",
+    "storage_bucket": "expat-homes-28b62.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:348041462667:android:8315d5a8cdf0cfe21f258e",
+        "android_client_info": {
+          "package_name": "com.example.expat_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4NZFJwPorsY-fEg_yzqsTGUBm09bJvD0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

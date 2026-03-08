@@ -1,6 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
-import 'landlord_home_screen.dart';
+import 'package:expat_app/models/user_profile.dart';
+import 'package:expat_app/services/auth_service.dart';
 
 /// Palette for Landlord signup (mirrors Expat signup).
 class _LandlordSignUpColors {
@@ -19,7 +20,14 @@ class _LandlordSignUpColors {
 
 /// Landlord signup screen: legal name, DOB, password, terms, Agree & Continue.
 class LandlordSignUpScreen extends StatefulWidget {
-  const LandlordSignUpScreen({super.key});
+  const LandlordSignUpScreen({
+    super.key,
+    this.initialEmail,
+    this.preferredLanguage = 'English',
+  });
+
+  final String? initialEmail;
+  final String? preferredLanguage;
 
   @override
   State<LandlordSignUpScreen> createState() => _LandlordSignUpScreenState();
@@ -31,6 +39,8 @@ class _LandlordSignUpScreenState extends State<LandlordSignUpScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   DateTime? _dateOfBirth;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   void _onPasswordFieldChanged() => setState(() {});
 
@@ -120,6 +130,7 @@ class _LandlordSignUpScreenState extends State<LandlordSignUpScreen> {
                   const SizedBox(height: 4),
                   _buildPasswordFeedback(textTheme),
                   const SizedBox(height: 24),
+                  _buildErrorBanner(textTheme),
                   _buildTermsText(textTheme),
                   const SizedBox(height: 28),
                   _buildAgreeButton(textTheme),
@@ -367,16 +378,54 @@ class _LandlordSignUpScreenState extends State<LandlordSignUpScreen> {
     );
   }
 
+  Future<void> _handleAgreeAndContinue() async {
+    final email = widget.initialEmail?.trim() ?? '';
+    if (email.isEmpty) {
+      setState(() => _errorMessage = 'Please go back and enter your email on Get Started.');
+      return;
+    }
+    final password = _passwordController.text;
+    if (password != _confirmPasswordController.text) {
+      setState(() => _errorMessage = 'Passwords do not match');
+      return;
+    }
+    if (password.length < 8 || !RegExp(r'[a-zA-Z]').hasMatch(password) || !RegExp(r'[0-9]').hasMatch(password)) {
+      setState(() => _errorMessage = 'Use 8+ characters with letters and numbers');
+      return;
+    }
+    setState(() {
+      _errorMessage = null;
+      _isLoading = true;
+    });
+    try {
+      await AuthService().register(
+        email: email,
+        password: password,
+        role: UserRole.landlord,
+        profile: UserProfile(
+          id: '',
+          email: email,
+          role: UserRole.landlord,
+          preferredLanguage: widget.preferredLanguage ?? 'English',
+          legalFirstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
+          legalLastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
+          dateOfBirth: _dateOfBirth,
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e is FirebaseAuthException ? e.message : e.toString();
+      });
+    }
+  }
+
   Widget _buildAgreeButton(TextTheme textTheme) {
     return FilledButton(
-      onPressed: () {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute<void>(
-            builder: (_) => const LandlordHomeScreen(),
-          ),
-          (route) => false,
-        );
-      },
+      onPressed: _isLoading ? null : _handleAgreeAndContinue,
       style: FilledButton.styleFrom(
         backgroundColor: _LandlordSignUpColors.accentGreen,
         foregroundColor: _LandlordSignUpColors.primaryDark,
@@ -385,13 +434,30 @@ class _LandlordSignUpScreenState extends State<LandlordSignUpScreen> {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
+      child: _isLoading
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(
+              'Agree & Continue',
+              style: textTheme.titleMedium?.copyWith(
+                color: _LandlordSignUpColors.primaryDark,
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
+              ),
+            ),
+    );
+  }
+
+  Widget _buildErrorBanner(TextTheme textTheme) {
+    if (_errorMessage == null || _errorMessage!.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
       child: Text(
-        'Agree & Continue',
-        style: textTheme.titleMedium?.copyWith(
-          color: _LandlordSignUpColors.primaryDark,
-          fontWeight: FontWeight.bold,
-          fontSize: 17,
-        ),
+        _errorMessage!,
+        style: textTheme.bodySmall?.copyWith(color: _LandlordSignUpColors.invalidRed),
       ),
     );
   }

@@ -37,6 +37,11 @@ dependencies:
   google_fonts: ^6.2.1
   image_picker: ^1.0.7
 
+  # Firebase backend (auth + Firestore)
+  firebase_core: ^3.8.1
+  firebase_auth: ^5.3.4
+  cloud_firestore: ^5.5.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

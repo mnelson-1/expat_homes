@@ -293,7 +293,10 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
         if (_selectedRole == _UserRole.expat) {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => const SignUpScreen(),
+              builder: (_) => SignUpScreen(
+                initialEmail: _emailController.text.trim(),
+                preferredLanguage: _selectedLanguage,
+              ),
             ),
           );
           return;
@@ -301,7 +304,10 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
         if (_selectedRole == _UserRole.landlord) {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => const LandlordSignUpScreen(),
+              builder: (_) => LandlordSignUpScreen(
+                initialEmail: _emailController.text.trim(),
+                preferredLanguage: _selectedLanguage,
+              ),
             ),
           );
           return;
@@ -309,7 +315,10 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
         if (_selectedRole == _UserRole.agent) {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => const AgentSignUpScreen(),
+              builder: (_) => AgentSignUpScreen(
+                initialEmail: _emailController.text.trim(),
+                preferredLanguage: _selectedLanguage,
+              ),
             ),
           );
           return;

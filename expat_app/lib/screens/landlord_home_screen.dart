@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/services/auth_service.dart';
 import 'agent_profile_screen.dart';
 import 'landlord_estates_screen.dart';
 import 'landlord_make_listing_screen.dart';
@@ -118,15 +119,37 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
               ),
             ),
             Row(
-              children: const [
-                Icon(Icons.notifications_none, color: Colors.white),
-                SizedBox(width: 16),
-                Icon(Icons.person_outline, color: Colors.white),
+              children: [
+                const Icon(Icons.notifications_none, color: Colors.white),
+                const SizedBox(width: 8),
+                _buildProfileMenu(textTheme),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Temporary testing: profile menu with Log out.
+  Widget _buildProfileMenu(TextTheme textTheme) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.person_outline, color: Colors.white),
+      color: Colors.white,
+      onSelected: (value) {
+        if (value == 'logout') {
+          AuthService().signOut();
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: ListTile(
+            leading: Icon(Icons.logout),
+            title: Text('Log out'),
+          ),
+        ),
+      ],
     );
   }
 

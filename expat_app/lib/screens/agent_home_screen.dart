@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/services/auth_service.dart';
 import 'agent_assigned_listings_screen.dart';
 import 'agent_bio_view_screen.dart';
 import 'agent_payments_screen.dart';
@@ -38,9 +39,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       body: Column(
         children: [
           _buildHeader(textTheme),
-          Expanded(
-            child: _buildBody(textTheme),
-          ),
+          Expanded(child: _buildBody(textTheme)),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(textTheme),
@@ -67,26 +66,53 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.notifications_none, color: Colors.white),
+                  icon: const Icon(
+                    Icons.notifications_none,
+                    color: Colors.white,
+                  ),
                   onPressed: () {},
                 ),
-                IconButton(
-                  icon: const Icon(Icons.person_outline, color: Colors.white),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const AgentProfileScreen(
-                          showAssignProperty: false,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                _buildProfileMenu(textTheme),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Temporary testing: profile menu with Profile and Log out.
+  Widget _buildProfileMenu(TextTheme textTheme) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.person_outline, color: Colors.white),
+      color: Colors.white,
+      onSelected: (value) {
+        if (value == 'profile') {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const AgentProfileScreen(showAssignProperty: false),
+            ),
+          );
+        } else if (value == 'logout') {
+          AuthService().signOut();
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem<String>(
+          value: 'profile',
+          child: ListTile(
+            leading: Icon(Icons.person),
+            title: Text('Profile'),
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: ListTile(
+            leading: Icon(Icons.logout),
+            title: Text('Log out'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -129,10 +155,30 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(textTheme, 0, 'assets/images/Bio-View Icon.png', 'Bio-View'),
-                _buildNavItem(textTheme, 1, 'assets/images/Estates Icon.png', 'Estates'),
-                _buildNavItem(textTheme, 2, 'assets/images/Messages icon.png', 'Messages'),
-                _buildNavItem(textTheme, 3, 'assets/images/Payment Icon.png', 'Payments'),
+                _buildNavItem(
+                  textTheme,
+                  0,
+                  'assets/images/Bio-View Icon.png',
+                  'Bio-View',
+                ),
+                _buildNavItem(
+                  textTheme,
+                  1,
+                  'assets/images/Estates Icon.png',
+                  'Estates',
+                ),
+                _buildNavItem(
+                  textTheme,
+                  2,
+                  'assets/images/Messages icon.png',
+                  'Messages',
+                ),
+                _buildNavItem(
+                  textTheme,
+                  3,
+                  'assets/images/Payment Icon.png',
+                  'Payments',
+                ),
               ],
             ),
           ),
@@ -162,7 +208,8 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             height: 22,
             color: color,
             colorBlendMode: BlendMode.srcIn,
-            errorBuilder: (_, __, ___) => Icon(Icons.circle, size: 22, color: color),
+            errorBuilder:
+                (_, __, ___) => Icon(Icons.circle, size: 22, color: color),
           ),
           const SizedBox(height: 4),
           Text(
