@@ -43,6 +43,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   double _feedScrollOffset = 0;
   double _bowlsScrollOffset = 0;
   double _estatesScrollOffset = 0;
+  late final Stream<List<Listing>> _publishedListingsStream;
 
   static const List<BoxShadow> _tabBarShadow = [
     BoxShadow(
@@ -56,6 +57,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   @override
   void initState() {
     super.initState();
+    _publishedListingsStream = ListingsService().publishedListingsStream();
     _feedScrollController.addListener(_onFeedScroll);
     _bowlsScrollController.addListener(_onBowlsScroll);
     _estatesScrollController.addListener(_onEstatesScroll);
@@ -85,7 +87,11 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
 
   void _onEstatesScroll() {
     final o = _estatesScrollController.offset;
-    if (_estatesScrollOffset != o) setState(() => _estatesScrollOffset = o);
+    // Only rebuild when crossing zero so the header shadow show/hide updates; avoids refresh-like rebuilds on every scroll.
+    final hadShadow = _estatesScrollOffset > 0;
+    final hasShadow = o > 0;
+    if (hadShadow != hasShadow) setState(() => _estatesScrollOffset = o);
+    else if (_estatesScrollOffset != o) _estatesScrollOffset = o;
   }
 
   @override
@@ -453,7 +459,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   /// Estates tab: stream published listings from Firestore, filter by type + search.
   Widget _buildEstatesContentWithStream(TextTheme textTheme) {
     return StreamBuilder<List<Listing>>(
-      stream: ListingsService().publishedListingsStream(),
+      stream: _publishedListingsStream,
       builder: (context, snapshot) {
         var list = snapshot.data ?? [];
         if (_selectedEstateFilter == 1) {

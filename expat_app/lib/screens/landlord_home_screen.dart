@@ -359,57 +359,55 @@ Widget _buildMakeListingButton(BuildContext context, TextTheme textTheme) {
   const accentGreen = _LandlordHomeColors.accentGreen;
   final width = MediaQuery.of(context).size.width;
 
-  // Use Builder so Navigator uses the correct context (under MaterialApp).
+  // Builder gives correct context for Navigator. Avoid Transform.translate here —
+  // it moves the button visually but hit-testing stays in the original place, so taps miss.
   return Builder(
     builder: (ctx) {
-      return Transform.translate(
-        offset: const Offset(0, -48),
-        child: SizedBox(
-          height: 56,
-          width: width * 0.45,
-          child: ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const LandlordMakeListingScreen(),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentGreen,
-              foregroundColor: bodyText,
-              elevation: 6,
-              side: const BorderSide(
-                color: Colors.black,
-                width: 2,
+      return SizedBox(
+        height: 56,
+        width: width * 0.45,
+        child: ElevatedButton(
+          onPressed: () {
+            Navigator.of(ctx).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const LandlordMakeListingScreen(),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(32),
-              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: accentGreen,
+            foregroundColor: bodyText,
+            elevation: 6,
+            side: const BorderSide(
+              color: Colors.black,
+              width: 2,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.max,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: Text(
-                    'Make a Listing',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: bodyText,
-                      fontWeight: FontWeight.bold,
-                    ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(32),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  'Make a Listing',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: bodyText,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.add,
-                  size: 26,
-                  color: bodyText,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.add,
+                size: 26,
+                color: bodyText,
+              ),
+            ],
           ),
         ),
       );
