@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 
+import { auth } from '../firebase'
 import { EditRequestsProvider } from '../context/EditRequestsContext'
 import pendingIcon from '../../images/Pending Verification Icon.png'
 import editIcon from '../../images/Edit Request Icon.png'
@@ -7,9 +10,31 @@ import logoutIcon from '../../images/Logout Icon.png'
 
 export function AdminLayout() {
   const navigate = useNavigate()
+  const [checkingAuth, setCheckingAuth] = useState(true)
 
-  const handleLogout = () => {
-    navigate('/admin/login')
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        navigate('/admin/login', { replace: true })
+      }
+      setCheckingAuth(false)
+    })
+    return () => unsub()
+  }, [navigate])
+
+  const handleLogout = async () => {
+    await signOut(auth)
+    navigate('/admin/login', { replace: true })
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="admin-layout">
+        <main className="admin-main">
+          <p>Checking admin session…</p>
+        </main>
+      </div>
+    )
   }
 
   return (

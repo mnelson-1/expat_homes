@@ -69,6 +69,29 @@ class ListingsService {
     }
 
     onProgress?.call('Saving listing...');
+
+    // Resolve landlord display name once so Super Admin and other clients
+    // can show it directly from the listing document.
+    String? representativeName;
+    try {
+      final userSnap =
+          await _firestore.collection('users').doc(landlordId).get();
+      final data = userSnap.data();
+      if (data != null) {
+        final first = (data['legalFirstName'] as String?) ?? '';
+        final last = (data['legalLastName'] as String?) ?? '';
+        final combined = '$first $last'.trim();
+        if (combined.isNotEmpty) {
+          representativeName = combined;
+        } else {
+          representativeName = data['email'] as String?;
+        }
+      }
+    } catch (_) {
+      // If this lookup fails for any reason, we still proceed; the
+      // listing will just omit representativeName.
+    }
+
     final listing = Listing(
       id: listingId,
       landlordId: landlordId,
@@ -82,6 +105,8 @@ class ListingsService {
       status: ListingStatus.pendingVerification,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      representativeName: representativeName,
+      representativeRole: 'Landlord',
     );
 
     await ref.set(listing.toFirestoreCreate());

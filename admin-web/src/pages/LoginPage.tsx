@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
+
+import { auth, db } from '../firebase'
 
 import slide1 from '/images/1.jpg'
 import slide2 from '/images/2.jpg'
 import slide3 from '/images/3.jpg'
 import slide4 from '/images/4.jpg'
 
-const PLACEHOLDER_EMAIL = 'admin@expathomes.rw'
-const PLACEHOLDER_PASSWORD = 'admin123'
 const CAROUSEL_INTERVAL_MS = 7000
 
 const SLIDES = [
@@ -38,6 +40,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentSlide, setCurrentSlide] = useState(0)
 
   useEffect(() => {
@@ -50,14 +53,28 @@ export function LoginPage() {
     }
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
-    if (email.trim().toLowerCase() !== PLACEHOLDER_EMAIL || password !== PLACEHOLDER_PASSWORD) {
-      setError('Invalid email or password.')
-      return
+    setIsSubmitting(true)
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password)
+
+      // Ensure this user has a super admin role in Firestore.
+      const userDoc = await getDoc(doc(db, 'users', cred.user.uid))
+      const role = userDoc.exists() ? (userDoc.data() as any).role : null
+      if (role !== 'super_admin') {
+        setError('You do not have Super Admin access.')
+        await auth.signOut()
+        return
+      }
+
+      navigate('/admin/listings/pending')
+    } catch (err: any) {
+      setError(err.message ?? 'Failed to sign in.')
+    } finally {
+      setIsSubmitting(false)
     }
-    navigate('/admin/listings/pending')
   }
 
   const activeSlide = SLIDES[currentSlide]
@@ -124,8 +141,8 @@ export function LoginPage() {
                   {error}
                 </p>
               )}
-              <button type="submit" className="login-submit">
-                Sign in
+              <button type="submit" className="login-submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
             <p className="login-subtitle login-subtitle-bottom">

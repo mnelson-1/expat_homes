@@ -32,19 +32,26 @@ class ListingDetailScreen extends StatelessWidget {
   final String typeLabel; // e.g. "Apartment", "House", "Short-Stay"
   final List<String> imagePaths;
   final String description;
+
   /// Optional house UPI (placeholder for now in Expat flow).
   final String? upi;
   final bool isVerifiedByRdb;
+
   /// Optional agent/landlord representative; when null, the section is hidden.
   final String? representativeName;
+
   /// When true (landlord view), bottom bar shows only a single "Request Edit" button.
   final bool showRequestEditOnly;
+
   /// When true (agent view), bottom bar shows Decline, Accept, and Chat Landlord.
   final bool showAgentActions;
+
   /// When opening from agent Listings; used to notify when listing is accepted.
   final String? listingId;
+
   /// Called when agent taps Accept (so the listing can move to Accepted tab).
   final void Function(String listingId)? onListingAccepted;
+
   /// Called when agent taps Decline (so the listing is removed from Pending).
   final void Function(String listingId)? onListingDeclined;
 
@@ -98,8 +105,9 @@ class ListingDetailScreen extends StatelessWidget {
       ),
       bottomNavigationBar: ValueListenableBuilder<bool>(
         valueListenable: _showBottomShadow,
-        builder: (context, showShadow, _) =>
-            _buildBottomActions(context, textTheme, showShadow: showShadow),
+        builder:
+            (context, showShadow, _) =>
+                _buildBottomActions(context, textTheme, showShadow: showShadow),
       ),
     );
   }
@@ -113,7 +121,11 @@ class ListingDetailScreen extends StatelessWidget {
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 18,
+              ),
               onPressed: () => Navigator.of(context).pop(),
             ),
             const SizedBox(width: 4),
@@ -160,19 +172,22 @@ class ListingDetailScreen extends StatelessWidget {
                   bottomLeft: Radius.circular(0),
                   bottomRight: Radius.circular(0),
                 ),
-                child: isNetwork
-                    ? Image.network(
-                        path,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            Container(color: Colors.grey.shade300),
-                      )
-                    : Image.asset(
-                        path,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            Container(color: Colors.grey.shade300),
-                      ),
+                child:
+                    isNetwork
+                        ? Image.network(
+                          path,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (_, __, ___) =>
+                                  Container(color: Colors.grey.shade300),
+                        )
+                        : Image.asset(
+                          path,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (_, __, ___) =>
+                                  Container(color: Colors.grey.shade300),
+                        ),
               );
             },
           ),
@@ -218,7 +233,8 @@ class ListingDetailScreen extends StatelessWidget {
     final parts = price.split('/');
     final amount = parts.isNotEmpty ? parts[0] : price;
     final rawSuffix = parts.length > 1 ? parts[1] : '';
-    final suffix = rawSuffix.isEmpty ? '' : '/${_normalizePriceSuffix(rawSuffix)}';
+    final suffix =
+        rawSuffix.isEmpty ? '' : '/${_normalizePriceSuffix(rawSuffix)}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -236,9 +252,7 @@ class ListingDetailScreen extends StatelessWidget {
                   children: [
                     TextSpan(
                       text: amount,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     if (suffix.isNotEmpty)
                       TextSpan(
@@ -385,15 +399,16 @@ class ListingDetailScreen extends StatelessWidget {
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          boxShadow: showShadow
-              ? const [
-                  BoxShadow(
-                    color: Color(0x33000000),
-                    offset: Offset(0, -6),
-                    blurRadius: 12,
-                  ),
-                ]
-              : null,
+          boxShadow:
+              showShadow
+                  ? const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      offset: Offset(0, -6),
+                      blurRadius: 12,
+                    ),
+                  ]
+                  : null,
         ),
         child: SafeArea(
           top: false,
@@ -405,17 +420,18 @@ class ListingDetailScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => LandlordMakeListingScreen(
-                        isEdit: true,
-                        initialTitle: title,
-                        initialPrice: price,
-                        initialLocation: location,
-                        initialDescription: description,
-                        // UPI and owner name will be provided later
-                        // when backend data is available.
-                        initialUpi: null,
-                        initialOwnerName: representativeName,
-                      ),
+                      builder:
+                          (_) => LandlordMakeListingScreen(
+                            isEdit: true,
+                            initialTitle: title,
+                            initialPrice: price,
+                            initialLocation: location,
+                            initialDescription: description,
+                            // UPI and owner name will be provided later
+                            // when backend data is available.
+                            initialUpi: null,
+                            initialOwnerName: representativeName,
+                          ),
                     ),
                   );
                 },
@@ -445,15 +461,16 @@ class ListingDetailScreen extends StatelessWidget {
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          boxShadow: showShadow
-              ? const [
-                  BoxShadow(
-                    color: Color(0x33000000),
-                    offset: Offset(0, -6),
-                    blurRadius: 12,
-                  ),
-                ]
-              : null,
+          boxShadow:
+              showShadow
+                  ? const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      offset: Offset(0, -6),
+                      blurRadius: 12,
+                    ),
+                  ]
+                  : null,
         ),
         child: SafeArea(
           top: false,
@@ -541,34 +558,37 @@ class ListingDetailScreen extends StatelessWidget {
                         listingTitle: title,
                         location: location,
                         price: price,
-                        imagePath: imagePaths.isNotEmpty
-                            ? imagePaths.first
-                            : '',
+                        imagePath:
+                            imagePaths.isNotEmpty ? imagePaths.first : '',
                       );
-                      final initialMessage =
-                          getLastMessageForAgentLandlordChat(
+                      final initialMessage = getLastMessageForAgentLandlordChat(
                         listingTitle: title,
                       );
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => ConversationScreen(
-                            listingTitle: title,
-                            location: location,
-                            price: price,
-                            imagePath: imagePaths.isNotEmpty
-                                ? imagePaths.first
-                                : '',
-                            contactName: landlordName,
-                            contactSubtitle: subtitle,
-                            initialMessage: initialMessage,
-                            storedMessages: getStoredMessagesForThread(
-                                landlordName, subtitle, title),
-                            showInitialAsIncoming: true,
-                            listingFromOtherParty: true,
-                            returnToLandlordOnBack: false,
-                            returnToAgentMessagesOnBack: true,
-                            listingDetailRole: kRoleAgent,
-                          ),
+                          builder:
+                              (_) => ConversationScreen(
+                                listingTitle: title,
+                                location: location,
+                                price: price,
+                                imagePath:
+                                    imagePaths.isNotEmpty
+                                        ? imagePaths.first
+                                        : '',
+                                contactName: landlordName,
+                                contactSubtitle: subtitle,
+                                initialMessage: initialMessage,
+                                storedMessages: getStoredMessagesForThread(
+                                  landlordName,
+                                  subtitle,
+                                  title,
+                                ),
+                                showInitialAsIncoming: true,
+                                listingFromOtherParty: true,
+                                returnToLandlordOnBack: false,
+                                returnToAgentMessagesOnBack: true,
+                                listingDetailRole: kRoleAgent,
+                              ),
                         ),
                       );
                     },
@@ -599,15 +619,16 @@ class ListingDetailScreen extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: showShadow
-            ? const [
-                BoxShadow(
-                  color: Color(0x33000000),
-                  offset: Offset(0, -6),
-                  blurRadius: 12,
-                ),
-              ]
-            : null,
+        boxShadow:
+            showShadow
+                ? const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    offset: Offset(0, -6),
+                    blurRadius: 12,
+                  ),
+                ]
+                : null,
       ),
       child: SafeArea(
         top: false,
@@ -675,28 +696,29 @@ class ListingDetailScreen extends StatelessWidget {
                       listingTitle: title,
                       location: location,
                       price: price,
-                      imagePath: imagePaths.isNotEmpty
-                          ? imagePaths.first
-                          : '',
+                      imagePath: imagePaths.isNotEmpty ? imagePaths.first : '',
                       lastMessage: defaultInquiryMessage,
                     );
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => ConversationScreen(
-                          listingTitle: title,
-                          location: location,
-                          price: price,
-                          imagePath: imagePaths.isNotEmpty
-                              ? imagePaths.first
-                              : '',
-                          contactName: contactName,
-                          contactSubtitle: contactSubtitle,
-                          initialMessage: defaultInquiryMessage,
-                          storedMessages: getStoredMessagesForThread(
-                              contactName, contactSubtitle, title),
-                          returnToLandlordOnBack: false,
-                          listingDetailRole: kRoleExpat,
-                        ),
+                        builder:
+                            (_) => ConversationScreen(
+                              listingTitle: title,
+                              location: location,
+                              price: price,
+                              imagePath:
+                                  imagePaths.isNotEmpty ? imagePaths.first : '',
+                              contactName: contactName,
+                              contactSubtitle: contactSubtitle,
+                              initialMessage: defaultInquiryMessage,
+                              storedMessages: getStoredMessagesForThread(
+                                contactName,
+                                contactSubtitle,
+                                title,
+                              ),
+                              returnToLandlordOnBack: false,
+                              listingDetailRole: kRoleExpat,
+                            ),
                       ),
                     );
                   },
@@ -712,8 +734,7 @@ class ListingDetailScreen extends StatelessWidget {
                     'Inquire',
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize:
-                          (textTheme.titleMedium?.fontSize ?? 16) + 1,
+                      fontSize: (textTheme.titleMedium?.fontSize ?? 16) + 1,
                     ),
                   ),
                 ),
@@ -727,6 +748,7 @@ class ListingDetailScreen extends StatelessWidget {
 
   static const Color _agentAcceptGreen = Color(0xFF8ED966);
   static const Color _agentDeclineRed = Color(0xFFC62828);
+
   /// Body text blue used in Assignment Successful and other modals.
   static const Color _agentDialogBodyBlue = Color(0xFF1A2E35);
 
@@ -915,9 +937,8 @@ class ListingDetailScreenById extends StatelessWidget {
             body: const Center(child: Text('Listing not found')),
           );
         }
-        final imagePaths = listing.mediaUrls.isEmpty
-            ? <String>[]
-            : listing.mediaUrls;
+        final imagePaths =
+            listing.mediaUrls.isEmpty ? <String>[] : listing.mediaUrls;
         return ListingDetailScreen(
           title: listing.title,
           location: listing.location,
@@ -938,4 +959,3 @@ class ListingDetailScreenById extends StatelessWidget {
     );
   }
 }
-

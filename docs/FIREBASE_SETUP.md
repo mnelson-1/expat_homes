@@ -157,23 +157,82 @@ After Storage is enabled and rules are published, try again with **one small pho
 
 ---
 
-## 8. Firestore index (optional)
+## 8. Firestore index (published + pending listings)
 
-For the published listings stream, create a composite index in Firestore:
+For the Expat app’s published listings stream **and** the Super Admin dashboard’s pending‑verification table, create a composite index in Firestore:
 
 - Collection: `listings`
 - Fields: `status` (Ascending), `createdAt` (Descending)
 
-Firebase Console will prompt with a link when the query runs if the index is missing.
+Firebase Console will prompt with a link when either query runs if the index is missing; you can click the link to create it.
 
-## 9. Next steps (from BACKEND_CHECKLIST)
+## 9. Super Admin web dashboard (`admin-web/`)
+
+The `admin-web/` directory contains a Vite + React dashboard used by the **Super Admin** to approve/reject listings and (later) manage edit requests.
+
+### 9.1 Install dependencies
+
+From the project root:
+
+```bash
+cd admin-web
+npm install
+```
+
+Firebase is already added as a dependency in `admin-web/package.json`.
+
+### 9.2 Configure Firebase for the dashboard
+
+1. In Firebase Console, go to **Project settings → Your apps** and either reuse your existing Web app or create a new one.
+2. Copy the Web app config (`apiKey`, `authDomain`, etc.).
+3. In `admin-web/`, create a file named `.env.local` (not committed to git) with:
+
+```bash
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+```
+
+The React app reads these values in `src/firebase.ts` when initializing Firebase.
+
+### 9.3 Super Admin user and role
+
+1. In **Authentication → Users**, create a user for the admin dashboard (email/password).
+2. In **Firestore → Data**, add (or update) `users/{uid}` for that user with:
+
+```json
+{
+  "email": "admin@example.com",
+  "role": "super_admin"
+}
+```
+
+The admin login page (`LoginPage.tsx`) signs in with Firebase Auth and checks that `role == "super_admin"` before allowing access.
+
+### 9.4 Firestore access and rules
+
+- The dashboard reads listings from the `listings` collection where `status == "pending_verification"` and writes updates to change `status` to `published` (approve) or `archived` (reject).
+- Firestore rules (see `firestore.rules`) define:
+  - `isSuperAdmin()`: checks that the signed‑in user’s profile has `role == "super_admin"`.
+  - Listings read/write permissions that allow Super Admins to read and update any listing, while keeping landlords restricted to their own documents.
+
+After editing rules, deploy them from the repo root:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+## 10. Next steps (from BACKEND_CHECKLIST)
 
 After auth and listings are working:
 
 1. **Super Admin** — Approve/reject listings (set `status` to `published`), edit requests, revisions.
-3. **Agents & assignments** — `licensed_agents` (or seed), `listing_assignments`.
-4. **Conversations & messages** — `conversations`, `conversation_participants`, `messages`.
-5. **Community** — posts, comments, bowls.
-6. **Payments** — commission_slips.
+2. **Agents & assignments** — `licensed_agents` (or seed), `listing_assignments`.
+3. **Conversations & messages** — `conversations`, `conversation_participants`, `messages`.
+4. **Community** — posts, comments, bowls.
+5. **Payments** — commission_slips.
 
 See `docs/BACKEND_CHECKLIST.md` and `docs/BACKEND_IMPLEMENTATION_PLAN.md` for the full plan.
