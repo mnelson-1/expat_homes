@@ -29,6 +29,8 @@ ExpatHomes addresses these issues by prioritising:
 - Arrival mobility support (“Rides”) integration concept
 - Community-driven peer knowledge sharing and feedback features
 
+This Link will lead you to the Final Version of the Product Solution - (https://drive.google.com/drive/u/0/folders/1_AMhxyJX8jGhNmvqjKVwZOvtTcxecxAB)
+
 ---
 
 ## Designs
