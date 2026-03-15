@@ -28,6 +28,7 @@ class SignInScreen extends StatefulWidget {
 class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -146,7 +147,7 @@ class _SignInScreenState extends State<SignInScreen> {
           const Divider(height: 1, color: _SignInColors.border),
           TextField(
             controller: _passwordController,
-            obscureText: true,
+            obscureText: _obscurePassword,
             autofillHints: const [AutofillHints.password],
             style: _fieldTextStyle(context),
             decoration: InputDecoration(
@@ -158,6 +159,14 @@ class _SignInScreenState extends State<SignInScreen> {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               contentPadding: padding,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: _SignInColors.hint,
+                  size: 22,
+                ),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
             ),
           ),
         ],

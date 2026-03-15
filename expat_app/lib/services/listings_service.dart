@@ -120,20 +120,34 @@ class ListingsService {
     return Listing.fromFirestore(doc);
   }
 
-  /// Resolve representative name from users collection (landlord).
-  /// When listing_assignments exist we can override with agent; for now landlord only.
+  /// Resolve representative name from listing doc (or users when allowed).
+  /// Listings store representativeName/representativeRole at create time. If present, use them
+  /// so expats (who cannot read other users' profiles) still see the name. Otherwise try
+  /// users collection; on permission denied (e.g. expat viewing) keep listing's values or 'Landlord'.
   Future<Listing?> getListingByIdWithRepresentative(String id) async {
     final listing = await getListingById(id);
     if (listing == null) return null;
-    // TODO: when listing_assignments exist, if status accepted use agent name
-    final userDoc = await _firestore
-        .collection('users')
-        .doc(listing.landlordId)
-        .get();
-    final data = userDoc.data();
-    final firstName = data?['legalFirstName'] as String? ?? '';
-    final lastName = data?['legalLastName'] as String? ?? '';
-    final name = [firstName, lastName].join(' ').trim();
+    String? name = listing.representativeName;
+    String role = listing.representativeRole ?? 'Landlord';
+    try {
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(listing.landlordId)
+          .get();
+      final data = userDoc.data();
+      if (data != null) {
+        final firstName = data['legalFirstName'] as String? ?? '';
+        final lastName = data['legalLastName'] as String? ?? '';
+        final combined = [firstName, lastName].join(' ').trim();
+        if (combined.isNotEmpty) {
+          name = combined;
+          role = 'Landlord';
+        }
+      }
+    } catch (_) {
+      // Expat (or other non-landlord) cannot read users/{landlordId}. Use stored or default.
+      if (name == null || name.isEmpty) name = 'Landlord';
+    }
     return Listing(
       id: listing.id,
       landlordId: listing.landlordId,
@@ -150,8 +164,8 @@ class ListingsService {
       updatedAt: listing.updatedAt,
       publishedAt: listing.publishedAt,
       verifiedBy: listing.verifiedBy,
-      representativeName: name.isNotEmpty ? name : 'Landlord',
-      representativeRole: 'Landlord',
+      representativeName: name,
+      representativeRole: role,
     );
   }
 

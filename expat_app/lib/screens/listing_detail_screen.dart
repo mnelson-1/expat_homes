@@ -930,11 +930,37 @@ class ListingDetailScreenById extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Listing')),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Something went wrong.',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         final listing = snapshot.data;
         if (listing == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Listing')),
-            body: const Center(child: Text('Listing not found')),
+            body: const Center(child: Text('Listing not found.')),
           );
         }
         final imagePaths =

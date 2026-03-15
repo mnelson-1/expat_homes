@@ -40,6 +40,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   DateTime? _dateOfBirth;
   String _country = 'Nigeria';
+  bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -122,7 +123,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     secondHint: 'Confirm password',
                     firstController: _passwordController,
                     secondController: _confirmPasswordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
+                    trailingIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: _SignUpColors.hint,
+                        size: 22,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   _buildPasswordFeedback(textTheme),
@@ -259,6 +268,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     required TextEditingController firstController,
     required TextEditingController secondController,
     bool obscureText = false,
+    Widget? trailingIcon,
   }) {
     const padding = EdgeInsets.symmetric(horizontal: 16, vertical: 14);
     return Container(
@@ -298,6 +308,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               contentPadding: padding,
+              suffixIcon: trailingIcon,
             ),
           ),
         ],

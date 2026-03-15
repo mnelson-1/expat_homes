@@ -39,6 +39,7 @@ class _LandlordSignUpScreenState extends State<LandlordSignUpScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   DateTime? _dateOfBirth;
+  bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -125,7 +126,15 @@ class _LandlordSignUpScreenState extends State<LandlordSignUpScreen> {
                     secondHint: 'Confirm password',
                     firstController: _passwordController,
                     secondController: _confirmPasswordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
+                    trailingIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: _LandlordSignUpColors.hint,
+                        size: 22,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   _buildPasswordFeedback(textTheme),
@@ -244,6 +253,7 @@ class _LandlordSignUpScreenState extends State<LandlordSignUpScreen> {
     required TextEditingController firstController,
     required TextEditingController secondController,
     bool obscureText = false,
+    Widget? trailingIcon,
   }) {
     const padding = EdgeInsets.symmetric(horizontal: 16, vertical: 14);
     return Container(
@@ -283,6 +293,7 @@ class _LandlordSignUpScreenState extends State<LandlordSignUpScreen> {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               contentPadding: padding,
+              suffixIcon: trailingIcon,
             ),
           ),
         ],

@@ -64,6 +64,7 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
   String _selectedLanguage = 'English';
   /// null = default message, 'valid' = Valid ID, 'invalid' = Invalid ID
   String? _idValidationStatus;
+  bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -190,7 +191,15 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
                     secondHint: 'Confirm password',
                     firstController: _passwordController,
                     secondController: _confirmPasswordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
+                    trailingIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: _AgentSignUpColors.hint,
+                        size: 22,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   _buildPasswordFeedback(textTheme),
@@ -334,6 +343,7 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
     required TextEditingController firstController,
     required TextEditingController secondController,
     bool obscureText = false,
+    Widget? trailingIcon,
   }) {
     const padding = EdgeInsets.symmetric(horizontal: 16, vertical: 14);
     return Container(
@@ -373,6 +383,7 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               contentPadding: padding,
+              suffixIcon: trailingIcon,
             ),
           ),
         ],
