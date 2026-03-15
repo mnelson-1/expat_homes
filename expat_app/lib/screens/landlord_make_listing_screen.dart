@@ -7,12 +7,14 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:expat_app/models/listing.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/edit_requests_service.dart';
 import 'package:expat_app/services/listings_service.dart';
 
 class LandlordMakeListingScreen extends StatefulWidget {
   const LandlordMakeListingScreen({
     super.key,
     this.isEdit,
+    this.listingId,
     this.initialTitle,
     this.initialPrice,
     this.initialUpi,
@@ -21,9 +23,11 @@ class LandlordMakeListingScreen extends StatefulWidget {
     this.initialOwnerName,
   });
 
-  /// When true, the screen behaves as an "Edit Listing" form
-  /// instead of "Make a Listing".
+  /// When true, submitting creates an edit request instead of a new listing.
   final bool? isEdit;
+
+  /// The listing being edited.
+  final String? listingId;
   final String? initialTitle;
   final String? initialPrice;
   final String? initialUpi;
@@ -87,37 +91,66 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
       return;
     }
     if (price.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter price')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter price')));
       return;
     }
     if (location.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter location')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter location')));
       return;
     }
 
     final user = AuthService().currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be signed in to create a listing')),
+        const SnackBar(
+          content: Text('You must be signed in to create a listing'),
+        ),
       );
       return;
     }
 
     setState(() {
       _isLoading = true;
-      _loadingMessage = _selectedImages.isEmpty ? 'Saving listing...' : 'Preparing...';
+      _loadingMessage =
+          _selectedImages.isEmpty ? 'Saving listing...' : 'Preparing...';
     });
     try {
       if (isEditMode) {
+        final lstId = widget.listingId;
+        if (lstId == null) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cannot save: listing ID is missing.')),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        setState(() => _loadingMessage = 'Submitting edit request...');
+        await EditRequestsService().createEditRequest(
+          listingId: lstId,
+          landlordId: user.uid,
+          proposedFields: {
+            'title': title,
+            'price': price,
+            'location': location,
+            'description':
+                description.isEmpty ? 'No description.' : description,
+            'type': _listingTypeFromUi(_selectedType).value,
+            if (upi.isNotEmpty) 'upi': upi,
+          },
+        );
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Edit will be available after approval flow.')),
+          const SnackBar(
+            content: Text('Edit request submitted and awaiting approval.'),
+          ),
         );
-        setState(() => _isLoading = false);
+        Navigator.of(context).pop();
         return;
       }
 
@@ -126,21 +159,26 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
         if (mounted) setState(() => _loadingMessage = message);
       };
       try {
-        await svc.createListing(
-          landlordId: user.uid,
-          type: _listingTypeFromUi(_selectedType),
-          title: title,
-          description: description.isEmpty ? 'No description.' : description,
-          location: location,
-          price: price,
-          upi: upi.isEmpty ? null : upi,
-          imageFiles: _selectedImages,
-        ).timeout(
-          const Duration(seconds: 120),
-          onTimeout: () => throw TimeoutException(
-            'Request timed out. Check: 1) Firebase Storage is enabled, 2) Storage rules allow uploads, 3) Your internet connection.',
-          ),
-        );
+        await svc
+            .createListing(
+              landlordId: user.uid,
+              type: _listingTypeFromUi(_selectedType),
+              title: title,
+              description:
+                  description.isEmpty ? 'No description.' : description,
+              location: location,
+              price: price,
+              upi: upi.isEmpty ? null : upi,
+              imageFiles: _selectedImages,
+            )
+            .timeout(
+              const Duration(seconds: 120),
+              onTimeout:
+                  () =>
+                      throw TimeoutException(
+                        'Request timed out. Check: 1) Firebase Storage is enabled, 2) Storage rules allow uploads, 3) Your internet connection.',
+                      ),
+            );
       } finally {
         svc.onProgress = null;
       }
@@ -154,28 +192,32 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
       if (!context.mounted) return;
       String message;
       if (e is FirebaseException) {
-        message = '${e.message ?? e.code}. Check Firebase Console: Storage enabled and rules allow uploads.';
+        message =
+            '${e.message ?? e.code}. Check Firebase Console: Storage enabled and rules allow uploads.';
       } else if (e is TimeoutException) {
-        message = e.message ?? 'Timed out. See docs/FIREBASE_SETUP.md for checklist.';
+        message =
+            e.message ?? 'Timed out. See docs/FIREBASE_SETUP.md for checklist.';
       } else {
         message = '$e';
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit: $message'), duration: const Duration(seconds: 8)),
+        SnackBar(
+          content: Text('Failed to submit: $message'),
+          duration: const Duration(seconds: 8),
+        ),
       );
       debugPrint('createListing error: $e\n$st');
     } finally {
-      if (mounted) setState(() {
-        _isLoading = false;
-        _loadingMessage = '';
-      });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _loadingMessage = '';
+        });
     }
   }
 
   Future<void> _pickImages() async {
-    final images = await _imagePicker.pickMultiImage(
-      imageQuality: 85,
-    );
+    final images = await _imagePicker.pickMultiImage(imageQuality: 85);
 
     if (!mounted || images.isEmpty) return;
 
@@ -217,8 +259,11 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
         backgroundColor: _MakeListingColors.primaryDark,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              color: Colors.white, size: 18),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.white,
+            size: 18,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -252,8 +297,9 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
               _buildTextField(
                 controller: _priceController,
                 hint: 'price in usd (Fx‑rate aware)',
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
               ),
               const SizedBox(height: 16),
               _buildLabel(textTheme, 'House UPI (Unique Parcel Identifier)'),
@@ -291,7 +337,11 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
                 width: double.infinity,
                 height: 52,
                 child: FilledButton(
-                  onPressed: _isLoading ? null : () => _submitListing(context, isEditMode, textTheme),
+                  onPressed:
+                      _isLoading
+                          ? null
+                          : () =>
+                              _submitListing(context, isEditMode, textTheme),
                   style: FilledButton.styleFrom(
                     backgroundColor: _MakeListingColors.accentGreen,
                     foregroundColor: _MakeListingColors.bodyText,
@@ -302,13 +352,16 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(isEditMode ? 'Save Changes' : 'Verify Listing'),
+                  child:
+                      _isLoading
+                          ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : Text(
+                            isEditMode ? 'Save Changes' : 'Verify Listing',
+                          ),
                 ),
               ),
               if (_isLoading && _loadingMessage.isNotEmpty) ...[
@@ -348,10 +401,7 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
-      style: const TextStyle(
-        color: _MakeListingColors.bodyText,
-        fontSize: 14,
-      ),
+      style: const TextStyle(color: _MakeListingColors.bodyText, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(
@@ -360,18 +410,16 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(
-            color: _MakeListingColors.border,
-          ),
+          borderSide: const BorderSide(color: _MakeListingColors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(
-            color: _MakeListingColors.bodyText,
-          ),
+          borderSide: const BorderSide(color: _MakeListingColors.bodyText),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }
@@ -387,21 +435,14 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
         child: DropdownButton<String>(
           value: _selectedType,
           isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down,
-              color: _MakeListingColors.bodyText),
+          icon: const Icon(
+            Icons.keyboard_arrow_down,
+            color: _MakeListingColors.bodyText,
+          ),
           items: const [
-            DropdownMenuItem(
-              value: 'Apartment',
-              child: Text('Apartment'),
-            ),
-            DropdownMenuItem(
-              value: 'House',
-              child: Text('House'),
-            ),
-            DropdownMenuItem(
-              value: 'Short-Stay',
-              child: Text('Short-Stay'),
-            ),
+            DropdownMenuItem(value: 'Apartment', child: Text('Apartment')),
+            DropdownMenuItem(value: 'House', child: Text('House')),
+            DropdownMenuItem(value: 'Short-Stay', child: Text('Short-Stay')),
           ],
           onChanged: (value) {
             if (value == null) return;
@@ -431,45 +472,47 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
           height: 160,
           padding: const EdgeInsets.all(16),
           alignment: Alignment.center,
-          child: _selectedImages.isEmpty
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.cloud_upload_outlined,
-                      size: 40,
-                      color: _MakeListingColors.hint,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Upload pictures',
-                      style: textTheme.bodySmall?.copyWith(
+          child:
+              _selectedImages.isEmpty
+                  ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.cloud_upload_outlined,
+                        size: 40,
                         color: _MakeListingColors.hint,
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Upload pictures',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: _MakeListingColors.hint,
+                        ),
+                      ),
+                    ],
+                  )
+                  : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children:
+                          _selectedImages
+                              .map(
+                                (image) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      File(image.path),
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
                     ),
-                  ],
-                )
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _selectedImages
-                        .map(
-                          (image) => Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.file(
-                                File(image.path),
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
                   ),
-                ),
         ),
       ),
     );
@@ -496,10 +539,11 @@ class _DashedBorderPainter extends CustomPainter {
     final Rect rect = Offset.zero & size;
     final RRect rrect = borderRadius.toRRect(rect);
 
-    final Paint paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
+    final Paint paint =
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth;
 
     final Path path = Path()..addRRect(rrect);
     final Path dashedPath = Path();
@@ -509,10 +553,7 @@ class _DashedBorderPainter extends CustomPainter {
       while (distance < metric.length) {
         final double nextDistance = distance + dashLength;
         dashedPath.addPath(
-          metric.extractPath(
-            distance,
-            nextDistance.clamp(0.0, metric.length),
-          ),
+          metric.extractPath(distance, nextDistance.clamp(0.0, metric.length)),
           Offset.zero,
         );
         distance += dashLength + gap;
@@ -531,4 +572,3 @@ class _DashedBorderPainter extends CustomPainter {
         borderRadius != oldDelegate.borderRadius;
   }
 }
-

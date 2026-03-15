@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/models/listing_edit_request.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/edit_requests_service.dart';
 import 'package:expat_app/services/listings_service.dart';
 import 'landlord_make_listing_screen.dart';
 import 'listing_detail_screen.dart';
@@ -42,7 +44,9 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
       return Center(
         child: Text(
           'Sign in as a landlord to see your listings.',
-          style: textTheme.bodyMedium?.copyWith(color: _LandlordEstatesColors.hint),
+          style: textTheme.bodyMedium?.copyWith(
+            color: _LandlordEstatesColors.hint,
+          ),
           textAlign: TextAlign.center,
         ),
       );
@@ -68,9 +72,10 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
 
   List<Listing> _filterListings(List<Listing> list) {
     if (_selectedFilter == 0) return list;
-    final type = _selectedFilter == 1
-        ? ListingType.apartment
-        : _selectedFilter == 2
+    final type =
+        _selectedFilter == 1
+            ? ListingType.apartment
+            : _selectedFilter == 2
             ? ListingType.house
             : ListingType.shortStay;
     return list.where((e) => e.type == type).toList();
@@ -81,7 +86,6 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
     TextTheme textTheme,
     List<Listing> estates,
   ) {
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -99,53 +103,55 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
         _buildFilters(textTheme),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
         Expanded(
-          child: estates.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'No listings yet.',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: _LandlordEstatesColors.hint,
+          child:
+              estates.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'No listings yet.',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: _LandlordEstatesColors.hint,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const LandlordMakeListingScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.add),
-                        label: const Text('Create a listing'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF8ED966),
-                          foregroundColor: const Color(0xFF1A2E35),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder:
+                                    (_) => const LandlordMakeListingScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Create a listing'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF8ED966),
+                            foregroundColor: const Color(0xFF1A2E35),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  )
+                  : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                    itemCount: estates.length,
+                    itemBuilder: (context, index) {
+                      final estate = estates[index];
+                      if (index > 0) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                            _buildEstateCard(context, textTheme, estate),
+                          ],
+                        );
+                      }
+                      return _buildEstateCard(context, textTheme, estate);
+                    },
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                  itemCount: estates.length,
-                  itemBuilder: (context, index) {
-                    final estate = estates[index];
-                    if (index > 0) {
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Divider(height: 1, color: Color(0xFFE0E0E0)),
-                          _buildEstateCard(context, textTheme, estate),
-                        ],
-                      );
-                    }
-                    return _buildEstateCard(context, textTheme, estate);
-                  },
-                ),
         ),
       ],
     );
@@ -166,8 +172,7 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children:
-            _filters.map((f) => _buildFilterItem(textTheme, f)).toList(),
+        children: _filters.map((f) => _buildFilterItem(textTheme, f)).toList(),
       ),
     );
   }
@@ -184,9 +189,10 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
             Text(
               filter.label,
               style: textTheme.titleMedium?.copyWith(
-                color: selected
-                    ? _LandlordEstatesColors.bodyText
-                    : _LandlordEstatesColors.hint,
+                color:
+                    selected
+                        ? _LandlordEstatesColors.bodyText
+                        : _LandlordEstatesColors.hint,
                 fontWeight: selected ? FontWeight.bold : FontWeight.w500,
               ),
             ),
@@ -194,9 +200,10 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
             Container(
               height: 2,
               width: double.infinity,
-              color: selected
-                  ? _LandlordEstatesColors.bodyText
-                  : Colors.transparent,
+              color:
+                  selected
+                      ? _LandlordEstatesColors.bodyText
+                      : Colors.transparent,
             ),
           ],
         ),
@@ -218,10 +225,11 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => ListingDetailScreenById(
-                    listingId: estate.id,
-                    showRequestEditOnly: true,
-                  ),
+                  builder:
+                      (_) => ListingDetailScreenById(
+                        listingId: estate.id,
+                        showRequestEditOnly: true,
+                      ),
                 ),
               );
             },
@@ -280,9 +288,10 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
                         Builder(
                           builder: (_) {
                             final parts = estate.price.split('/');
-                            final amount = parts.isNotEmpty
-                                ? parts[0]
-                                : estate.price; // "$857"
+                            final amount =
+                                parts.isNotEmpty
+                                    ? parts[0]
+                                    : estate.price; // "$857"
                             final suffix =
                                 parts.length > 1 ? '/${parts[1]}' : '';
                             return Text.rich(
@@ -292,8 +301,7 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
                                     text: amount,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize:
-                                          textTheme.titleSmall?.fontSize,
+                                      fontSize: textTheme.titleSmall?.fontSize,
                                       color: _LandlordEstatesColors.bodyText,
                                     ),
                                   ),
@@ -301,8 +309,7 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
                                     text: suffix,
                                     style: TextStyle(
                                       fontWeight: FontWeight.normal,
-                                      fontSize:
-                                          textTheme.bodySmall?.fontSize,
+                                      fontSize: textTheme.bodySmall?.fontSize,
                                       color: _LandlordEstatesColors.bodyText,
                                     ),
                                   ),
@@ -319,42 +326,83 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: FilledButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => LandlordMakeListingScreen(
-                      isEdit: true,
-                      initialTitle: estate.title,
-                      initialPrice: estate.price,
-                      initialLocation: estate.location,
-                      initialDescription: estate.description,
-                      // UPI and owner name will be wired in once
-                      // backend data is available.
-                      initialUpi: null,
-                      initialOwnerName: null,
-                    ),
-                  ),
-                );
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: _LandlordEstatesColors.bodyText,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                textStyle: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              child: const Text('Request Edit'),
-            ),
-          ),
+          _buildEditRequestButton(context, textTheme, estate),
         ],
       ),
+    );
+  }
+
+  /// Contextual edit-request button per listing. Streams the latest
+  /// edit request so the label and color update in real time.
+  Widget _buildEditRequestButton(
+    BuildContext context,
+    TextTheme textTheme,
+    Listing estate,
+  ) {
+    return StreamBuilder<ListingEditRequest?>(
+      stream: EditRequestsService().listingEditRequestStream(estate.id),
+      builder: (context, snapshot) {
+        final req = snapshot.data;
+        final status = req?.status;
+
+        final String label;
+        final Color bgColor;
+        final Color fgColor;
+        final VoidCallback? onPressed;
+
+        if (status == EditRequestStatus.pending) {
+          label = 'Edit Request being Processed';
+          bgColor = const Color(0xFFFFD54F);
+          fgColor = _LandlordEstatesColors.bodyText;
+          onPressed = null;
+        } else if (status == EditRequestStatus.approved) {
+          label = 'Edit Request Approved';
+          bgColor = const Color(0xFF8ED966);
+          fgColor = _LandlordEstatesColors.bodyText;
+          onPressed = null;
+        } else {
+          label = 'Request Edit';
+          bgColor = _LandlordEstatesColors.bodyText;
+          fgColor = Colors.white;
+          onPressed = () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => LandlordMakeListingScreen(
+                  isEdit: true,
+                  listingId: estate.id,
+                  initialTitle: estate.title,
+                  initialPrice: estate.price,
+                  initialLocation: estate.location,
+                  initialDescription: estate.description,
+                  initialUpi: estate.upi,
+                  initialOwnerName: estate.representativeName,
+                ),
+              ),
+            );
+          };
+        }
+
+        return SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: FilledButton(
+            onPressed: onPressed,
+            style: FilledButton.styleFrom(
+              backgroundColor: bgColor,
+              foregroundColor: fgColor,
+              disabledBackgroundColor: bgColor,
+              disabledForegroundColor: fgColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(7),
+              ),
+              textStyle: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            child: Text(label),
+          ),
+        );
+      },
     );
   }
 
@@ -364,7 +412,9 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
       return Container(
         height: height,
         color: Colors.grey.shade300,
-        child: const Center(child: Icon(Icons.home, size: 48, color: Colors.grey)),
+        child: const Center(
+          child: Icon(Icons.home, size: 48, color: Colors.grey),
+        ),
       );
     }
     if (url.startsWith('http')) {
@@ -373,11 +423,12 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
         height: height,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-          height: height,
-          color: Colors.grey.shade300,
-          child: const Center(child: Icon(Icons.broken_image)),
-        ),
+        errorBuilder:
+            (_, __, ___) => Container(
+              height: height,
+              color: Colors.grey.shade300,
+              child: const Center(child: Icon(Icons.broken_image)),
+            ),
       );
     }
     return Image.asset(
@@ -385,11 +436,9 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
       height: height,
       width: double.infinity,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        height: height,
-        color: Colors.grey.shade300,
-      ),
+      errorBuilder:
+          (_, __, ___) =>
+              Container(height: height, color: Colors.grey.shade300),
     );
   }
 }
-

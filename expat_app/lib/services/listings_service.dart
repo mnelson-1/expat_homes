@@ -50,19 +50,21 @@ class ListingsService {
         onProgress?.call('Uploading image ${i + 1} of ${imageFiles.length}...');
         final path = '$kStorageListingsPath/$listingId/$i';
         final bytes = await imageFiles[i].readAsBytes();
-        final task = _storage.ref(path).putData(
-          bytes,
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
+        final task = _storage
+            .ref(path)
+            .putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
         final snapshot = await task.timeout(
           perImageTimeout,
-          onTimeout: () => throw TimeoutException(
-            'Image ${i + 1} upload timed out. Try a smaller photo, fewer photos, or check your connection.',
-          ),
+          onTimeout:
+              () =>
+                  throw TimeoutException(
+                    'Image ${i + 1} upload timed out. Try a smaller photo, fewer photos, or check your connection.',
+                  ),
         );
         final url = await snapshot.ref.getDownloadURL().timeout(
           const Duration(seconds: 10),
-          onTimeout: () => throw TimeoutException('Getting image URL timed out.'),
+          onTimeout:
+              () => throw TimeoutException('Getting image URL timed out.'),
         );
         mediaUrls.add(url);
       }
@@ -113,6 +115,15 @@ class ListingsService {
     return listing;
   }
 
+  /// Update an existing listing's fields directly (landlord editing their own listing).
+  Future<void> updateListing({
+    required String listingId,
+    required Map<String, dynamic> fields,
+  }) async {
+    fields['updatedAt'] = FieldValue.serverTimestamp();
+    await _listingsRef.doc(listingId).update(fields);
+  }
+
   /// Get a single listing by id. Returns null if not found.
   Future<Listing?> getListingById(String id) async {
     final doc = await _listingsRef.doc(id).get();
@@ -130,10 +141,8 @@ class ListingsService {
     String? name = listing.representativeName;
     String role = listing.representativeRole ?? 'Landlord';
     try {
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(listing.landlordId)
-          .get();
+      final userDoc =
+          await _firestore.collection('users').doc(listing.landlordId).get();
       final data = userDoc.data();
       if (data != null) {
         final firstName = data['legalFirstName'] as String? ?? '';
@@ -174,8 +183,10 @@ class ListingsService {
     ListingType? type,
     String searchQuery = '',
   }) {
-    final query = _listingsRef
-        .where('status', isEqualTo: ListingStatus.published.value);
+    final query = _listingsRef.where(
+      'status',
+      isEqualTo: ListingStatus.published.value,
+    );
 
     return query.snapshots().map((snap) {
       var list = snap.docs.map((d) => Listing.fromFirestore(d)).toList();
@@ -189,11 +200,12 @@ class ListingsService {
       }
       if (searchQuery.trim().isNotEmpty) {
         final q = searchQuery.trim().toLowerCase();
-        list = list.where((l) {
-          return l.title.toLowerCase().contains(q) ||
-              l.location.toLowerCase().contains(q) ||
-              l.description.toLowerCase().contains(q);
-        }).toList();
+        list =
+            list.where((l) {
+              return l.title.toLowerCase().contains(q) ||
+                  l.location.toLowerCase().contains(q) ||
+                  l.description.toLowerCase().contains(q);
+            }).toList();
       }
       return list;
     });
@@ -220,8 +232,10 @@ class ListingsService {
     ListingType? type,
     String searchQuery = '',
   }) async {
-    var query = _listingsRef
-        .where('status', isEqualTo: ListingStatus.published.value);
+    var query = _listingsRef.where(
+      'status',
+      isEqualTo: ListingStatus.published.value,
+    );
     if (type != null) {
       query = query.where('type', isEqualTo: type.value);
     }
@@ -234,20 +248,20 @@ class ListingsService {
     });
     if (searchQuery.trim().isNotEmpty) {
       final q = searchQuery.trim().toLowerCase();
-      list = list.where((l) {
-        return l.title.toLowerCase().contains(q) ||
-            l.location.toLowerCase().contains(q) ||
-            l.description.toLowerCase().contains(q);
-      }).toList();
+      list =
+          list.where((l) {
+            return l.title.toLowerCase().contains(q) ||
+                l.location.toLowerCase().contains(q) ||
+                l.description.toLowerCase().contains(q);
+          }).toList();
     }
     return list;
   }
 
   /// One-time fetch landlord listings. Sorted by createdAt in memory.
   Future<List<Listing>> getLandlordListings(String landlordId) async {
-    final snap = await _listingsRef
-        .where('landlordId', isEqualTo: landlordId)
-        .get();
+    final snap =
+        await _listingsRef.where('landlordId', isEqualTo: landlordId).get();
     final list = snap.docs.map((d) => Listing.fromFirestore(d)).toList();
     list.sort((a, b) {
       final aAt = a.createdAt ?? DateTime(0);

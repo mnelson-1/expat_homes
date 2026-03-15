@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/models/listing_edit_request.dart';
+import 'package:expat_app/services/edit_requests_service.dart';
 import 'package:expat_app/services/listings_service.dart';
 import 'landlord_make_listing_screen.dart';
 import 'messages_screen.dart';
@@ -24,6 +26,8 @@ class ListingDetailScreen extends StatelessWidget {
     this.listingId,
     this.onListingAccepted,
     this.onListingDeclined,
+    this.editRequest,
+    this.onRequestEdit,
   });
 
   final String title;
@@ -54,6 +58,13 @@ class ListingDetailScreen extends StatelessWidget {
 
   /// Called when agent taps Decline (so the listing is removed from Pending).
   final void Function(String listingId)? onListingDeclined;
+
+  /// Current edit request for this listing (landlord view only). Controls which
+  /// action the bottom button performs.
+  final ListingEditRequest? editRequest;
+
+  /// Called when landlord taps "Request Edit" — opens the edit form.
+  final void Function()? onRequestEdit;
 
   // Tracks whether content has been scrolled to show a drop shadow above buttons.
   final ValueNotifier<bool> _showBottomShadow = ValueNotifier<bool>(false);
@@ -396,6 +407,30 @@ class ListingDetailScreen extends StatelessWidget {
     required bool showShadow,
   }) {
     if (showRequestEditOnly) {
+      final reqStatus = editRequest?.status;
+
+      final String label;
+      final Color bgColor;
+      final Color fgColor;
+      final VoidCallback? action;
+
+      if (reqStatus == EditRequestStatus.pending) {
+        label = 'Edit Request being Processed';
+        bgColor = const Color(0xFFFFD54F);
+        fgColor = const Color(0xFF1A2E35);
+        action = null;
+      } else if (reqStatus == EditRequestStatus.approved) {
+        label = 'Edit Request Approved';
+        bgColor = const Color(0xFF8ED966);
+        fgColor = const Color(0xFF1A2E35);
+        action = null;
+      } else {
+        label = 'Request Edit';
+        bgColor = const Color(0xFF1A2E35);
+        fgColor = Colors.white;
+        action = onRequestEdit;
+      }
+
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -417,37 +452,22 @@ class ListingDetailScreen extends StatelessWidget {
             child: SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder:
-                          (_) => LandlordMakeListingScreen(
-                            isEdit: true,
-                            initialTitle: title,
-                            initialPrice: price,
-                            initialLocation: location,
-                            initialDescription: description,
-                            // UPI and owner name will be provided later
-                            // when backend data is available.
-                            initialUpi: null,
-                            initialOwnerName: representativeName,
-                          ),
-                    ),
-                  );
-                },
+                onPressed: action,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A2E35),
-                  foregroundColor: Colors.white,
+                  backgroundColor: bgColor,
+                  foregroundColor: fgColor,
+                  disabledBackgroundColor: bgColor,
+                  disabledForegroundColor: fgColor,
                   minimumSize: const Size.fromHeight(52),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(7),
                   ),
                 ),
                 child: Text(
-                  'Request Edit',
+                  label,
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: fgColor,
                   ),
                 ),
               ),
@@ -904,7 +924,9 @@ class ListingDetailScreen extends StatelessWidget {
 
 /// Loads a listing by id from Firestore and shows [ListingDetailScreen].
 /// Use for landlord "My Listings" and expat Estates when opening by id.
-class ListingDetailScreenById extends StatelessWidget {
+/// When [showRequestEditOnly] is true, also streams the edit request and revision
+/// state to drive the contextual action button.
+class ListingDetailScreenById extends StatefulWidget {
   const ListingDetailScreenById({
     super.key,
     required this.listingId,
@@ -921,9 +943,16 @@ class ListingDetailScreenById extends StatelessWidget {
   final void Function(String listingId)? onListingDeclined;
 
   @override
+  State<ListingDetailScreenById> createState() =>
+      _ListingDetailScreenByIdState();
+}
+
+class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<Listing?>(
-      future: ListingsService().getListingByIdWithRepresentative(listingId),
+      future: ListingsService()
+          .getListingByIdWithRepresentative(widget.listingId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -965,23 +994,70 @@ class ListingDetailScreenById extends StatelessWidget {
         }
         final imagePaths =
             listing.mediaUrls.isEmpty ? <String>[] : listing.mediaUrls;
-        return ListingDetailScreen(
-          title: listing.title,
-          location: listing.location,
-          price: listing.price,
-          typeLabel: listing.typeLabel,
-          imagePaths: imagePaths,
-          description: listing.description,
-          upi: listing.upi,
-          isVerifiedByRdb: listing.verifiedBy != null,
-          representativeName: listing.representativeName,
-          showRequestEditOnly: showRequestEditOnly,
-          showAgentActions: showAgentActions,
-          listingId: listingId,
-          onListingAccepted: onListingAccepted,
-          onListingDeclined: onListingDeclined,
-        );
+
+        // For the landlord view, embed two StreamBuilders to track edit request
+        // and revision states reactively without rebuilding the whole screen.
+        if (widget.showRequestEditOnly) {
+          return StreamBuilder<ListingEditRequest?>(
+            stream: EditRequestsService()
+                .listingEditRequestStream(widget.listingId),
+            builder: (context, reqSnap) {
+              final editRequest = reqSnap.data;
+              return _buildDetail(
+                context,
+                listing,
+                imagePaths,
+                editRequest: editRequest,
+              );
+            },
+          );
+        }
+
+        return _buildDetail(context, listing, imagePaths);
       },
+    );
+  }
+
+  Widget _buildDetail(
+    BuildContext context,
+    Listing listing,
+    List<String> imagePaths, {
+    ListingEditRequest? editRequest,
+  }) {
+    return ListingDetailScreen(
+      title: listing.title,
+      location: listing.location,
+      price: listing.price,
+      typeLabel: listing.typeLabel,
+      imagePaths: imagePaths,
+      description: listing.description,
+      upi: listing.upi,
+      isVerifiedByRdb: listing.verifiedBy != null,
+      representativeName: listing.representativeName,
+      showRequestEditOnly: widget.showRequestEditOnly,
+      showAgentActions: widget.showAgentActions,
+      listingId: widget.listingId,
+      onListingAccepted: widget.onListingAccepted,
+      onListingDeclined: widget.onListingDeclined,
+      editRequest: editRequest,
+      onRequestEdit: () => _handleRequestEdit(context, listing),
+    );
+  }
+
+  void _handleRequestEdit(BuildContext context, Listing listing) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LandlordMakeListingScreen(
+          isEdit: true,
+          listingId: widget.listingId,
+          initialTitle: listing.title,
+          initialPrice: listing.price,
+          initialLocation: listing.location,
+          initialDescription: listing.description,
+          initialUpi: listing.upi,
+          initialOwnerName: listing.representativeName,
+        ),
+      ),
     );
   }
 }
