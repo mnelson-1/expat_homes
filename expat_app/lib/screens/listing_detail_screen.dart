@@ -951,8 +951,9 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Listing?>(
-      future: ListingsService()
-          .getListingByIdWithRepresentative(widget.listingId),
+      future: ListingsService().getListingByIdWithRepresentative(
+        widget.listingId,
+      ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -999,8 +1000,9 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
         // and revision states reactively without rebuilding the whole screen.
         if (widget.showRequestEditOnly) {
           return StreamBuilder<ListingEditRequest?>(
-            stream: EditRequestsService()
-                .listingEditRequestStream(widget.listingId),
+            stream: EditRequestsService().listingEditRequestStream(
+              widget.listingId,
+            ),
             builder: (context, reqSnap) {
               final editRequest = reqSnap.data;
               return _buildDetail(
@@ -1047,16 +1049,17 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
   void _handleRequestEdit(BuildContext context, Listing listing) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => LandlordMakeListingScreen(
-          isEdit: true,
-          listingId: widget.listingId,
-          initialTitle: listing.title,
-          initialPrice: listing.price,
-          initialLocation: listing.location,
-          initialDescription: listing.description,
-          initialUpi: listing.upi,
-          initialOwnerName: listing.representativeName,
-        ),
+        builder:
+            (_) => LandlordMakeListingScreen(
+              isEdit: true,
+              listingId: widget.listingId,
+              initialTitle: listing.title,
+              initialPrice: listing.price,
+              initialLocation: listing.location,
+              initialDescription: listing.description,
+              initialUpi: listing.upi,
+              initialOwnerName: listing.representativeName,
+            ),
       ),
     );
   }

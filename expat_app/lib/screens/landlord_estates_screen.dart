@@ -367,16 +367,17 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
           onPressed = () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => LandlordMakeListingScreen(
-                  isEdit: true,
-                  listingId: estate.id,
-                  initialTitle: estate.title,
-                  initialPrice: estate.price,
-                  initialLocation: estate.location,
-                  initialDescription: estate.description,
-                  initialUpi: estate.upi,
-                  initialOwnerName: estate.representativeName,
-                ),
+                builder:
+                    (_) => LandlordMakeListingScreen(
+                      isEdit: true,
+                      listingId: estate.id,
+                      initialTitle: estate.title,
+                      initialPrice: estate.price,
+                      initialLocation: estate.location,
+                      initialDescription: estate.description,
+                      initialUpi: estate.upi,
+                      initialOwnerName: estate.representativeName,
+                    ),
               ),
             );
           };

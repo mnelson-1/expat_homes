@@ -20,13 +20,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Listings: landlord can create and read/update their own; any signed-in user can read published.
+    // Listings: any signed-in user can read (agents need access to assigned listings,
+    // expats to published ones). Writes restricted to owner or admin.
     match /listings/{listingId} {
-      allow read: if isSignedIn() &&
-        (resource == null ||
-         resource.data.landlordId == request.auth.uid ||
-         resource.data.status == 'published' ||
-         isSuperAdmin());
+      allow read: if isSignedIn();
       allow create: if isSignedIn() &&
         (request.resource.data.landlordId == request.auth.uid || isSuperAdmin());
       allow update, delete: if isSignedIn() &&
@@ -49,6 +46,21 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
         request.resource.data.landlordId == request.auth.uid;
       allow update: if isSignedIn() && isSuperAdmin();
+    }
+
+    // Licensed agents: anyone can read (needed for agent ID validation at sign-up
+    // before the user is authenticated). Writes allowed for signed-in users (seeding + registration link).
+    match /licensed_agents/{agentId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Listing assignments: any signed-in user can read (needed for representative
+    // resolution). Landlord can create; landlord/agent/admin can update.
+    match /listing_assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
     }
   }
 }

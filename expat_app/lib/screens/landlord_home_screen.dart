@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/licensed_agent.dart';
+import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'agent_profile_screen.dart';
 import 'landlord_estates_screen.dart';
@@ -34,37 +36,6 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   int _selectedBottomIndex = 0; // 0 = Find Agent, 1 = Estates, 2 = Messages, 3 = Payments
   final TextEditingController _regionController = TextEditingController();
   String _activeRegion = '';
-
-  final List<_AgentSummary> _agents = const [
-    _AgentSummary(
-      name: 'Jean Claude',
-      agentId: 'KM-201903',
-      region: 'Kimironko',
-      rating: 4.5,
-      ratingCount: 18,
-    ),
-    _AgentSummary(
-      name: 'Aline Uwase',
-      agentId: 'RM-204112',
-      region: 'Remera',
-      rating: 4.7,
-      ratingCount: 24,
-    ),
-    _AgentSummary(
-      name: 'Eric Niyonzima',
-      agentId: 'KG-198745',
-      region: 'Kacyiru',
-      rating: 4.3,
-      ratingCount: 9,
-    ),
-    _AgentSummary(
-      name: 'Linda Mukamana',
-      agentId: 'KG-205678',
-      region: 'Kimironko',
-      rating: 4.9,
-      ratingCount: 31,
-    ),
-  ];
 
   @override
   void initState() {
@@ -217,35 +188,42 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
         );
       }
 
-      final query = _activeRegion.toLowerCase();
-      final matches = _agents
-          .where(
-            (a) => a.region.toLowerCase().contains(query),
-          )
-          .toList();
+      return StreamBuilder<List<LicensedAgent>>(
+        stream: AgentsService().agentsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final allAgents = snapshot.data ?? [];
+          final query = _activeRegion.toLowerCase();
+          final matches = allAgents
+              .where((a) => a.region.toLowerCase().contains(query))
+              .toList();
 
-      if (matches.isEmpty) {
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              'No agents found for "$_activeRegion".',
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(
-                color: _LandlordHomeColors.helper,
+          if (matches.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  'No agents found for "$_activeRegion".',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: _LandlordHomeColors.helper,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }
+            );
+          }
 
-      return ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        itemCount: matches.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final agent = matches[index];
-          return _buildAgentCard(context, agent, textTheme);
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            itemCount: matches.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final agent = matches[index];
+              return _buildAgentCard(context, agent, textTheme);
+            },
+          );
         },
       );
     }
@@ -415,25 +393,9 @@ Widget _buildMakeListingButton(BuildContext context, TextTheme textTheme) {
   );
 }
 
-class _AgentSummary {
-  const _AgentSummary({
-    required this.name,
-    required this.agentId,
-    required this.region,
-    required this.rating,
-    required this.ratingCount,
-  });
-
-  final String name;
-  final String agentId;
-  final String region;
-  final double rating;
-  final int ratingCount;
-}
-
 Widget _buildAgentCard(
   BuildContext context,
-  _AgentSummary agent,
+  LicensedAgent agent,
   TextTheme textTheme,
 ) {
   return InkWell(
@@ -441,10 +403,14 @@ Widget _buildAgentCard(
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (context) => AgentProfileScreen(
-            agentName: agent.name,
-            agentFullName: agent.name,
+            agentName: agent.fullName,
+            agentFullName: agent.fullName,
             agentId: agent.agentId,
             locationTag: agent.region,
+            bio: agent.bio,
+            phone: agent.phone ?? '',
+            rating: agent.rating,
+            ratingCount: agent.ratingCount,
             showAssignProperty: true,
           ),
         ),
@@ -481,7 +447,7 @@ Widget _buildAgentCard(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      agent.name,
+                      agent.fullName,
                       style: textTheme.titleMedium?.copyWith(
                         color: _LandlordHomeColors.bodyText,
                         fontWeight: FontWeight.w600,

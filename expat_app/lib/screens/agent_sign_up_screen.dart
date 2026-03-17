@@ -1,29 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:expat_app/models/user_profile.dart';
+import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
-
-/// Seed data: agents issued by RWAREB (or app's copy of that database).
-/// In production the backend will validate against the institution's data.
-class _SeedAgent {
-  const _SeedAgent({
-    required this.agentId,
-    required this.firstName,
-    required this.lastName,
-  });
-  final String agentId;
-  final String firstName;
-  final String lastName;
-}
-
-const List<_SeedAgent> _seedAgents = [
-  _SeedAgent(agentId: 'KM-201903', firstName: 'Jean', lastName: 'Claude'),
-  _SeedAgent(agentId: 'KM-202005', firstName: 'Eric', lastName: 'Niyonsenga'),
-  _SeedAgent(agentId: 'KM-201940', firstName: 'Jean', lastName: 'Claude'),
-  _SeedAgent(agentId: 'RM-204112', firstName: 'Aline', lastName: 'Uwase'),
-  _SeedAgent(agentId: 'KG-198745', firstName: 'Eric', lastName: 'Niyonzima'),
-  _SeedAgent(agentId: 'KG-205678', firstName: 'Linda', lastName: 'Mukamana'),
-];
 
 /// Palette for Agent signup (mirrors Expat / Landlord signup).
 class _AgentSignUpColors {
@@ -99,6 +78,9 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
     'Swahili',
   ];
 
+  /// Debounce token to avoid redundant Firestore lookups.
+  int _validateGeneration = 0;
+
   void _onAgentIdChanged() {
     final id = _agentIdController.text.trim();
     if (id.isEmpty) {
@@ -109,13 +91,14 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
       });
       return;
     }
-    _SeedAgent? agent;
-    for (final a in _seedAgents) {
-      if (a.agentId.toUpperCase() == id.toUpperCase()) {
-        agent = a;
-        break;
-      }
-    }
+    _validateAgentIdAsync(id);
+  }
+
+  Future<void> _validateAgentIdAsync(String id) async {
+    final gen = ++_validateGeneration;
+    final agent = await AgentsService().validateAgentId(id);
+    if (gen != _validateGeneration || !mounted) return;
+
     if (agent == null) {
       setState(() {
         _idValidationStatus = 'invalid';

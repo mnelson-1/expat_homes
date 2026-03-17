@@ -5,6 +5,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/listing.dart';
+import '../models/listing_assignment.dart';
+import 'agents_service.dart';
 
 const String kListingsCollection = 'listings';
 const String kStorageListingsPath = 'listings';
@@ -140,6 +142,29 @@ class ListingsService {
     if (listing == null) return null;
     String? name = listing.representativeName;
     String role = listing.representativeRole ?? 'Landlord';
+
+    // Check for an accepted assignment — if one exists, the agent is the representative.
+    try {
+      final assignment = await AgentsService().getActiveAssignment(id);
+      if (assignment != null &&
+          assignment.status == AssignmentStatus.accepted) {
+        // Use the denormalized agent name from the assignment.
+        if (assignment.agentName != null && assignment.agentName!.isNotEmpty) {
+          name = assignment.agentName;
+          role = 'Agent';
+        } else {
+          // Fallback: look up the agent from licensed_agents.
+          final agent = await AgentsService().getAgent(assignment.agentId);
+          if (agent != null) {
+            name = agent.fullName;
+            role = 'Agent';
+          }
+        }
+        return _buildListingWithRep(listing, name, role);
+      }
+    } catch (_) {}
+
+    // No accepted agent — resolve landlord name.
     try {
       final userDoc =
           await _firestore.collection('users').doc(listing.landlordId).get();
@@ -154,9 +179,12 @@ class ListingsService {
         }
       }
     } catch (_) {
-      // Expat (or other non-landlord) cannot read users/{landlordId}. Use stored or default.
       if (name == null || name.isEmpty) name = 'Landlord';
     }
+    return _buildListingWithRep(listing, name, role);
+  }
+
+  Listing _buildListingWithRep(Listing listing, String? name, String role) {
     return Listing(
       id: listing.id,
       landlordId: listing.landlordId,

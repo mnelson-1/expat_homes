@@ -7,6 +7,7 @@ import 'package:expat_app/screens/expat_home_screen.dart';
 import 'package:expat_app/screens/get_started_screen.dart';
 import 'package:expat_app/screens/landlord_home_screen.dart';
 import 'package:expat_app/screens/splash_screen.dart';
+import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
 
 void main() async {
@@ -72,6 +73,8 @@ class _AppEntryState extends State<_AppEntry> {
         }
         final profile = snapshot.data;
         if (profile != null) {
+          // Seed licensed agents once a user is authenticated (no-op if already seeded).
+          AgentsService().seedLicensedAgents();
           return _buildHomeForRole(profile.role);
         }
         return const GetStartedScreen();

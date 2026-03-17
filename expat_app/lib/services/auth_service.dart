@@ -87,6 +87,16 @@ class AuthService {
 
     await _firestore.collection(kUsersCollection).doc(user.uid).set(createData);
 
+    // Link the agent's Firebase UID to their licensed_agents record.
+    if (role == UserRole.agent && profile.agentId != null) {
+      try {
+        await _firestore
+            .collection('licensed_agents')
+            .doc(profile.agentId)
+            .update({'registeredUid': user.uid});
+      } catch (_) {}
+    }
+
     if (sendEmailVerification && !user.emailVerified) {
       await user.sendEmailVerification();
     }

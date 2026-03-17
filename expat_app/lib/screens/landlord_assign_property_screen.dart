@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/services/agents_service.dart';
+import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/listings_service.dart';
 import 'messages_screen.dart'
-    show ConversationScreen, addOrUpdateChatThreadForAgent,
+    show
+        ConversationScreen,
+        addOrUpdateChatThreadForAgent,
         addOrUpdateChatThreadForAgentLandlordChat,
-        getStoredMessagesForThread, kRoleLandlord;
+        getStoredMessagesForThread,
+        kRoleLandlord;
 
 /// Screen where a Landlord selects one of their listings
 /// to assign to a chosen agent.
@@ -29,29 +36,10 @@ class _AssignColors {
   static const Color hint = Color(0xFF9CA5A8);
 }
 
-class _AssignEstate {
-  const _AssignEstate({
-    required this.title,
-    required this.location,
-    required this.price,
-    required this.priceSuffix,
-    required this.typeLabel,
-    required this.typeKey, // 'apartment' | 'house' | 'short_stay'
-    required this.imagePath,
-  });
-
-  final String title;
-  final String location;
-  final String price;
-  final String priceSuffix;
-  final String typeLabel;
-  final String typeKey;
-  final String imagePath;
-}
-
 class _LandlordAssignPropertyScreenState
     extends State<LandlordAssignPropertyScreen> {
-  int _selectedFilter = 0; // 0 = All, 1 = Apartments, 2 = Houses, 3 = Short-Stay
+  int _selectedFilter = 0;
+  Stream<List<Listing>>? _listingsStream;
 
   static const List<String> _filters = [
     'All',
@@ -60,36 +48,14 @@ class _LandlordAssignPropertyScreenState
     'Short-Stay',
   ];
 
-  // Placeholder landlord listings; in a real app this would come from backend.
-  static const List<_AssignEstate> _estates = [
-    _AssignEstate(
-      title: 'Charm Nest Apartments',
-      location: 'KG 286, Kigali Rwanda',
-      price: '\$857',
-      priceSuffix: '/mo',
-      typeLabel: 'Apartment',
-      typeKey: 'apartment',
-      imagePath: 'assets/images/Apartments/Charm Nest Apartments/1.jpg',
-    ),
-    _AssignEstate(
-      title: 'Olympic Hotel',
-      location: 'KG 11 AVE, Kigali Rwanda',
-      price: '\$1796',
-      priceSuffix: '/night',
-      typeLabel: 'Short-Stay',
-      typeKey: 'short_stay',
-      imagePath: 'assets/images/Short-Stay/Olympic Hotel/1.jpg',
-    ),
-    _AssignEstate(
-      title: 'Green Valley Villa',
-      location: '49 KG 706 Street 1, Kigali',
-      price: '\$2754',
-      priceSuffix: '/mo',
-      typeLabel: 'House',
-      typeKey: 'house',
-      imagePath: 'assets/images/Houses/Green Valley Villa/1.jpg',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    final uid = AuthService().currentUser?.uid;
+    if (uid != null) {
+      _listingsStream = ListingsService().landlordListingsStream(uid);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,45 +84,70 @@ class _LandlordAssignPropertyScreenState
         children: [
           _buildFilters(textTheme),
           const Divider(height: 1, color: Color(0xFFE0E0E0)),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              itemCount: _filteredEstates.length,
-              itemBuilder: (context, index) {
-                final estate = _filteredEstates[index];
-                if (index > 0) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Divider(height: 1, color: Color(0xFFE0E0E0)),
-                      _buildEstateCard(context, textTheme, estate),
-                    ],
-                  );
-                }
-                return _buildEstateCard(context, textTheme, estate);
-              },
-            ),
-          ),
+          Expanded(child: _buildListingsList(textTheme)),
         ],
       ),
     );
   }
 
-  List<_AssignEstate> get _filteredEstates {
-    if (_selectedFilter == 0) return _estates;
+  Widget _buildListingsList(TextTheme textTheme) {
+    if (_listingsStream == null) {
+      return const Center(child: Text('Not signed in'));
+    }
+    return StreamBuilder<List<Listing>>(
+      stream: _listingsStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final allListings = snapshot.data ?? [];
+        final filtered = _applyFilter(allListings);
+
+        if (filtered.isEmpty) {
+          return Center(
+            child: Text(
+              'No listings to assign.',
+              style: textTheme.bodySmall?.copyWith(color: _AssignColors.hint),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            final listing = filtered[index];
+            if (index > 0) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                  _buildEstateCard(context, textTheme, listing),
+                ],
+              );
+            }
+            return _buildEstateCard(context, textTheme, listing);
+          },
+        );
+      },
+    );
+  }
+
+  List<Listing> _applyFilter(List<Listing> listings) {
+    if (_selectedFilter == 0) return listings;
     final key = _selectedFilter == 1
-        ? 'apartment'
+        ? ListingType.apartment
         : _selectedFilter == 2
-            ? 'house'
-            : 'short_stay';
-    return _estates.where((e) => e.typeKey == key).toList();
+            ? ListingType.house
+            : ListingType.shortStay;
+    return listings.where((e) => e.type == key).toList();
   }
 
   Widget _buildFilters(TextTheme textTheme) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             color: Color(0x26000000),
             offset: Offset(0, 4),
@@ -175,11 +166,7 @@ class _LandlordAssignPropertyScreenState
     );
   }
 
-  Widget _buildFilterItem(
-    TextTheme textTheme,
-    int index,
-    String label,
-  ) {
+  Widget _buildFilterItem(TextTheme textTheme, int index, String label) {
     final selected = index == _selectedFilter;
     return GestureDetector(
       onTap: () => setState(() => _selectedFilter = index),
@@ -191,19 +178,15 @@ class _LandlordAssignPropertyScreenState
             Text(
               label,
               style: textTheme.titleMedium?.copyWith(
-                color:
-                    selected ? _AssignColors.bodyText : _AssignColors.hint,
-                fontWeight:
-                    selected ? FontWeight.bold : FontWeight.w500,
+                color: selected ? _AssignColors.bodyText : _AssignColors.hint,
+                fontWeight: selected ? FontWeight.bold : FontWeight.w500,
               ),
             ),
             const SizedBox(height: 2),
             Container(
               height: 2,
               width: double.infinity,
-              color: selected
-                  ? _AssignColors.bodyText
-                  : Colors.transparent,
+              color: selected ? _AssignColors.bodyText : Colors.transparent,
             ),
           ],
         ),
@@ -214,8 +197,16 @@ class _LandlordAssignPropertyScreenState
   Widget _buildEstateCard(
     BuildContext context,
     TextTheme textTheme,
-    _AssignEstate estate,
+    Listing listing,
   ) {
+    final imagePath = (listing.mediaUrls.isNotEmpty)
+        ? listing.mediaUrls.first
+        : 'assets/images/placeholder.png';
+    final isNetwork =
+        imagePath.startsWith('http://') || imagePath.startsWith('https://');
+    final priceSuffix =
+        listing.type == ListingType.shortStay ? '/night' : '/mo';
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
@@ -223,16 +214,13 @@ class _LandlordAssignPropertyScreenState
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              estate.imagePath,
-              height: 180,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                height: 180,
-                color: Colors.grey.shade300,
-              ),
-            ),
+            child: isNetwork
+                ? Image.network(imagePath,
+                    height: 180, width: double.infinity, fit: BoxFit.cover)
+                : Image.asset(imagePath,
+                    height: 180, width: double.infinity, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(height: 180, color: Colors.grey.shade300)),
           ),
           const SizedBox(height: 12),
           Row(
@@ -242,20 +230,14 @@ class _LandlordAssignPropertyScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      estate.title,
-                      style: textTheme.titleMedium?.copyWith(
-                        color: _AssignColors.bodyText,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(listing.title,
+                        style: textTheme.titleMedium?.copyWith(
+                            color: _AssignColors.bodyText,
+                            fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
-                    Text(
-                      estate.location,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: _AssignColors.bodyText,
-                      ),
-                    ),
+                    Text(listing.location,
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: _AssignColors.bodyText)),
                   ],
                 ),
               ),
@@ -263,44 +245,31 @@ class _LandlordAssignPropertyScreenState
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: _AssignColors.hint,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      estate.typeLabel,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: _AssignColors.bodyText,
-                      ),
-                    ),
+                    child: Text(listing.typeLabel,
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: _AssignColors.bodyText)),
                   ),
                   const SizedBox(height: 4),
-                  Text.rich(
+                  Text.rich(TextSpan(children: [
                     TextSpan(
-                      children: [
-                        TextSpan(
-                          text: estate.price,
-                          style: TextStyle(
+                        text: listing.price,
+                        style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: textTheme.titleSmall?.fontSize,
-                            color: _AssignColors.bodyText,
-                          ),
-                        ),
-                        TextSpan(
-                          text: ' ${estate.priceSuffix}',
-                          style: TextStyle(
+                            color: _AssignColors.bodyText)),
+                    TextSpan(
+                        text: ' $priceSuffix',
+                        style: TextStyle(
                             fontWeight: FontWeight.normal,
                             fontSize: textTheme.bodySmall?.fontSize,
-                            color: _AssignColors.bodyText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                            color: _AssignColors.bodyText)),
+                  ])),
                 ],
               ),
             ],
@@ -310,16 +279,14 @@ class _LandlordAssignPropertyScreenState
             width: double.infinity,
             height: 44,
             child: FilledButton(
-              onPressed: () => _handleAssign(context, textTheme, estate),
+              onPressed: () => _handleAssign(context, textTheme, listing),
               style: FilledButton.styleFrom(
                 backgroundColor: _AssignColors.accentGreen,
                 foregroundColor: _AssignColors.bodyText,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                textStyle: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                    borderRadius: BorderRadius.circular(7)),
+                textStyle: textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               child: const Text('Assign'),
             ),
@@ -329,33 +296,60 @@ class _LandlordAssignPropertyScreenState
     );
   }
 
-  void _handleAssign(
+  Future<void> _handleAssign(
     BuildContext context,
     TextTheme textTheme,
-    _AssignEstate estate,
-  ) {
-    final priceWithSuffix = '${estate.price}${estate.priceSuffix}';
+    Listing listing,
+  ) async {
+    final uid = AuthService().currentUser?.uid;
+    if (uid == null) return;
 
+    final imagePath = listing.mediaUrls.isNotEmpty
+        ? listing.mediaUrls.first
+        : 'assets/images/placeholder.png';
+    final priceSuffix =
+        listing.type == ListingType.shortStay ? '/night' : '/mo';
+    final priceWithSuffix = '${listing.price}$priceSuffix';
     final message =
         'Hi ${widget.agentName}. I would like for you to represent me in the sale of this listing.';
+
+    try {
+      final agentUid = await AgentsService().getAgentUid(widget.agentId);
+      await AgentsService().createAssignment(
+        listingId: listing.id,
+        agentId: widget.agentId,
+        landlordId: uid,
+        agentUid: agentUid,
+        agentName: widget.agentName,
+        listingTitle: listing.title,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+      return;
+    }
 
     addOrUpdateChatThreadForAgent(
       agentName: widget.agentName,
       agentId: widget.agentId,
       message: message,
-      listingTitle: estate.title,
-      location: estate.location,
+      listingTitle: listing.title,
+      location: listing.location,
       price: priceWithSuffix,
-      imagePath: estate.imagePath,
+      imagePath: imagePath,
     );
     addOrUpdateChatThreadForAgentLandlordChat(
       contactName: 'Landlord',
-      listingTitle: estate.title,
-      location: estate.location,
+      listingTitle: listing.title,
+      location: listing.location,
       price: priceWithSuffix,
-      imagePath: estate.imagePath,
+      imagePath: imagePath,
       lastMessage: message,
     );
+
+    if (!context.mounted) return;
 
     showDialog<void>(
       context: context,
@@ -377,11 +371,8 @@ class _LandlordAssignPropertyScreenState
                 Align(
                   alignment: Alignment.topRight,
                   child: IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: _AssignColors.bodyText,
-                      size: 22,
-                    ),
+                    icon: const Icon(Icons.close,
+                        color: _AssignColors.bodyText, size: 22),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     onPressed: () {
@@ -389,15 +380,17 @@ class _LandlordAssignPropertyScreenState
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => ConversationScreen(
-                            listingTitle: estate.title,
-                            location: estate.location,
+                            listingTitle: listing.title,
+                            location: listing.location,
                             price: priceWithSuffix,
-                            imagePath: estate.imagePath,
+                            imagePath: imagePath,
                             contactName: widget.agentName,
                             contactSubtitle: widget.agentId,
                             initialMessage: message,
                             storedMessages: getStoredMessagesForThread(
-                                widget.agentName, widget.agentId, estate.title),
+                                widget.agentName,
+                                widget.agentId,
+                                listing.title),
                             returnToLandlordOnBack: true,
                             showInitialAsIncoming: false,
                             listingFromOtherParty: false,
@@ -412,17 +405,15 @@ class _LandlordAssignPropertyScreenState
                 Text(
                   'Assignment Successful',
                   style: textTheme.titleLarge?.copyWith(
-                    color: _AssignColors.bodyText,
-                    fontWeight: FontWeight.w700,
-                  ),
+                      color: _AssignColors.bodyText,
+                      fontWeight: FontWeight.w700),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'The agent has received your assignment. Once he accepts, the status of this listing will be updated.',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: _AssignColors.bodyText,
-                  ),
+                  style: textTheme.bodyMedium
+                      ?.copyWith(color: _AssignColors.bodyText),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
@@ -433,11 +424,7 @@ class _LandlordAssignPropertyScreenState
                     color: _AssignColors.bodyText,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 32,
-                  ),
+                  child: const Icon(Icons.check, color: Colors.white, size: 32),
                 ),
               ],
             ),
@@ -447,4 +434,3 @@ class _LandlordAssignPropertyScreenState
     );
   }
 }
-
