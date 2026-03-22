@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/commission_slip.dart';
+import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/commission_slips_service.dart';
+
 class AgentPaymentsScreen extends StatefulWidget {
   const AgentPaymentsScreen({super.key});
 
@@ -13,34 +17,8 @@ class _AgentPaymentsColors {
   static const Color helper = Color(0xFF9CA5A8);
 }
 
-class _AgentPayment {
-  const _AgentPayment({
-    required this.reference,
-    required this.contractCode,
-    required this.landlordName,
-    required this.estateName,
-    required this.amount,
-    required this.paymentMethod,
-    required this.phoneNumber,
-    required this.statusLabel,
-    required this.isConfirmed,
-    required this.createdAt,
-  });
-
-  final String reference; // e.g. COM-8F4K29
-  final String contractCode; // e.g. UPI-KIG-REM-00034
-  final String landlordName;
-  final String estateName;
-  final String amount;
-  final String paymentMethod;
-  final String phoneNumber;
-  final String statusLabel; // "Payment Pending" | "Payment Confirmed"
-  final bool isConfirmed;
-  final DateTime createdAt;
-}
-
 class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
-  int _selectedTab = 0; // 0 = Track, 1 = Create
+  int _selectedTab = 0;
 
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
@@ -62,38 +40,17 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
       TextEditingController(text: 'MTN Momo');
   final TextEditingController _phoneController = TextEditingController();
 
-  static final List<_AgentPayment> _payments = [
-    _AgentPayment(
-      reference: 'COM-8F4K29',
-      contractCode: 'UPI-KIG-REM-00034',
-      landlordName: 'Jean Uwimana',
-      estateName: 'Charm Nest Apartments',
-      amount: 'RWF100,000',
-      paymentMethod: 'MTN Momo',
-      phoneNumber: '0792106639',
-      statusLabel: 'Payment Pending',
-      isConfirmed: false,
-      createdAt: DateTime.now(),
-    ),
-    _AgentPayment(
-      reference: 'COM-9G5K40',
-      contractCode: 'UPI-KIG-REM-00035',
-      landlordName: 'Jean Uwimana',
-      estateName: 'Charm Nest Apartments',
-      amount: 'RWF50,000',
-      paymentMethod: 'MTN Momo',
-      phoneNumber: '0792106639',
-      statusLabel: 'Payment Confirmed',
-      isConfirmed: true,
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-  ];
-
+  String? _agentUid;
+  Stream<List<CommissionSlip>>? _slipsStream;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _agentUid = AuthService().currentUser?.uid;
+    if (_agentUid != null) {
+      _slipsStream = CommissionSlipsService().agentSlipsStream(_agentUid!);
+    }
   }
 
   @override
@@ -148,11 +105,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedTab = 0;
-                });
-              },
+              onTap: () => setState(() => _selectedTab = 0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -215,54 +168,72 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
   }
 
   Widget _buildTrackTab(TextTheme textTheme) {
-    if (_payments.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-        children: [
-          const SizedBox(height: 120),
-          Center(
-            child: Text(
-              'You have no commission slips yet.\nThey will appear here once created.',
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(
-                color: _AgentPaymentsColors.helper,
-              ),
-            ),
+    if (_slipsStream == null) {
+      return Center(
+        child: Text(
+          'Not signed in.',
+          style: textTheme.bodySmall?.copyWith(
+            color: _AgentPaymentsColors.helper,
           ),
-        ],
+        ),
       );
     }
 
-    final payments = List<_AgentPayment>.from(_payments)
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-    final List<Widget> children = [];
-    DateTime? lastDate;
-
-    for (final payment in payments) {
-      final isNewDate =
-          lastDate == null || !_isSameDay(lastDate, payment.createdAt);
-
-      if (isNewDate) {
-        if (lastDate != null) {
-          children.add(const SizedBox(height: 18));
+    return StreamBuilder<List<CommissionSlip>>(
+      stream: _slipsStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
         }
-        children.add(_buildDateHeader(textTheme, payment.createdAt));
-        children.add(const SizedBox(height: 16));
-        lastDate = _startOfDay(payment.createdAt);
-      } else {
-        children.add(const Divider(height: 1, color: Color(0xFFE0E0E0)));
-        children.add(const SizedBox(height: 12));
-      }
+        final slips = snapshot.data ?? [];
+        if (slips.isEmpty) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+            children: [
+              const SizedBox(height: 120),
+              Center(
+                child: Text(
+                  'You have no commission slips yet.\nThey will appear here once created.',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: _AgentPaymentsColors.helper,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
 
-      children.add(_buildPaymentCard(textTheme, payment));
-      children.add(const SizedBox(height: 12));
-    }
+        final List<Widget> children = [];
+        DateTime? lastDate;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
-      controller: _scrollController,
-      children: children,
+        for (final slip in slips) {
+          final date = slip.createdAt ?? DateTime.now();
+          final isNewDate =
+              lastDate == null || !_isSameDay(lastDate, date);
+
+          if (isNewDate) {
+            if (lastDate != null) {
+              children.add(const SizedBox(height: 18));
+            }
+            children.add(_buildDateHeader(textTheme, date));
+            children.add(const SizedBox(height: 16));
+            lastDate = _startOfDay(date);
+          } else {
+            children.add(const Divider(height: 1, color: Color(0xFFE0E0E0)));
+            children.add(const SizedBox(height: 12));
+          }
+
+          children.add(_buildPaymentCard(textTheme, slip));
+          children.add(const SizedBox(height: 12));
+        }
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+          controller: _scrollController,
+          children: children,
+        );
+      },
     );
   }
 
@@ -282,10 +253,20 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     );
   }
 
-  Widget _buildPaymentCard(TextTheme textTheme, _AgentPayment payment) {
-    final statusColor = payment.isConfirmed
-        ? _AgentPaymentsColors.accentGreen
-        : _AgentPaymentsColors.helper;
+  Widget _buildPaymentCard(TextTheme textTheme, CommissionSlip slip) {
+    final isActionable =
+        slip.status == SlipStatus.pending ||
+        slip.status == SlipStatus.agentConfirmationPending;
+
+    final Color statusColor;
+    switch (slip.status) {
+      case SlipStatus.confirmed:
+        statusColor = _AgentPaymentsColors.accentGreen;
+      case SlipStatus.reported:
+        statusColor = const Color(0xFFC62828);
+      default:
+        statusColor = _AgentPaymentsColors.helper;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -311,7 +292,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    payment.reference,
+                    slip.reference,
                     style: textTheme.titleSmall?.copyWith(
                       color: _AgentPaymentsColors.bodyText,
                       fontWeight: FontWeight.w600,
@@ -325,7 +306,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      payment.statusLabel,
+                      slip.status.displayLabel,
                       style: textTheme.bodySmall?.copyWith(
                         color: statusColor,
                         fontWeight: FontWeight.w600,
@@ -336,14 +317,14 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${payment.contractCode} • ${payment.landlordName}',
+                '${slip.contractCode} • ${slip.landlordName}',
                 style: textTheme.bodySmall?.copyWith(
                   color: _AgentPaymentsColors.helper,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                payment.estateName,
+                slip.listingTitle,
                 style: textTheme.bodyMedium?.copyWith(
                   color: _AgentPaymentsColors.bodyText,
                   fontWeight: FontWeight.w600,
@@ -364,7 +345,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        payment.amount,
+                        slip.amount,
                         style: textTheme.bodyMedium?.copyWith(
                           color: _AgentPaymentsColors.bodyText,
                           fontWeight: FontWeight.w600,
@@ -383,7 +364,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        payment.paymentMethod,
+                        slip.paymentMethod,
                         style: textTheme.bodyMedium?.copyWith(
                           color: _AgentPaymentsColors.bodyText,
                         ),
@@ -401,7 +382,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        payment.phoneNumber,
+                        slip.recipientPhone,
                         style: textTheme.bodyMedium?.copyWith(
                           color: _AgentPaymentsColors.bodyText,
                         ),
@@ -413,7 +394,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
             ],
           ),
         ),
-        if (!payment.isConfirmed) ...[
+        if (isActionable) ...[
           const SizedBox(height: 8),
           Row(
             children: [
@@ -421,8 +402,10 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                 child: SizedBox(
                   height: 44,
                   child: FilledButton(
-                    onPressed: () {
-                      _showReportDialog(payment);
+                    onPressed: () async {
+                      await CommissionSlipsService().reportSlip(slip.id);
+                      if (!context.mounted) return;
+                      _showReportDialog();
                     },
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFC62828),
@@ -443,8 +426,9 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                 child: SizedBox(
                   height: 44,
                   child: FilledButton(
-                    onPressed: () {
-                      _markPaymentAsConfirmed(payment.reference);
+                    onPressed: () async {
+                      await CommissionSlipsService().confirmSlip(slip.id);
+                      if (!context.mounted) return;
                       _showPaymentConfirmedDialog();
                     },
                     style: FilledButton.styleFrom(
@@ -577,36 +561,11 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
   void _onScroll() {
     final offset = _scrollController.offset;
     if (_scrollOffset != offset) {
-      setState(() {
-        _scrollOffset = offset;
-      });
+      setState(() => _scrollOffset = offset);
     }
   }
 
-  void _markPaymentAsConfirmed(String reference) {
-    final index = _payments.indexWhere((p) => p.reference == reference);
-    if (index == -1) return;
-
-    final payment = _payments[index];
-    if (payment.isConfirmed) return;
-
-    setState(() {
-      _payments[index] = _AgentPayment(
-        reference: payment.reference,
-        contractCode: payment.contractCode,
-        landlordName: payment.landlordName,
-        estateName: payment.estateName,
-        amount: payment.amount,
-        paymentMethod: payment.paymentMethod,
-        phoneNumber: payment.phoneNumber,
-        statusLabel: 'Payment Confirmed',
-        isConfirmed: true,
-        createdAt: payment.createdAt,
-      );
-    });
-  }
-
-  void _handleCreateSlip() {
+  Future<void> _handleCreateSlip() async {
     final propertyTitle = _estateNameController.text.trim();
     final houseUpi = _commissionIdController.text.trim();
     final landlord = _landlordNameController.text.trim();
@@ -632,30 +591,28 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     }
 
     final formattedAmount = _formatAmountRwf(amount);
+    final profile = await AuthService().getCurrentUserProfile();
+    final agentName = profile?.legalName ?? 'Agent';
+    final agentId = profile?.agentId ?? '';
 
-    setState(() {
-      _payments.add(
-        _AgentPayment(
-          reference: 'COM-DEMO-${_payments.length + 1}',
-          contractCode: houseUpi,
-          landlordName: landlord,
-          estateName: propertyTitle,
-          amount: formattedAmount,
-          paymentMethod: method,
-          phoneNumber: phone,
-          statusLabel: 'Payment Pending',
-          isConfirmed: false,
-          createdAt: DateTime.now(),
-        ),
-      );
-    });
+    await CommissionSlipsService().createSlip(
+      listingTitle: propertyTitle,
+      contractCode: houseUpi,
+      landlordId: ownerId,
+      landlordName: landlord,
+      agentId: agentId,
+      agentUid: _agentUid ?? '',
+      agentName: agentName,
+      amount: formattedAmount,
+      recipientPhone: phone,
+      homeOwnerId: ownerId,
+      paymentMethod: method,
+    );
 
+    if (!mounted) return;
     _showSlipCreatedDialog(ownerId);
-
     _clearForm();
-    setState(() {
-      _selectedTab = 0;
-    });
+    setState(() => _selectedTab = 0);
   }
 
   void _clearForm() {
@@ -771,15 +728,11 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(
-            color: Color(0xFF9E9E9E),
-          ),
+          borderSide: const BorderSide(color: Color(0xFF9E9E9E)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(
-            color: _AgentPaymentsColors.bodyText,
-          ),
+          borderSide: const BorderSide(color: _AgentPaymentsColors.bodyText),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -860,7 +813,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     );
   }
 
-  void _showReportDialog(_AgentPayment payment) {
+  void _showReportDialog() {
     final textTheme = Theme.of(context).textTheme;
 
     showDialog<void>(
@@ -934,4 +887,3 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     );
   }
 }
-

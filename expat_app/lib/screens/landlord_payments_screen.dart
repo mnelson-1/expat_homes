@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/commission_slip.dart';
+import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/commission_slips_service.dart';
+
 class LandlordPaymentsScreen extends StatefulWidget {
   const LandlordPaymentsScreen({super.key});
 
   @override
-  State<LandlordPaymentsScreen> createState() => _LandlordPaymentsScreenState();
+  State<LandlordPaymentsScreen> createState() =>
+      _LandlordPaymentsScreenState();
 }
 
 class _LandlordPaymentsColors {
@@ -13,38 +18,8 @@ class _LandlordPaymentsColors {
   static const Color helper = Color(0xFF9CA5A8);
 }
 
-class _LandlordPayment {
-  const _LandlordPayment({
-    required this.reference,
-    required this.contractCode,
-    required this.agentName,
-    required this.agentId,
-    required this.landlordName,
-    required this.estateName,
-    required this.amount,
-    required this.paymentMethod,
-    required this.phoneNumber,
-    required this.statusLabel,
-    required this.isConfirmed,
-    required this.createdAt,
-  });
-
-  final String reference; // e.g. COM-8F4K29
-  final String contractCode; // e.g. KM-202005
-  final String agentName;
-  final String agentId;
-  final String landlordName;
-  final String estateName;
-  final String amount;
-  final String paymentMethod;
-  final String phoneNumber;
-  final String statusLabel; // "Payment Pending" | "Payment Confirmed"
-  final bool isConfirmed;
-  final DateTime createdAt;
-}
-
 class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
-  int _selectedTab = 0; // 0 = Track, 1 = Pay
+  int _selectedTab = 0;
 
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
@@ -57,7 +32,6 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
     ),
   ];
 
-
   final TextEditingController _commissionIdController = TextEditingController();
   final TextEditingController _agentNameController = TextEditingController();
   final TextEditingController _agentIdController = TextEditingController();
@@ -66,41 +40,21 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
       TextEditingController(text: 'MTN Momo');
   final TextEditingController _phoneController = TextEditingController();
 
-  static final List<_LandlordPayment> _payments = [
-    _LandlordPayment(
-      reference: 'COM-8F4K29',
-      contractCode: 'KM-202005',
-      agentName: 'Jean Claude',
-      agentId: 'KM-201903',
-      landlordName: 'Eric Niyonsenga',
-      estateName: 'Charm Nest Apartments',
-      amount: 'RWF100,000',
-      paymentMethod: 'MTN Momo',
-      phoneNumber: '0792106639',
-      statusLabel: 'Payment Pending',
-      isConfirmed: false,
-      createdAt: DateTime.now(),
-    ),
-    _LandlordPayment(
-      reference: 'COM-9G5K40',
-      contractCode: 'KM-201940',
-      agentName: 'Jean Claude',
-      agentId: 'KM-201903',
-      landlordName: 'Jean Claude',
-      estateName: 'Charm Nest Apartments',
-      amount: 'RWF50,000',
-      paymentMethod: 'MTN Momo',
-      phoneNumber: '0792106639',
-      statusLabel: 'Payment Confirmed',
-      isConfirmed: true,
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-  ];
+  String? _landlordUid;
+  Stream<List<CommissionSlip>>? _slipsStream;
+
+  /// Currently selected slip (from Track tab "Pay" button).
+  CommissionSlip? _activeSlip;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _landlordUid = AuthService().currentUser?.uid;
+    if (_landlordUid != null) {
+      _slipsStream =
+          CommissionSlipsService().landlordSlipsStream(_landlordUid!);
+    }
   }
 
   @override
@@ -139,8 +93,9 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
           ),
         ),
         Expanded(
-          child:
-              _selectedTab == 0 ? _buildTrackTab(textTheme) : _buildPayTab(textTheme),
+          child: _selectedTab == 0
+              ? _buildTrackTab(textTheme)
+              : _buildPayTab(textTheme),
         ),
       ],
     );
@@ -153,11 +108,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedTab = 0;
-                });
-              },
+              onTap: () => setState(() => _selectedTab = 0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -220,54 +171,72 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
   }
 
   Widget _buildTrackTab(TextTheme textTheme) {
-    if (_payments.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-        children: [
-          const SizedBox(height: 120),
-          Center(
-            child: Text(
-              'You have no commission payments yet.\nThey will appear here once created.',
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(
-                color: _LandlordPaymentsColors.helper,
-              ),
-            ),
+    if (_slipsStream == null) {
+      return Center(
+        child: Text(
+          'Not signed in.',
+          style: textTheme.bodySmall?.copyWith(
+            color: _LandlordPaymentsColors.helper,
           ),
-        ],
+        ),
       );
     }
 
-    final payments = List<_LandlordPayment>.from(_payments)
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-    final List<Widget> children = [];
-    DateTime? lastDate;
-
-    for (final payment in payments) {
-      final isNewDate =
-          lastDate == null || !_isSameDay(lastDate, payment.createdAt);
-
-      if (isNewDate) {
-        if (lastDate != null) {
-          children.add(const SizedBox(height: 18));
+    return StreamBuilder<List<CommissionSlip>>(
+      stream: _slipsStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
         }
-        children.add(_buildDateHeader(textTheme, payment.createdAt));
-        children.add(const SizedBox(height: 16));
-        lastDate = _startOfDay(payment.createdAt);
-      } else {
-        children.add(const Divider(height: 1, color: Color(0xFFE0E0E0)));
-        children.add(const SizedBox(height: 12));
-      }
+        final slips = snapshot.data ?? [];
+        if (slips.isEmpty) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+            children: [
+              const SizedBox(height: 120),
+              Center(
+                child: Text(
+                  'You have no commission payments yet.\nThey will appear here once created.',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: _LandlordPaymentsColors.helper,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
 
-      children.add(_buildPaymentCard(textTheme, payment));
-      children.add(const SizedBox(height: 12));
-    }
+        final List<Widget> children = [];
+        DateTime? lastDate;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
-      controller: _scrollController,
-      children: children,
+        for (final slip in slips) {
+          final date = slip.createdAt ?? DateTime.now();
+          final isNewDate =
+              lastDate == null || !_isSameDay(lastDate, date);
+
+          if (isNewDate) {
+            if (lastDate != null) {
+              children.add(const SizedBox(height: 18));
+            }
+            children.add(_buildDateHeader(textTheme, date));
+            children.add(const SizedBox(height: 16));
+            lastDate = _startOfDay(date);
+          } else {
+            children.add(const Divider(height: 1, color: Color(0xFFE0E0E0)));
+            children.add(const SizedBox(height: 12));
+          }
+
+          children.add(_buildPaymentCard(textTheme, slip));
+          children.add(const SizedBox(height: 12));
+        }
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+          controller: _scrollController,
+          children: children,
+        );
+      },
     );
   }
 
@@ -287,10 +256,20 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
     );
   }
 
-  Widget _buildPaymentCard(TextTheme textTheme, _LandlordPayment payment) {
-    final statusColor = payment.isConfirmed
-        ? const Color(0xFF8ED966)
-        : _LandlordPaymentsColors.helper;
+  Widget _buildPaymentCard(TextTheme textTheme, CommissionSlip slip) {
+    final bool canPay = slip.status == SlipStatus.pending;
+
+    final Color statusColor;
+    switch (slip.status) {
+      case SlipStatus.confirmed:
+        statusColor = _LandlordPaymentsColors.accentGreen;
+      case SlipStatus.reported:
+        statusColor = const Color(0xFFC62828);
+      case SlipStatus.agentConfirmationPending:
+        statusColor = const Color(0xFFFFD54F);
+      default:
+        statusColor = _LandlordPaymentsColors.helper;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -316,7 +295,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    payment.reference,
+                    slip.reference,
                     style: textTheme.titleSmall?.copyWith(
                       color: _LandlordPaymentsColors.bodyText,
                       fontWeight: FontWeight.w600,
@@ -330,7 +309,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      payment.statusLabel,
+                      slip.status.displayLabel,
                       style: textTheme.bodySmall?.copyWith(
                         color: statusColor,
                         fontWeight: FontWeight.w600,
@@ -341,14 +320,14 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${payment.contractCode} • ${payment.landlordName}',
+                '${slip.contractCode} • ${slip.landlordName}',
                 style: textTheme.bodySmall?.copyWith(
                   color: _LandlordPaymentsColors.helper,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                payment.estateName,
+                slip.listingTitle,
                 style: textTheme.bodyMedium?.copyWith(
                   color: _LandlordPaymentsColors.bodyText,
                   fontWeight: FontWeight.w600,
@@ -369,7 +348,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        payment.amount,
+                        slip.amount,
                         style: textTheme.bodyMedium?.copyWith(
                           color: _LandlordPaymentsColors.bodyText,
                           fontWeight: FontWeight.w600,
@@ -388,7 +367,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        payment.paymentMethod,
+                        slip.paymentMethod,
                         style: textTheme.bodyMedium?.copyWith(
                           color: _LandlordPaymentsColors.bodyText,
                         ),
@@ -406,7 +385,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        payment.phoneNumber,
+                        slip.recipientPhone,
                         style: textTheme.bodyMedium?.copyWith(
                           color: _LandlordPaymentsColors.bodyText,
                         ),
@@ -418,7 +397,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
             ],
           ),
         ),
-        if (!payment.isConfirmed) ...[
+        if (canPay) ...[
           const SizedBox(height: 8),
           SizedBox(
             height: 44,
@@ -426,7 +405,8 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
               onPressed: () {
                 setState(() {
                   _selectedTab = 1;
-                  _populateFormFromPayment(payment);
+                  _activeSlip = slip;
+                  _populateFormFromSlip(slip);
                 });
               },
               style: FilledButton.styleFrom(
@@ -465,7 +445,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
           const SizedBox(height: 8),
           _buildTextField(
             controller: _agentNameController,
-            hint: 'Landlord name',
+            hint: 'Agent name',
           ),
           const SizedBox(height: 16),
           _buildLabel(textTheme, 'Agent ID'),
@@ -502,10 +482,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
           SizedBox(
             height: 52,
             child: FilledButton(
-              onPressed: () {
-                _markActivePaymentAsConfirmed();
-                _showPaymentSuccessDialog();
-              },
+              onPressed: _handlePay,
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFFFD54F),
                 foregroundColor: _LandlordPaymentsColors.bodyText,
@@ -535,50 +512,53 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
     return DateTime(date.year, date.month, date.day);
   }
 
-  void _markActivePaymentAsConfirmed() {
+  Future<void> _handlePay() async {
     final ref = _commissionIdController.text.trim();
-    if (ref.isEmpty) return;
-
-    final index = _payments.indexWhere((p) => p.reference == ref);
-    if (index == -1) return;
-
-    final payment = _payments[index];
-    if (payment.isConfirmed) return;
-
-    setState(() {
-      _payments[index] = _LandlordPayment(
-        reference: payment.reference,
-        contractCode: payment.contractCode,
-        agentName: payment.agentName,
-        agentId: payment.agentId,
-        landlordName: payment.landlordName,
-        estateName: payment.estateName,
-        amount: payment.amount,
-        paymentMethod: payment.paymentMethod,
-        phoneNumber: payment.phoneNumber,
-        statusLabel: 'Payment Confirmed',
-        isConfirmed: true,
-        createdAt: payment.createdAt,
+    if (ref.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter the commission IDREF.')),
       );
+      return;
+    }
+
+    CommissionSlip? target = _activeSlip;
+    if (target == null || target.reference != ref) {
+      target = await CommissionSlipsService().getSlipByReference(ref);
+    }
+
+    if (target == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No slip found with reference $ref.')),
+      );
+      return;
+    }
+
+    await CommissionSlipsService().paySlip(target.id);
+
+    if (!mounted) return;
+    _showPaymentSuccessDialog();
+    _clearForm();
+    setState(() {
+      _activeSlip = null;
+      _selectedTab = 0;
     });
+  }
+
+  void _populateFormFromSlip(CommissionSlip slip) {
+    _commissionIdController.text = slip.reference;
+    _agentNameController.text = slip.agentName;
+    _agentIdController.text = slip.agentId;
+    _amountController.text = slip.amount;
+    _paymentMethodController.text = slip.paymentMethod;
+    _phoneController.text = slip.recipientPhone;
   }
 
   void _onScroll() {
     final offset = _scrollController.offset;
     if (_scrollOffset != offset) {
-      setState(() {
-        _scrollOffset = offset;
-      });
+      setState(() => _scrollOffset = offset);
     }
-  }
-
-  void _populateFormFromPayment(_LandlordPayment payment) {
-    _commissionIdController.text = payment.reference;
-    _agentNameController.text = payment.agentName;
-    _agentIdController.text = payment.agentId;
-    _amountController.text = payment.amount;
-    _paymentMethodController.text = payment.paymentMethod;
-    _phoneController.text = payment.phoneNumber;
   }
 
   void _clearForm() {
@@ -588,6 +568,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
     _amountController.clear();
     _paymentMethodController.text = 'MTN Momo';
     _phoneController.clear();
+    _activeSlip = null;
   }
 
   Widget _buildLabel(TextTheme textTheme, String text) {
@@ -620,15 +601,11 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(
-            color: Color(0xFF9E9E9E),
-          ),
+          borderSide: const BorderSide(color: Color(0xFF9E9E9E)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(
-            color: _LandlordPaymentsColors.bodyText,
-          ),
+          borderSide: const BorderSide(color: _LandlordPaymentsColors.bodyText),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -709,4 +686,3 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
     );
   }
 }
-
