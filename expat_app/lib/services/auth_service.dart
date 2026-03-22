@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/user_profile.dart';
 import 'bowls_service.dart';
@@ -16,6 +20,7 @@ class AuthService {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   /// Current Firebase user (null if not signed in).
   User? get currentUser => _auth.currentUser;
@@ -148,5 +153,34 @@ class AuthService {
   Future<UserProfile?> reloadUserAndProfile() async {
     await _auth.currentUser?.reload();
     return getCurrentUserProfile();
+  }
+
+  /// Upload a profile image to Firebase Storage and update the Firestore
+  /// user document with the download URL. Returns the URL.
+  Future<String> uploadProfileImage(XFile image) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Not signed in');
+
+    final bytes = await image.readAsBytes();
+    final ref = _storage.ref('users/${user.uid}/profile');
+    final task = ref.putData(
+      bytes,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+    final snapshot = await task.timeout(
+      const Duration(seconds: 45),
+      onTimeout: () => throw TimeoutException('Profile image upload timed out'),
+    );
+    final url = await snapshot.ref.getDownloadURL().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw TimeoutException('Getting image URL timed out'),
+    );
+
+    await _firestore.collection(kUsersCollection).doc(user.uid).update({
+      'profileImageUrl': url,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    return url;
   }
 }

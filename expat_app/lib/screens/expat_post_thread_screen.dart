@@ -32,6 +32,7 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
   String? _uid;
   String _userName = '';
   String _userRole = 'Expat';
+  String? _userProfileImageUrl;
 
   Post? _post;
   bool _loadingPost = true;
@@ -58,6 +59,7 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
         _userName = profile.legalName;
         _userRole = profile.role.value.substring(0, 1).toUpperCase() +
             profile.role.value.substring(1);
+        _userProfileImageUrl = profile.profileImageUrl;
       });
     }
   }
@@ -187,14 +189,21 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
             CircleAvatar(
               radius: 18,
               backgroundColor: Colors.grey.shade200,
-              child: Text(
-                post.authorName.isNotEmpty
-                    ? post.authorName[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: _ThreadColors.bodyText),
-              ),
+              backgroundImage: post.authorImageUrl != null &&
+                      post.authorImageUrl!.isNotEmpty
+                  ? NetworkImage(post.authorImageUrl!)
+                  : null,
+              child: post.authorImageUrl == null ||
+                      post.authorImageUrl!.isEmpty
+                  ? Text(
+                      post.authorName.isNotEmpty
+                          ? post.authorName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: _ThreadColors.bodyText),
+                    )
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -291,15 +300,22 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
               CircleAvatar(
                 radius: 14,
                 backgroundColor: Colors.grey.shade300,
-                child: Text(
-                  comment.authorName.isNotEmpty
-                      ? comment.authorName[0].toUpperCase()
-                      : '?',
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _ThreadColors.bodyText),
-                ),
+                backgroundImage: comment.authorImageUrl != null &&
+                        comment.authorImageUrl!.isNotEmpty
+                    ? NetworkImage(comment.authorImageUrl!)
+                    : null,
+                child: comment.authorImageUrl == null ||
+                        comment.authorImageUrl!.isEmpty
+                    ? Text(
+                        comment.authorName.isNotEmpty
+                            ? comment.authorName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _ThreadColors.bodyText),
+                      )
+                    : null,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -460,6 +476,7 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
       authorName: _userName,
       authorRole: _userRole,
       content: text,
+      authorImageUrl: _userProfileImageUrl,
       parentCommentId: _replyToCommentId,
     );
 

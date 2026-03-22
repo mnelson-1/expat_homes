@@ -66,6 +66,7 @@ class CommunityService {
     required String authorRole,
     required String content,
     String? imageUrl,
+    String? authorImageUrl,
     String scope = 'feed',
     String? bowlId,
   }) async {
@@ -76,6 +77,7 @@ class CommunityService {
       authorRole: authorRole,
       content: content,
       imageUrl: imageUrl,
+      authorImageUrl: authorImageUrl,
       scope: scope,
       bowlId: bowlId,
     );
@@ -147,6 +149,7 @@ class CommunityService {
     required String authorName,
     required String authorRole,
     required String content,
+    String? authorImageUrl,
     String? parentCommentId,
   }) async {
     final comment = PostComment(
@@ -156,6 +159,7 @@ class CommunityService {
       authorName: authorName,
       authorRole: authorRole,
       content: content,
+      authorImageUrl: authorImageUrl,
       parentCommentId: parentCommentId,
     );
     final docRef = await _commentsRef.add(comment.toFirestoreCreate());

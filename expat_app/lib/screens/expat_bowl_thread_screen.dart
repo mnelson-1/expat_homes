@@ -32,6 +32,7 @@ class _ExpatBowlThreadScreenState extends State<ExpatBowlThreadScreen> {
   String? _uid;
   String _userName = '';
   String _userRole = 'Expat';
+  String? _userProfileImageUrl;
 
   @override
   void initState() {
@@ -54,6 +55,7 @@ class _ExpatBowlThreadScreenState extends State<ExpatBowlThreadScreen> {
         _userName = profile.legalName;
         _userRole = profile.role.value.substring(0, 1).toUpperCase() +
             profile.role.value.substring(1);
+        _userProfileImageUrl = profile.profileImageUrl;
       });
     }
   }
@@ -196,14 +198,21 @@ class _ExpatBowlThreadScreenState extends State<ExpatBowlThreadScreen> {
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: Colors.grey.shade200,
-                  child: Text(
-                    post.authorName.isNotEmpty
-                        ? post.authorName[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: _BowlColors.bodyText),
-                  ),
+                  backgroundImage: post.authorImageUrl != null &&
+                          post.authorImageUrl!.isNotEmpty
+                      ? NetworkImage(post.authorImageUrl!)
+                      : null,
+                  child: post.authorImageUrl == null ||
+                          post.authorImageUrl!.isEmpty
+                      ? Text(
+                          post.authorName.isNotEmpty
+                              ? post.authorName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: _BowlColors.bodyText),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -321,6 +330,7 @@ class _ExpatBowlThreadScreenState extends State<ExpatBowlThreadScreen> {
                       authorName: _userName,
                       authorRole: _userRole,
                       content: text,
+                      authorImageUrl: _userProfileImageUrl,
                       scope: 'bowl',
                       bowlId: widget.bowlId,
                     );

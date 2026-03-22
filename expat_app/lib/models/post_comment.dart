@@ -8,6 +8,7 @@ class PostComment {
     required this.authorName,
     required this.authorRole,
     required this.content,
+    this.authorImageUrl,
     this.parentCommentId,
     this.likedBy = const [],
     this.likeCount = 0,
@@ -20,6 +21,7 @@ class PostComment {
   final String authorName;
   final String authorRole;
   final String content;
+  final String? authorImageUrl;
   final String? parentCommentId;
   final List<String> likedBy;
   final int likeCount;
@@ -44,6 +46,7 @@ class PostComment {
       authorName: data['authorName'] as String? ?? '',
       authorRole: data['authorRole'] as String? ?? 'Expat',
       content: data['content'] as String? ?? '',
+      authorImageUrl: data['authorImageUrl'] as String?,
       parentCommentId: data['parentCommentId'] as String?,
       likedBy: rawLikedBy,
       likeCount: data['likeCount'] as int? ?? rawLikedBy.length,
@@ -57,6 +60,7 @@ class PostComment {
         'authorName': authorName,
         'authorRole': authorRole,
         'content': content,
+        'authorImageUrl': authorImageUrl,
         'parentCommentId': parentCommentId,
         'likedBy': likedBy,
         'likeCount': likeCount,

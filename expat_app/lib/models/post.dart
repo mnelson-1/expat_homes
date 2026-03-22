@@ -8,6 +8,7 @@ class Post {
     required this.authorRole,
     required this.content,
     this.imageUrl,
+    this.authorImageUrl,
     this.scope = 'feed',
     this.bowlId,
     this.likedBy = const [],
@@ -23,6 +24,7 @@ class Post {
   final String authorRole;
   final String content;
   final String? imageUrl;
+  final String? authorImageUrl;
   final String scope;
   final String? bowlId;
   final List<String> likedBy;
@@ -47,6 +49,7 @@ class Post {
       authorRole: data['authorRole'] as String? ?? 'Expat',
       content: data['content'] as String? ?? '',
       imageUrl: data['imageUrl'] as String?,
+      authorImageUrl: data['authorImageUrl'] as String?,
       scope: data['scope'] as String? ?? 'feed',
       bowlId: data['bowlId'] as String?,
       likedBy: rawLikedBy,
@@ -63,6 +66,7 @@ class Post {
         'authorRole': authorRole,
         'content': content,
         'imageUrl': imageUrl,
+        'authorImageUrl': authorImageUrl,
         'scope': scope,
         'bowlId': bowlId,
         'likedBy': likedBy,

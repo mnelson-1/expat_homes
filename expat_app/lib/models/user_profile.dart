@@ -39,6 +39,8 @@ class UserProfile {
     this.demographic,
     // Agent (links to licensed_agents)
     this.agentId,
+    // Profile picture
+    this.profileImageUrl,
   });
 
   final String id;
@@ -60,6 +62,9 @@ class UserProfile {
 
   /// Agent: institution-issued ID (e.g. RWAREB); links to licensed_agents
   final String? agentId;
+
+  /// Profile picture URL (Firebase Storage)
+  final String? profileImageUrl;
 
   String get legalName {
     if (legalFirstName != null || legalLastName != null) {
@@ -88,6 +93,7 @@ class UserProfile {
       countryOfCitizenship: data['countryOfCitizenship'] as String?,
       demographic: data['demographic'] as String?,
       agentId: data['agentId'] as String?,
+      profileImageUrl: data['profileImageUrl'] as String?,
     );
   }
 
@@ -115,6 +121,7 @@ class UserProfile {
     }
     if (demographic != null) map['demographic'] = demographic;
     if (agentId != null) map['agentId'] = agentId;
+    if (profileImageUrl != null) map['profileImageUrl'] = profileImageUrl;
     return map;
   }
 

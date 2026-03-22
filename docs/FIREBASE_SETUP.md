@@ -97,11 +97,14 @@ flutter run
 
 ---
 
-## 6. Firebase Storage (listings images)
+## 6. Firebase Storage (listings + profile images)
 
-Enable **Storage** in Firebase Console (Build → Storage → Get started). The app uploads listing images to `listings/{listingId}/{index}` and stores the download URLs in the listing’s `mediaUrls` field.
+Enable **Storage** in Firebase Console (Build → Storage → Get started). The app uses:
 
-If “Verify Listing” hangs or fails with a permission error, set **Storage rules** (Storage → Rules) so authenticated users can upload under `listings/`:
+- **Listings:** `listings/{listingId}/{index}` → stored in each listing’s `mediaUrls`.
+- **Profile photos:** `users/{uid}/profile` (and similar under that user folder) → URL saved on the user’s Firestore `users/{uid}` document as `profileImageUrl`.
+
+If uploads fail with **`firebase_storage/unauthorized`**, your **Storage rules** do not allow that path. Copy the rules below into **Storage → Rules** → **Publish** (or deploy the repo’s `storage.rules` with Firebase CLI).
 
 ```javascript
 rules_version = '2';
@@ -110,6 +113,11 @@ service firebase.storage {
     match /listings/{listingId}/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
+    }
+    // Required for profile picture upload from the app
+    match /users/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
@@ -129,9 +137,10 @@ If the Make a Listing screen shows **TimeoutException** or **permission denied**
 ### Step 2: Set Storage rules
 
 1. In **Storage**, open the **Rules** tab.
-2. Replace the rules with the snippet from **Section 6** above (so authenticated users can read/write under `listings/`).
+2. Replace the rules with the snippet from **Section 6** above (covers both `listings/` and `users/{uid}/…` for profile photos).
 3. Click **Publish**.  
-   If rules are too strict (e.g. `allow read, write: if false`), uploads will fail or hang.
+   If rules are too strict (e.g. `allow read, write: if false`), uploads will fail or hang.  
+   **Profile picture errors** (`unauthorized` on `uploadProfileImage`) almost always mean the `users/{userId}/…` block is missing from Storage rules.
 
 ### Step 3: Confirm Firestore allows creates
 

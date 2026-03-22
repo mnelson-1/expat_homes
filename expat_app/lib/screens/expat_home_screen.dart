@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:expat_app/models/listing.dart';
 import 'package:expat_app/models/post.dart';
@@ -52,7 +53,9 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   late final Stream<List<Post>> _feedPostsStream;
   String? _uid;
   String _userName = '';
+  String _userEmail = '';
   String _userRole = 'Expat';
+  String? _userProfileImageUrl;
 
   static const List<BoxShadow> _tabBarShadow = [
     BoxShadow(
@@ -81,9 +84,11 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     if (profile != null && mounted) {
       setState(() {
         _userName = profile.legalName;
+        _userEmail = profile.email;
         _userRole =
             profile.role.value.substring(0, 1).toUpperCase() +
             profile.role.value.substring(1);
+        _userProfileImageUrl = profile.profileImageUrl;
       });
     }
   }
@@ -206,26 +211,48 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     );
   }
 
-  /// Temporary testing: profile menu with Log out. Auth state stream in main will show Get Started.
+  Widget _buildProfileAvatar({double radius = 16}) {
+    if (_userProfileImageUrl != null && _userProfileImageUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: NetworkImage(_userProfileImageUrl!),
+        backgroundColor: Colors.grey.shade200,
+      );
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: _ExpatHomeColors.accentGreen,
+      child: Text(
+        _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
+        style: TextStyle(
+          color: _ExpatHomeColors.primaryDark,
+          fontWeight: FontWeight.w600,
+          fontSize: radius * 0.9,
+        ),
+      ),
+    );
+  }
+
   Widget _buildProfileMenu(TextTheme textTheme) {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.person_outline, color: Colors.white),
-      color: Colors.white,
-      onSelected: (value) {
-        if (value == 'logout') {
-          AuthService().signOut();
-        }
+    return GestureDetector(
+      onTap: () => _showProfilePopup(textTheme),
+      child: _buildProfileAvatar(),
+    );
+  }
+
+  void _showProfilePopup(TextTheme textTheme) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return _ProfilePopupDialog(
+          userName: _userName,
+          userEmail: _userEmail,
+          profileImageUrl: _userProfileImageUrl,
+          onImageUpdated: (url) {
+            setState(() => _userProfileImageUrl = url);
+          },
+        );
       },
-      itemBuilder:
-          (context) => [
-            const PopupMenuItem<String>(
-              value: 'logout',
-              child: ListTile(
-                leading: Icon(Icons.logout),
-                title: Text('Log out'),
-              ),
-            ),
-          ],
     );
   }
 
@@ -398,15 +425,22 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
               CircleAvatar(
                 radius: 18,
                 backgroundColor: Colors.grey.shade200,
-                child: Text(
-                  post.authorName.isNotEmpty
-                      ? post.authorName[0].toUpperCase()
-                      : '?',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: _ExpatHomeColors.bodyText,
-                  ),
-                ),
+                backgroundImage: post.authorImageUrl != null &&
+                        post.authorImageUrl!.isNotEmpty
+                    ? NetworkImage(post.authorImageUrl!)
+                    : null,
+                child: post.authorImageUrl == null ||
+                        post.authorImageUrl!.isEmpty
+                    ? Text(
+                        post.authorName.isNotEmpty
+                            ? post.authorName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: _ExpatHomeColors.bodyText,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1555,6 +1589,7 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
                       authorName: _userName,
                       authorRole: _userRole,
                       content: text,
+                      authorImageUrl: _userProfileImageUrl,
                     );
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   },
@@ -1743,4 +1778,175 @@ class _Estate {
   final String imagePath;
   // Long-form listing description shown on the detail page.
   final String description;
+}
+
+/// Gmail-style profile popup dialog, reusable across all home screens.
+class _ProfilePopupDialog extends StatefulWidget {
+  const _ProfilePopupDialog({
+    required this.userName,
+    required this.userEmail,
+    required this.profileImageUrl,
+    required this.onImageUpdated,
+  });
+
+  final String userName;
+  final String userEmail;
+  final String? profileImageUrl;
+  final ValueChanged<String> onImageUpdated;
+
+  @override
+  State<_ProfilePopupDialog> createState() => _ProfilePopupDialogState();
+}
+
+class _ProfilePopupDialogState extends State<_ProfilePopupDialog> {
+  String? _imageUrl;
+  bool _uploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageUrl = widget.profileImageUrl;
+  }
+
+  Future<void> _pickAndUpload() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    setState(() => _uploading = true);
+    try {
+      final url = await AuthService().uploadProfileImage(picked);
+      if (mounted) {
+        setState(() {
+          _imageUrl = url;
+          _uploading = false;
+        });
+        widget.onImageUpdated(url);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _uploading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    const primaryDark = Color(0xFF1A2E35);
+    const accentGreen = Color(0xFF8ED966);
+
+    return Dialog(
+      alignment: Alignment.topRight,
+      backgroundColor: primaryDark,
+      insetPadding: const EdgeInsets.only(top: 70, right: 12, left: 80),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                _uploading
+                    ? const SizedBox(
+                        width: 72,
+                        height: 72,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          color: accentGreen,
+                        ),
+                      )
+                    : _buildAvatar(72),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: _uploading ? null : _pickAndUpload,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: accentGreen,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 14,
+                        color: primaryDark,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              widget.userName,
+              style: textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.userEmail,
+              style: textTheme.bodySmall?.copyWith(
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Divider(height: 1, color: Colors.white24),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.white),
+              title: Text(
+                'Log out',
+                style: textTheme.bodyMedium?.copyWith(color: Colors.white),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                AuthService().signOut();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar(double radius) {
+    if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius / 2,
+        backgroundImage: NetworkImage(_imageUrl!),
+        backgroundColor: Colors.grey.shade200,
+      );
+    }
+    return CircleAvatar(
+      radius: radius / 2,
+      backgroundColor: const Color(0xFF8ED966),
+      child: Text(
+        widget.userName.isNotEmpty
+            ? widget.userName[0].toUpperCase()
+            : '?',
+        style: TextStyle(
+          color: const Color(0xFF1A2E35),
+          fontWeight: FontWeight.w600,
+          fontSize: radius * 0.4,
+        ),
+      ),
+    );
+  }
 }

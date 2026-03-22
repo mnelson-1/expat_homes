@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:expat_app/services/auth_service.dart';
 import 'agent_assigned_listings_screen.dart';
@@ -23,11 +24,26 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
   static const Color _accentGreen = Color(0xFF8ED966);
 
   late int _selectedBottomIndex;
+  String _userName = '';
+  String _userEmail = '';
+  String? _userProfileImageUrl;
 
   @override
   void initState() {
     super.initState();
     _selectedBottomIndex = widget.initialIndex;
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final profile = await AuthService().getCurrentUserProfile();
+    if (profile != null && mounted) {
+      setState(() {
+        _userName = profile.legalName;
+        _userEmail = profile.email;
+        _userProfileImageUrl = profile.profileImageUrl;
+      });
+    }
   }
 
   @override
@@ -81,38 +97,55 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
     );
   }
 
-  /// Temporary testing: profile menu with Profile and Log out.
+  Widget _buildProfileAvatar({double radius = 16}) {
+    if (_userProfileImageUrl != null && _userProfileImageUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: NetworkImage(_userProfileImageUrl!),
+        backgroundColor: Colors.grey.shade200,
+      );
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: _accentGreen,
+      child: Text(
+        _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
+        style: TextStyle(
+          color: _primaryDark,
+          fontWeight: FontWeight.w600,
+          fontSize: radius * 0.9,
+        ),
+      ),
+    );
+  }
+
   Widget _buildProfileMenu(TextTheme textTheme) {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.person_outline, color: Colors.white),
-      color: Colors.white,
-      onSelected: (value) {
-        if (value == 'profile') {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const AgentProfileScreen(showAssignProperty: false),
-            ),
-          );
-        } else if (value == 'logout') {
-          AuthService().signOut();
-        }
+    return GestureDetector(
+      onTap: () => _showProfilePopup(textTheme),
+      child: _buildProfileAvatar(),
+    );
+  }
+
+  void _showProfilePopup(TextTheme textTheme) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return _AgentProfilePopup(
+          userName: _userName,
+          userEmail: _userEmail,
+          profileImageUrl: _userProfileImageUrl,
+          onImageUpdated: (url) {
+            setState(() => _userProfileImageUrl = url);
+          },
+          onViewProfile: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AgentProfileScreen(showAssignProperty: false),
+              ),
+            );
+          },
+        );
       },
-      itemBuilder: (context) => [
-        const PopupMenuItem<String>(
-          value: 'profile',
-          child: ListTile(
-            leading: Icon(Icons.person),
-            title: Text('Profile'),
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'logout',
-          child: ListTile(
-            leading: Icon(Icons.logout),
-            title: Text('Log out'),
-          ),
-        ),
-      ],
     );
   }
 
@@ -220,6 +253,161 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AgentProfilePopup extends StatefulWidget {
+  const _AgentProfilePopup({
+    required this.userName,
+    required this.userEmail,
+    required this.profileImageUrl,
+    required this.onImageUpdated,
+    required this.onViewProfile,
+  });
+
+  final String userName;
+  final String userEmail;
+  final String? profileImageUrl;
+  final ValueChanged<String> onImageUpdated;
+  final VoidCallback onViewProfile;
+
+  @override
+  State<_AgentProfilePopup> createState() => _AgentProfilePopupState();
+}
+
+class _AgentProfilePopupState extends State<_AgentProfilePopup> {
+  String? _imageUrl;
+  bool _uploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageUrl = widget.profileImageUrl;
+  }
+
+  Future<void> _pickAndUpload() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    setState(() => _uploading = true);
+    try {
+      final url = await AuthService().uploadProfileImage(picked);
+      if (mounted) {
+        setState(() { _imageUrl = url; _uploading = false; });
+        widget.onImageUpdated(url);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _uploading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    const primaryDark = Color(0xFF1A2E35);
+    const accentGreen = Color(0xFF8ED966);
+
+    return Dialog(
+      alignment: Alignment.topRight,
+      backgroundColor: primaryDark,
+      insetPadding: const EdgeInsets.only(top: 70, right: 12, left: 80),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                _uploading
+                    ? const SizedBox(
+                        width: 72, height: 72,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          color: accentGreen,
+                        ))
+                    : CircleAvatar(
+                        radius: 36,
+                        backgroundColor: accentGreen,
+                        backgroundImage:
+                            _imageUrl != null && _imageUrl!.isNotEmpty
+                                ? NetworkImage(_imageUrl!)
+                                : null,
+                        child: _imageUrl == null || _imageUrl!.isEmpty
+                            ? Text(
+                                widget.userName.isNotEmpty
+                                    ? widget.userName[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: primaryDark,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 28,
+                                ))
+                            : null,
+                      ),
+                Positioned(
+                  bottom: 0, right: 0,
+                  child: GestureDetector(
+                    onTap: _uploading ? null : _pickAndUpload,
+                    child: Container(
+                      width: 28, height: 28,
+                      decoration: BoxDecoration(
+                        color: accentGreen,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(Icons.camera_alt, size: 14,
+                          color: primaryDark),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(widget.userName,
+                style: textTheme.titleMedium?.copyWith(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text(widget.userEmail,
+                style: textTheme.bodySmall?.copyWith(color: Colors.white70)),
+            const SizedBox(height: 20),
+            const Divider(height: 1, color: Colors.white24),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.person, color: Colors.white),
+              title: Text('Profile',
+                  style: textTheme.bodyMedium?.copyWith(color: Colors.white)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onViewProfile();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.white),
+              title: Text('Log out',
+                  style: textTheme.bodyMedium?.copyWith(color: Colors.white)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              onTap: () {
+                Navigator.of(context).pop();
+                AuthService().signOut();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
