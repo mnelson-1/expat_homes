@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/listing.dart';
 import 'package:expat_app/models/listing_edit_request.dart';
+import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/conversations_service.dart';
 import 'package:expat_app/services/edit_requests_service.dart';
 import 'package:expat_app/services/listings_service.dart';
 import 'landlord_make_listing_screen.dart';
-import 'messages_screen.dart';
+import 'messages_screen.dart' show ConversationScreen, kRoleAgent, kRoleExpat;
 
 /// Detail page for a single estate listing.
 /// This will later be wired up to real data from the backend.
@@ -24,6 +26,7 @@ class ListingDetailScreen extends StatelessWidget {
     this.showRequestEditOnly = false,
     this.showAgentActions = false,
     this.listingId,
+    this.landlordId,
     this.onListingAccepted,
     this.onListingDeclined,
     this.editRequest,
@@ -52,6 +55,9 @@ class ListingDetailScreen extends StatelessWidget {
 
   /// When opening from agent Listings; used to notify when listing is accepted.
   final String? listingId;
+
+  /// UID of the listing's landlord (for creating conversations).
+  final String? landlordId;
 
   /// Called when agent taps Accept (so the listing can move to Accepted tab).
   final void Function(String listingId)? onListingAccepted;
@@ -570,45 +576,37 @@ class ListingDetailScreen extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: () {
-                      const landlordName = 'Landlord';
-                      final subtitle = 'Landlord of $title';
-                      addOrUpdateChatThreadForAgentLandlordChat(
-                        contactName: landlordName,
+                    onPressed: () async {
+                      final myUid = AuthService().currentUser?.uid;
+                      if (myUid == null || listingId == null || landlordId == null) return;
+
+                      final myProfile = await AuthService().getCurrentUserProfile();
+                      final myName = myProfile?.legalName ?? 'Agent';
+                      final landlordName = representativeName ?? 'Landlord';
+
+                      final convo = await ConversationsService().getOrCreateConversation(
+                        listingId: listingId!,
+                        participantIds: [myUid, landlordId!],
+                        participantNames: {myUid: myName, landlordId!: landlordName},
                         listingTitle: title,
-                        location: location,
-                        price: price,
-                        imagePath:
-                            imagePaths.isNotEmpty ? imagePaths.first : '',
+                        listingImage: imagePaths.isNotEmpty ? imagePaths.first : '',
+                        listingPrice: price,
+                        listingLocation: location,
                       );
-                      final initialMessage = getLastMessageForAgentLandlordChat(
-                        listingTitle: title,
-                      );
+
+                      if (!context.mounted) return;
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder:
-                              (_) => ConversationScreen(
-                                listingTitle: title,
-                                location: location,
-                                price: price,
-                                imagePath:
-                                    imagePaths.isNotEmpty
-                                        ? imagePaths.first
-                                        : '',
-                                contactName: landlordName,
-                                contactSubtitle: subtitle,
-                                initialMessage: initialMessage,
-                                storedMessages: getStoredMessagesForThread(
-                                  landlordName,
-                                  subtitle,
-                                  title,
-                                ),
-                                showInitialAsIncoming: true,
-                                listingFromOtherParty: true,
-                                returnToLandlordOnBack: false,
-                                returnToAgentMessagesOnBack: true,
-                                listingDetailRole: kRoleAgent,
-                              ),
+                          builder: (_) => ConversationScreen(
+                            conversationId: convo.id,
+                            listingTitle: title,
+                            location: location,
+                            price: price,
+                            imagePath: imagePaths.isNotEmpty ? imagePaths.first : '',
+                            contactName: landlordName,
+                            returnToAgentMessagesOnBack: true,
+                            listingDetailRole: kRoleAgent,
+                          ),
                         ),
                       );
                     },
@@ -705,40 +703,48 @@ class ListingDetailScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () {
+                  onPressed: () async {
+                    final myUid = AuthService().currentUser?.uid;
+                    if (myUid == null || listingId == null || landlordId == null) return;
+
                     const defaultInquiryMessage =
                         'Hey there! I would like to get more\ninformation on this Listing.';
                     final contactName = representativeName ?? 'Representative';
-                    final contactSubtitle = 'Representative';
-                    addOrUpdateChatThreadForExpatInquiry(
-                      contactName: contactName,
-                      contactSubtitle: contactSubtitle,
+
+                    final myProfile = await AuthService().getCurrentUserProfile();
+                    final myName = myProfile?.legalName ?? 'Expat';
+
+                    final convo = await ConversationsService().getOrCreateConversation(
+                      listingId: listingId!,
+                      participantIds: [myUid, landlordId!],
+                      participantNames: {myUid: myName, landlordId!: contactName},
                       listingTitle: title,
-                      location: location,
-                      price: price,
-                      imagePath: imagePaths.isNotEmpty ? imagePaths.first : '',
-                      lastMessage: defaultInquiryMessage,
+                      listingImage: imagePaths.isNotEmpty ? imagePaths.first : '',
+                      listingPrice: price,
+                      listingLocation: location,
                     );
+
+                    // Only send the default inquiry on first contact.
+                    if (convo.lastMessage == null) {
+                      await ConversationsService().sendMessage(
+                        conversationId: convo.id,
+                        senderId: myUid,
+                        content: defaultInquiryMessage,
+                      );
+                    }
+
+                    if (!context.mounted) return;
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder:
-                            (_) => ConversationScreen(
-                              listingTitle: title,
-                              location: location,
-                              price: price,
-                              imagePath:
-                                  imagePaths.isNotEmpty ? imagePaths.first : '',
-                              contactName: contactName,
-                              contactSubtitle: contactSubtitle,
-                              initialMessage: defaultInquiryMessage,
-                              storedMessages: getStoredMessagesForThread(
-                                contactName,
-                                contactSubtitle,
-                                title,
-                              ),
-                              returnToLandlordOnBack: false,
-                              listingDetailRole: kRoleExpat,
-                            ),
+                        builder: (_) => ConversationScreen(
+                          conversationId: convo.id,
+                          listingTitle: title,
+                          location: location,
+                          price: price,
+                          imagePath: imagePaths.isNotEmpty ? imagePaths.first : '',
+                          contactName: contactName,
+                          listingDetailRole: kRoleExpat,
+                        ),
                       ),
                     );
                   },
@@ -1039,6 +1045,7 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
       showRequestEditOnly: widget.showRequestEditOnly,
       showAgentActions: widget.showAgentActions,
       listingId: widget.listingId,
+      landlordId: listing.representativeUid ?? listing.landlordId,
       onListingAccepted: widget.onListingAccepted,
       onListingDeclined: widget.onListingDeclined,
       editRequest: editRequest,

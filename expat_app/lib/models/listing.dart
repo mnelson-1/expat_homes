@@ -69,6 +69,7 @@ class Listing {
     this.verifiedBy,
     this.representativeName,
     this.representativeRole,
+    this.representativeUid,
   });
 
   final String id;
@@ -90,6 +91,9 @@ class Listing {
   final String? representativeName;
   /// "Landlord" or "Agent".
   final String? representativeRole;
+  /// Firebase UID of the resolved representative (agent UID if assigned, otherwise landlordId).
+  /// Populated client-side only, not stored in Firestore.
+  final String? representativeUid;
 
   String get typeLabel => type.displayLabel;
 

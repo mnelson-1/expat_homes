@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/conversation.dart';
+import 'package:expat_app/models/chat_message.dart';
+import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/conversations_service.dart';
 import 'agent_home_screen.dart';
-import 'agent_profile_screen.dart';
 import 'landlord_home_screen.dart';
 import 'listing_detail_screen.dart';
 
-/// Normalizes price string for display: "/per month" -> "/mo", "/per night" -> "/night".
 String _normalizePriceForDisplay(String price) {
   if (!price.contains('/')) return price;
   final parts = price.split('/');
@@ -16,157 +18,9 @@ String _normalizePriceForDisplay(String price) {
   return price;
 }
 
-/// Empty-state view for the Messages tab.
-///
-/// When messages are populated and the list becomes scrollable,
-/// a drop shadow appears under the Messages header while any
-/// part of the list is scrolled beneath it.
-/// Role that owns this thread; only that role's Messages tab shows it.
 const String kRoleLandlord = 'landlord';
 const String kRoleAgent = 'agent';
 const String kRoleExpat = 'expat';
-
-class ChatThread {
-  ChatThread({
-    required this.contactName,
-    required this.contactSubtitle,
-    required this.lastMessage,
-    required this.lastUpdated,
-    required this.listingTitle,
-    required this.location,
-    required this.price,
-    required this.imagePath,
-    required this.forRole,
-  });
-
-  final String contactName;
-  final String contactSubtitle;
-  final String lastMessage;
-  final DateTime lastUpdated;
-  final String listingTitle;
-  final String location;
-  final String price;
-  final String imagePath;
-  /// Which user role this thread belongs to: [kRoleLandlord], [kRoleAgent], or [kRoleExpat].
-  final String forRole;
-}
-
-final List<ChatThread> _chatThreads = [];
-final ValueNotifier<List<ChatThread>> chatThreadsNotifier =
-    ValueNotifier<List<ChatThread>>([]);
-
-void addOrUpdateChatThread(ChatThread thread) {
-  final index = _chatThreads.indexWhere((t) =>
-      t.contactName == thread.contactName &&
-      t.contactSubtitle == thread.contactSubtitle &&
-      t.forRole == thread.forRole);
-  if (index >= 0) {
-    _chatThreads[index] = thread;
-  } else {
-    _chatThreads.add(thread);
-  }
-  chatThreadsNotifier.value = List.from(_chatThreads);
-}
-
-void addOrUpdateChatThreadForAgent({
-  required String agentName,
-  required String agentId,
-  required String message,
-  required String listingTitle,
-  required String location,
-  required String price,
-  required String imagePath,
-}) {
-  addOrUpdateChatThread(
-    ChatThread(
-      contactName: agentName,
-      contactSubtitle: agentId,
-      lastMessage: message,
-      lastUpdated: DateTime.now(),
-      listingTitle: listingTitle,
-      location: location,
-      price: price,
-      imagePath: imagePath,
-      forRole: kRoleLandlord,
-    ),
-  );
-}
-
-/// Call when an Agent taps "Chat Landlord" so the conversation appears in the Messages tab.
-/// [contactName] is the landlord's name (main title); subtitle is always "Landlord of [listing]".
-void addOrUpdateChatThreadForAgentLandlordChat({
-  required String contactName,
-  required String listingTitle,
-  required String location,
-  required String price,
-  required String imagePath,
-  String lastMessage =
-      'Hi there. I would like for you to represent me in the sale of this listing.',
-}) {
-  final subtitle = 'Landlord of $listingTitle';
-  final existingIndex = _chatThreads.indexWhere(
-    (t) => t.listingTitle == listingTitle && t.contactSubtitle == subtitle,
-  );
-  if (existingIndex >= 0) {
-    return;
-  }
-
-  addOrUpdateChatThread(
-    ChatThread(
-      contactName: contactName,
-      contactSubtitle: subtitle,
-      lastMessage: lastMessage,
-      lastUpdated: DateTime.now(),
-      listingTitle: listingTitle,
-      location: location,
-      price: price,
-      imagePath: imagePath,
-      forRole: kRoleAgent,
-    ),
-  );
-}
-
-/// Returns the last message text for a given landlord/listing thread,
-/// or null if no such thread exists.
-String? getLastMessageForAgentLandlordChat({
-  required String listingTitle,
-}) {
-  final subtitle = 'Landlord of $listingTitle';
-  for (final thread in _chatThreads) {
-    if (thread.listingTitle == listingTitle &&
-        thread.contactSubtitle == subtitle) {
-      return thread.lastMessage;
-    }
-  }
-  return null;
-}
-
-/// Call when an Expat inquires on a listing so the conversation appears
-/// in the Messages tab with timestamp and preview (parity with Landlord).
-void addOrUpdateChatThreadForExpatInquiry({
-  required String contactName,
-  required String contactSubtitle,
-  required String listingTitle,
-  required String location,
-  required String price,
-  required String imagePath,
-  String lastMessage =
-      'Hey there! I would like to get more\ninformation on this Listing.',
-}) {
-  addOrUpdateChatThread(
-    ChatThread(
-      contactName: contactName,
-      contactSubtitle: contactSubtitle,
-      lastMessage: lastMessage,
-      lastUpdated: DateTime.now(),
-      listingTitle: listingTitle,
-      location: location,
-      price: price,
-      imagePath: imagePath,
-      forRole: kRoleExpat,
-    ),
-  );
-}
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({
@@ -176,7 +30,6 @@ class MessagesScreen extends StatefulWidget {
   }) : currentUserRole = currentUserRole ?? kRoleExpat;
 
   final String? emptyStateMessage;
-  /// Only threads with [forRole] == [currentUserRole] are shown. Use [kRoleLandlord], [kRoleAgent], or [kRoleExpat].
   final String currentUserRole;
 
   @override
@@ -195,10 +48,18 @@ class _MessagesScreenState extends State<MessagesScreen> {
     ),
   ];
 
+  String? _uid;
+  Stream<List<Conversation>>? _conversationsStream;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _uid = AuthService().currentUser?.uid;
+    if (_uid != null) {
+      _conversationsStream =
+          ConversationsService().conversationsStream(_uid!);
+    }
   }
 
   @override
@@ -241,41 +102,48 @@ class _MessagesScreenState extends State<MessagesScreen> {
         ),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
         Expanded(
-          child: ValueListenableBuilder<List<ChatThread>>(
-            valueListenable: chatThreadsNotifier,
-            builder: (context, threads, _) {
-              final forCurrentRole = threads
-                  .where((t) => t.forRole == widget.currentUserRole)
-                  .toList();
-              if (forCurrentRole.isEmpty) {
-                return ListView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(bottom: 56),
-                  children: [
-                    const SizedBox(height: 200),
-                    Center(
-                      child: Text(
-                        widget.emptyStateMessage ??
-                            'You have no messages yet. Make enquiries\non listings and watch the magic happen.',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF9CA5A8),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
-              return ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 56),
-                itemCount: forCurrentRole.length,
-                itemBuilder: (context, index) {
-                  final thread = forCurrentRole[index];
-                  return _buildThreadRow(context, textTheme, thread);
-                },
-              );
-            },
+          child: _uid == null || _conversationsStream == null
+              ? _buildEmptyState(textTheme)
+              : StreamBuilder<List<Conversation>>(
+                  stream: _conversationsStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final convos = snapshot.data ?? [];
+                    if (convos.isEmpty) {
+                      return _buildEmptyState(textTheme);
+                    }
+                    return ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.only(bottom: 56),
+                      itemCount: convos.length,
+                      itemBuilder: (context, index) {
+                        final convo = convos[index];
+                        return _buildThreadRow(context, textTheme, convo);
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(TextTheme textTheme) {
+    return ListView(
+      controller: _scrollController,
+      padding: const EdgeInsets.only(bottom: 56),
+      children: [
+        const SizedBox(height: 200),
+        Center(
+          child: Text(
+            widget.emptyStateMessage ??
+                'You have no messages yet. Make enquiries\non listings and watch the magic happen.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF9CA5A8),
+            ),
           ),
         ),
       ],
@@ -285,32 +153,28 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Widget _buildThreadRow(
     BuildContext context,
     TextTheme textTheme,
-    ChatThread thread,
+    Conversation convo,
   ) {
-    final now = DateTime.now();
-    final diff = now.difference(thread.lastUpdated);
-    final timeLabel = _formatThreadTime(thread.lastUpdated, now, diff);
+    final myUid = _uid!;
+    final contactName = convo.contactName(myUid);
+    final lastMessage = convo.lastMessage ?? '';
+    final lastTime = convo.lastMessageAt ?? convo.createdAt;
 
-    final isAgentLandlordThread = thread.contactSubtitle.startsWith('Landlord of ');
+    final now = DateTime.now();
+    final timeLabel =
+        lastTime != null ? _formatThreadTime(lastTime, now) : '';
+
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => ConversationScreen(
-              listingTitle: thread.listingTitle,
-              location: thread.location,
-              price: thread.price,
-              imagePath: thread.imagePath,
-              contactName: thread.contactName,
-              contactSubtitle: thread.contactSubtitle,
-              initialMessage: thread.lastMessage,
-              storedMessages: getStoredMessagesForThread(
-                thread.contactName,
-                thread.contactSubtitle,
-                thread.listingTitle,
-              ),
-              showInitialAsIncoming: isAgentLandlordThread,
-              listingFromOtherParty: isAgentLandlordThread,
+              conversationId: convo.id,
+              listingTitle: convo.listingTitle,
+              location: convo.listingLocation,
+              price: convo.listingPrice,
+              imagePath: convo.listingImage,
+              contactName: contactName,
               listingDetailRole: widget.currentUserRole,
             ),
           ),
@@ -331,7 +195,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    thread.contactName,
+                    contactName,
                     style: textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFF1A2E35),
                       fontWeight: FontWeight.w600,
@@ -339,7 +203,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    thread.lastMessage,
+                    lastMessage,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.bodySmall?.copyWith(
@@ -375,15 +239,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
 }
 
 String _formatTime(DateTime dt) {
-  final h = dt.hour;
-  final m = dt.minute;
-  final hh = h.toString().padLeft(2, '0');
-  final mm = m.toString().padLeft(2, '0');
+  final hh = dt.hour.toString().padLeft(2, '0');
+  final mm = dt.minute.toString().padLeft(2, '0');
   return '$hh:$mm';
 }
 
-/// Timestamp for the Messages tab thread list: "now", "Today", "Yesterday", or time.
-String _formatThreadTime(DateTime then, DateTime now, Duration diff) {
+String _formatThreadTime(DateTime then, DateTime now) {
+  final diff = now.difference(then);
   if (diff.inMinutes < 1) return 'now';
   final sameDay = then.year == now.year &&
       then.month == now.month &&
@@ -397,81 +259,32 @@ String _formatThreadTime(DateTime then, DateTime now, Duration diff) {
   return _formatTime(then);
 }
 
-/// Single message in a conversation. Rule: user sent = right, blue; received = left, green.
-class ConversationMessage {
-  const ConversationMessage({required this.text, required this.isFromUser});
-  final String text;
-  final bool isFromUser;
-}
+// ---------------------------------------------------------------------------
+// ConversationScreen — real-time Firestore chat
+// ---------------------------------------------------------------------------
 
-/// In-memory store for conversation messages until backend persists them.
-/// Key: contactName|contactSubtitle|listingTitle. When backend exists, replace with API load/save.
-final Map<String, List<ConversationMessage>> _conversationMessageStore = {};
-
-String _threadKey(String contactName, String contactSubtitle, String listingTitle) =>
-    '$contactName|$contactSubtitle|$listingTitle';
-
-List<ConversationMessage> getStoredMessagesForThread(
-  String contactName,
-  String contactSubtitle,
-  String listingTitle,
-) {
-  final key = _threadKey(contactName, contactSubtitle, listingTitle);
-  return List.from(_conversationMessageStore[key] ?? []);
-}
-
-void appendMessageToStore(
-  String contactName,
-  String contactSubtitle,
-  String listingTitle,
-  ConversationMessage message,
-) {
-  final key = _threadKey(contactName, contactSubtitle, listingTitle);
-  _conversationMessageStore[key] ??= [];
-  _conversationMessageStore[key]!.add(message);
-}
-
-/// Conversation thread screen opened after tapping "Inquire" (Expat) or
-/// after assigning a property (Landlord).
 class ConversationScreen extends StatefulWidget {
   const ConversationScreen({
     super.key,
+    required this.conversationId,
     required this.listingTitle,
     required this.location,
     required this.price,
     required this.imagePath,
-    this.contactName = 'Jean Claude',
-    this.contactSubtitle = 'Agent of Elizabeth G. Apartments',
-    this.initialMessage,
-    this.storedMessages,
+    this.contactName = 'Contact',
     this.returnToLandlordOnBack = false,
     this.returnToAgentMessagesOnBack = false,
-    this.showInitialAsIncoming = false,
-    this.listingFromOtherParty = false,
     String? listingDetailRole,
   }) : listingDetailRole = listingDetailRole ?? kRoleExpat;
 
+  final String conversationId;
   final String listingTitle;
   final String location;
   final String price;
   final String imagePath;
   final String contactName;
-  final String contactSubtitle;
-  final String? initialMessage;
-  /// Persisted messages for this thread (so chat continues when reopened). When backend exists, load from API.
-  final List<ConversationMessage>? storedMessages;
-  /// When true (Landlord flow), back button goes to Landlord home Messages tab.
   final bool returnToLandlordOnBack;
-  /// When true (Agent flow from Chat Landlord), back button goes to Agent home Messages tab.
   final bool returnToAgentMessagesOnBack;
-  /// When true, the [initialMessage] is rendered as an incoming (green) bubble
-  /// instead of an outgoing (blue) one.
-  final bool showInitialAsIncoming;
-  /// When true, the listing card is visually aligned as if it was sent by the
-  /// other party (left-aligned); otherwise it is aligned as the current user's card.
-  final bool listingFromOtherParty;
-  /// Role used when opening listing detail from the card: [kRoleLandlord] = Request Edit,
-  /// [kRoleAgent] = Decline/Accept/Chat Landlord, [kRoleExpat] = Get a Ride/Explore/Inquire.
   final String listingDetailRole;
 
   @override
@@ -482,31 +295,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
   bool _liveTranslateEnabled = true;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<ConversationMessage> _messages = [];
+
+  String? _myUid;
+  Stream<List<ChatMessage>>? _messagesStream;
 
   @override
   void initState() {
     super.initState();
-    final stored = widget.storedMessages ?? getStoredMessagesForThread(
-      widget.contactName,
-      widget.contactSubtitle,
-      widget.listingTitle,
-    );
-    if (stored.isNotEmpty) {
-      _messages.addAll(stored);
-    } else if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
-      final initial = ConversationMessage(
-        text: widget.initialMessage!,
-        isFromUser: !widget.showInitialAsIncoming,
-      );
-      _messages.add(initial);
-      appendMessageToStore(
-        widget.contactName,
-        widget.contactSubtitle,
-        widget.listingTitle,
-        initial,
-      );
-    }
+    _myUid = AuthService().currentUser?.uid;
+    _messagesStream =
+        ConversationsService().messagesStream(widget.conversationId);
   }
 
   @override
@@ -518,19 +316,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   void _onSend() {
     final text = _messageController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _myUid == null) return;
     _messageController.clear();
-    final message = ConversationMessage(text: text, isFromUser: true);
-    setState(() {
-      _messages.add(message);
-    });
-    appendMessageToStore(
-      widget.contactName,
-      widget.contactSubtitle,
-      widget.listingTitle,
-      message,
+    ConversationsService().sendMessage(
+      conversationId: widget.conversationId,
+      senderId: _myUid!,
+      content: text,
     );
-    _updateThreadLastMessage(text);
+  }
+
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -540,30 +335,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
         );
       }
     });
-  }
-
-  void _updateThreadLastMessage(String lastMessage) {
-    final index = _chatThreads.indexWhere(
-      (t) =>
-          t.contactName == widget.contactName &&
-          t.contactSubtitle == widget.contactSubtitle &&
-          t.listingTitle == widget.listingTitle,
-    );
-    if (index >= 0) {
-      final t = _chatThreads[index];
-      _chatThreads[index] = ChatThread(
-        contactName: t.contactName,
-        contactSubtitle: t.contactSubtitle,
-        lastMessage: lastMessage,
-        lastUpdated: DateTime.now(),
-        listingTitle: t.listingTitle,
-        location: t.location,
-        price: t.price,
-        imagePath: t.imagePath,
-        forRole: t.forRole,
-      );
-      chatThreadsNotifier.value = List.from(_chatThreads);
-    }
   }
 
   @override
@@ -576,22 +347,30 @@ class _ConversationScreenState extends State<ConversationScreen> {
         children: [
           _buildHeader(context, textTheme),
           Expanded(
-            child: ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-              children: [
-                _buildDateAndEncryption(textTheme),
-                const SizedBox(height: 24),
-                _buildListingCard(context, textTheme),
-                ..._messages.map((m) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: m.isFromUser
-                        ? _buildOutgoingBubble(textTheme, m.text)
-                        : _buildIncomingBubble(textTheme, m.text),
-                  );
-                }),
-              ],
+            child: StreamBuilder<List<ChatMessage>>(
+              stream: _messagesStream,
+              builder: (context, snapshot) {
+                final messages = snapshot.data ?? [];
+                _scrollToBottom();
+                return ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                  children: [
+                    _buildDateAndEncryption(textTheme),
+                    const SizedBox(height: 24),
+                    _buildListingCard(context, textTheme),
+                    ...messages.map((m) {
+                      final isMe = m.senderId == _myUid;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: isMe
+                            ? _buildOutgoingBubble(textTheme, m.content)
+                            : _buildIncomingBubble(textTheme, m.content),
+                      );
+                    }),
+                  ],
+                );
+              },
             ),
           ),
           _buildComposer(context, textTheme),
@@ -601,8 +380,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildHeader(BuildContext context, TextTheme textTheme) {
-    final contactName = widget.contactName;
-    final contactSubtitle = widget.contactSubtitle;
     return Container(
       color: const Color(0xFF1A2E35),
       padding: const EdgeInsets.only(top: 40, left: 8, right: 16, bottom: 12),
@@ -636,12 +413,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               },
             ),
             Expanded(
-              child: _buildHeaderContactRow(
-                context,
-                textTheme,
-                contactName: contactName,
-                contactSubtitle: contactSubtitle,
-              ),
+              child: _buildHeaderContactRow(context, textTheme),
             ),
           ],
         ),
@@ -649,15 +421,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  /// Header contact row: tappable to open Agent profile only when contact is
-  /// an agent. Landlords do not have profiles — tap does nothing.
-  Widget _buildHeaderContactRow(
-    BuildContext context,
-    TextTheme textTheme, {
-    required String contactName,
-    required String contactSubtitle,
-  }) {
-    final isLandlord = contactSubtitle.startsWith('Landlord of ');
+  Widget _buildHeaderContactRow(BuildContext context, TextTheme textTheme) {
     final row = Row(
       children: [
         CircleAvatar(
@@ -672,7 +436,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                contactName,
+                widget.contactName,
                 style: textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
@@ -681,7 +445,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                contactSubtitle,
+                widget.listingTitle,
                 style: textTheme.bodySmall?.copyWith(
                   color: Colors.white.withValues(alpha: 0.8),
                 ),
@@ -692,23 +456,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
       ],
     );
-    if (isLandlord) {
-      return row;
-    }
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (context) => AgentProfileScreen(
-              agentName: contactName,
-              agentFullName: contactName,
-              agentId: contactSubtitle,
-            ),
-          ),
-        );
-      },
-      child: row,
-    );
+    return row;
   }
 
   Widget _buildDateAndEncryption(TextTheme textTheme) {
@@ -737,9 +485,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildListingCard(BuildContext context, TextTheme textTheme) {
-    final isFromOther = widget.listingFromOtherParty;
     return Align(
-      alignment: isFromOther ? Alignment.centerLeft : Alignment.centerRight,
+      alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 240),
         child: InkWell(
@@ -780,12 +527,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 ),
                 AspectRatio(
                   aspectRatio: 4 / 3,
-                  child: Image.asset(
-                    widget.imagePath,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: Colors.grey.shade300),
-                  ),
+                  child: _buildCardImage(),
                 ),
                 Container(
                   color: const Color(0xFF1A2E35),
@@ -844,9 +586,26 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
+  Widget _buildCardImage() {
+    final path = widget.imagePath;
+    if (path.isEmpty) {
+      return Container(color: Colors.grey.shade300);
+    }
+    final isNetwork =
+        path.startsWith('http://') || path.startsWith('https://');
+    if (isNetwork) {
+      return Image.network(path,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              Container(color: Colors.grey.shade300));
+    }
+    return Image.asset(path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            Container(color: Colors.grey.shade300));
+  }
+
   void _onListingCardTap(BuildContext context) {
-    // Open listing detail with the correct view for the current user's role:
-    // Landlord = Request Edit only; Agent = Decline, Accept, Chat Landlord; Expat = Get a Ride, Explore, Inquire.
     final role = widget.listingDetailRole;
     final showRequestEditOnly = role == kRoleLandlord;
     final showAgentActions = role == kRoleAgent;
@@ -985,7 +744,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 ],
               ),
               const SizedBox(width: 8),
-              // Plus icon button (e.g. for uploads)
               InkWell(
                 onTap: () {},
                 child: const Padding(
@@ -1050,4 +808,3 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 }
-

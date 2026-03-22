@@ -3,14 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:expat_app/models/listing.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/conversations_service.dart';
 import 'package:expat_app/services/listings_service.dart';
-import 'messages_screen.dart'
-    show
-        ConversationScreen,
-        addOrUpdateChatThreadForAgent,
-        addOrUpdateChatThreadForAgentLandlordChat,
-        getStoredMessagesForThread,
-        kRoleLandlord;
+import 'messages_screen.dart' show ConversationScreen, kRoleLandlord;
 
 /// Screen where a Landlord selects one of their listings
 /// to assign to a chosen agent.
@@ -313,13 +308,14 @@ class _LandlordAssignPropertyScreenState
     final message =
         'Hi ${widget.agentName}. I would like for you to represent me in the sale of this listing.';
 
+    String? agentUidValue;
     try {
-      final agentUid = await AgentsService().getAgentUid(widget.agentId);
+      agentUidValue = await AgentsService().getAgentUid(widget.agentId);
       await AgentsService().createAssignment(
         listingId: listing.id,
         agentId: widget.agentId,
         landlordId: uid,
-        agentUid: agentUid,
+        agentUid: agentUidValue,
         agentName: widget.agentName,
         listingTitle: listing.title,
       );
@@ -331,22 +327,31 @@ class _LandlordAssignPropertyScreenState
       return;
     }
 
-    addOrUpdateChatThreadForAgent(
-      agentName: widget.agentName,
-      agentId: widget.agentId,
-      message: message,
+    if (agentUidValue == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Agent has not registered yet.')),
+      );
+      return;
+    }
+
+    final myProfile = await AuthService().getCurrentUserProfile();
+    final myName = myProfile?.legalName ?? 'Landlord';
+
+    final convo = await ConversationsService().getOrCreateConversation(
+      listingId: listing.id,
+      participantIds: [uid, agentUidValue],
+      participantNames: {uid: myName, agentUidValue: widget.agentName},
       listingTitle: listing.title,
-      location: listing.location,
-      price: priceWithSuffix,
-      imagePath: imagePath,
+      listingImage: imagePath,
+      listingPrice: priceWithSuffix,
+      listingLocation: listing.location,
     );
-    addOrUpdateChatThreadForAgentLandlordChat(
-      contactName: 'Landlord',
-      listingTitle: listing.title,
-      location: listing.location,
-      price: priceWithSuffix,
-      imagePath: imagePath,
-      lastMessage: message,
+
+    await ConversationsService().sendMessage(
+      conversationId: convo.id,
+      senderId: uid,
+      content: message,
     );
 
     if (!context.mounted) return;
@@ -380,20 +385,13 @@ class _LandlordAssignPropertyScreenState
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => ConversationScreen(
+                            conversationId: convo.id,
                             listingTitle: listing.title,
                             location: listing.location,
                             price: priceWithSuffix,
                             imagePath: imagePath,
                             contactName: widget.agentName,
-                            contactSubtitle: widget.agentId,
-                            initialMessage: message,
-                            storedMessages: getStoredMessagesForThread(
-                                widget.agentName,
-                                widget.agentId,
-                                listing.title),
                             returnToLandlordOnBack: true,
-                            showInitialAsIncoming: false,
-                            listingFromOtherParty: false,
                             listingDetailRole: kRoleLandlord,
                           ),
                         ),

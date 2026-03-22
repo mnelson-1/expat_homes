@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/services/agents_service.dart';
+import 'package:expat_app/services/auth_service.dart';
 import 'agent_edit_field_screen.dart';
 import 'agent_reviews_screen.dart';
 
@@ -16,20 +18,49 @@ class _AgentBioViewScreenState extends State<AgentBioViewScreen> {
   static const Color _hint = Color(0xFF9CA5A8);
   static const Color _reviewGreen = Color(0xFFD3F1C5);
 
-  // For now we mirror the default Agent profile data; later this will come
-  // from the signed-in agent's backend profile so Bio-View and Profile stay in sync.
-  String _agentName = 'Jean Claude';
-  final String _agentId = 'KM-201903';
-  String _bioText =
-      'Fluent in Kinyarwanda, English, and French. Commission Rate starts at '
-      '5% of sale price. Varies and Negotiable.';
-  String _phone = '(+250) 0792106639';
-  final double _rating = 4.5;
-  final int _ratingCount = 10;
+  String _agentName = '';
+  String _agentId = '';
+  String _bioText = '';
+  String _phone = '';
+  double _rating = 0.0;
+  int _ratingCount = 0;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAgentProfile();
+  }
+
+  Future<void> _loadAgentProfile() async {
+    final profile = await AuthService().getCurrentUserProfile();
+    if (profile == null || profile.agentId == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+
+    _agentId = profile.agentId!;
+    _agentName = profile.legalName;
+
+    final agent = await AgentsService().getAgent(_agentId);
+    if (agent != null) {
+      _agentName = agent.fullName;
+      _bioText = agent.bio ?? '';
+      _phone = agent.phone ?? '';
+      _rating = agent.rating;
+      _ratingCount = agent.ratingCount;
+    }
+
+    if (mounted) setState(() => _loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),

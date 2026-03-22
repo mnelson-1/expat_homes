@@ -142,25 +142,28 @@ class ListingsService {
     if (listing == null) return null;
     String? name = listing.representativeName;
     String role = listing.representativeRole ?? 'Landlord';
+    String? repUid = listing.landlordId;
 
     // Check for an accepted assignment — if one exists, the agent is the representative.
     try {
       final assignment = await AgentsService().getActiveAssignment(id);
       if (assignment != null &&
           assignment.status == AssignmentStatus.accepted) {
-        // Use the denormalized agent name from the assignment.
         if (assignment.agentName != null && assignment.agentName!.isNotEmpty) {
           name = assignment.agentName;
           role = 'Agent';
         } else {
-          // Fallback: look up the agent from licensed_agents.
           final agent = await AgentsService().getAgent(assignment.agentId);
           if (agent != null) {
             name = agent.fullName;
             role = 'Agent';
           }
         }
-        return _buildListingWithRep(listing, name, role);
+        // Resolve agent Firebase UID for messaging.
+        repUid = assignment.agentUid ??
+            await AgentsService().getAgentUid(assignment.agentId) ??
+            listing.landlordId;
+        return _buildListingWithRep(listing, name, role, repUid);
       }
     } catch (_) {}
 
@@ -181,10 +184,11 @@ class ListingsService {
     } catch (_) {
       if (name == null || name.isEmpty) name = 'Landlord';
     }
-    return _buildListingWithRep(listing, name, role);
+    return _buildListingWithRep(listing, name, role, repUid);
   }
 
-  Listing _buildListingWithRep(Listing listing, String? name, String role) {
+  Listing _buildListingWithRep(
+      Listing listing, String? name, String role, String? repUid) {
     return Listing(
       id: listing.id,
       landlordId: listing.landlordId,
@@ -203,6 +207,7 @@ class ListingsService {
       verifiedBy: listing.verifiedBy,
       representativeName: name,
       representativeRole: role,
+      representativeUid: repUid,
     );
   }
 
