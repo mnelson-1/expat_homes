@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../constants/bowl_cover_defaults.dart';
+import '../constants/bowl_ids.dart';
 import '../models/bowl.dart';
 
-/// Well-known bowl document IDs for deterministic seeding.
-const kBowlExpatLife = 'bowl_expat_life';
-const kBowlJobHunting = 'bowl_job_hunting';
-const kBowlNigeria = 'bowl_nigeria';
+export '../constants/bowl_ids.dart'
+    show kBowlExpatLife, kBowlJobHunting, kBowlNigeria;
 
 class BowlsService {
   BowlsService._();
@@ -25,6 +25,7 @@ class BowlsService {
   // ---------------------------------------------------------------------------
 
   /// Idempotent seed of default bowls using fixed document IDs.
+  /// New docs get default cover URLs; existing docs with missing [imageUrl] are backfilled.
   Future<void> seedDefaultBowls() async {
     final defaults = <String, Map<String, dynamic>>{
       kBowlExpatLife: {
@@ -32,7 +33,7 @@ class BowlsService {
         'description':
             'A community recommended for all Expats, to share and review experiences in Rwanda. Connect, plan and have fun together.',
         'type': 'topic',
-        'imageUrl': null,
+        'imageUrl': kDefaultBowlCoverImageUrls[kBowlExpatLife],
         'countryCode': null,
         'createdAt': FieldValue.serverTimestamp(),
       },
@@ -41,7 +42,7 @@ class BowlsService {
         'description':
             'A community to discuss the job market, as well as finding, applying for, posting, and interviewing for roles within and, if possible, outside the Rwandan job market.',
         'type': 'topic',
-        'imageUrl': null,
+        'imageUrl': kDefaultBowlCoverImageUrls[kBowlJobHunting],
         'countryCode': null,
         'createdAt': FieldValue.serverTimestamp(),
       },
@@ -50,16 +51,26 @@ class BowlsService {
         'description':
             'A community for all Nigerian Expats in Rwanda. Bi-weekly Nigerian-themed events and many more.',
         'type': 'country',
-        'imageUrl': null,
+        'imageUrl': kDefaultBowlCoverImageUrls[kBowlNigeria],
         'countryCode': 'Nigeria',
         'createdAt': FieldValue.serverTimestamp(),
       },
     };
 
     for (final entry in defaults.entries) {
-      final doc = await _bowlsRef.doc(entry.key).get();
+      final ref = _bowlsRef.doc(entry.key);
+      final doc = await ref.get();
+      final coverUrl = entry.value['imageUrl'] as String?;
+
       if (!doc.exists) {
-        await _bowlsRef.doc(entry.key).set(entry.value);
+        await ref.set(entry.value);
+        continue;
+      }
+
+      final existing = doc.data();
+      final existingUrl = existing?['imageUrl'] as String?;
+      if (existingUrl == null || existingUrl.trim().isEmpty) {
+        await ref.update({'imageUrl': coverUrl});
       }
     }
   }

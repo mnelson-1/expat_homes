@@ -7,7 +7,7 @@ class Post {
     required this.authorName,
     required this.authorRole,
     required this.content,
-    this.imageUrl,
+    this.imageUrls = const [],
     this.authorImageUrl,
     this.scope = 'feed',
     this.bowlId,
@@ -23,7 +23,11 @@ class Post {
   final String authorName;
   final String authorRole;
   final String content;
-  final String? imageUrl;
+
+  /// Display URLs for post images (order preserved). Legacy docs may only have
+  /// `imageUrl` in Firestore; [fromFirestore] merges that into this list.
+  final List<String> imageUrls;
+
   final String? authorImageUrl;
   final String scope;
   final String? bowlId;
@@ -42,13 +46,25 @@ class Post {
             ?.map((e) => e as String)
             .toList() ??
         [];
+    final fromArray = (data['imageUrls'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .where((u) => u.isNotEmpty)
+            .toList() ??
+        [];
+    final legacySingle = data['imageUrl'] as String?;
+    final urls = fromArray.isNotEmpty
+        ? fromArray
+        : (legacySingle != null && legacySingle.isNotEmpty
+            ? <String>[legacySingle]
+            : <String>[]);
+
     return Post(
       id: doc.id,
       authorId: data['authorId'] as String? ?? '',
       authorName: data['authorName'] as String? ?? '',
       authorRole: data['authorRole'] as String? ?? 'Expat',
       content: data['content'] as String? ?? '',
-      imageUrl: data['imageUrl'] as String?,
+      imageUrls: urls,
       authorImageUrl: data['authorImageUrl'] as String?,
       scope: data['scope'] as String? ?? 'feed',
       bowlId: data['bowlId'] as String?,
@@ -65,7 +81,9 @@ class Post {
         'authorName': authorName,
         'authorRole': authorRole,
         'content': content,
-        'imageUrl': imageUrl,
+        'imageUrls': imageUrls,
+        if (imageUrls.isNotEmpty) 'imageUrl': imageUrls.first,
+        if (imageUrls.isEmpty) 'imageUrl': null,
         'authorImageUrl': authorImageUrl,
         'scope': scope,
         'bowlId': bowlId,

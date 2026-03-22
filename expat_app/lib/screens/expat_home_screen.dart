@@ -10,6 +10,9 @@ import 'package:expat_app/services/community_service.dart';
 import 'package:expat_app/services/bowls_service.dart';
 import 'listing_detail_screen.dart';
 import 'messages_screen.dart' show MessagesScreen, kRoleExpat;
+import 'package:expat_app/widgets/bowl_cover_avatar.dart';
+import 'package:expat_app/widgets/community_post_composer_sheet.dart';
+import 'package:expat_app/widgets/post_media_gallery.dart';
 import 'expat_post_thread_screen.dart';
 import 'expat_bowl_thread_screen.dart';
 
@@ -479,18 +482,9 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
               color: _ExpatHomeColors.bodyText,
             ),
           ),
-          if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
+          if (post.imageUrls.isNotEmpty) ...[
             const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                post.imageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) =>
-                        Container(height: 180, color: Colors.grey.shade300),
-              ),
-            ),
+            PostMediaGallery(imageUrls: post.imageUrls),
           ],
           const SizedBox(height: 12),
           Row(
@@ -650,16 +644,10 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
+            BowlCoverAvatar(
+              bowl: bowl,
               radius: 20,
-              backgroundColor: Colors.grey.shade200,
-              child: Text(
-                bowl.name.isNotEmpty ? bowl.name[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: _ExpatHomeColors.bodyText,
-                ),
-              ),
+              nameColor: _ExpatHomeColors.bodyText,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1537,7 +1525,6 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
   }
 
   void _showCreatePostDialog() {
-    final controller = TextEditingController();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1546,68 +1533,23 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Share your experience',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: _ExpatHomeColors.bodyText,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 5,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'What would you like to share?',
-                  hintStyle: TextStyle(color: _ExpatHomeColors.helper),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 48,
-                child: FilledButton(
-                  onPressed: () async {
-                    final text = controller.text.trim();
-                    if (text.isEmpty || _uid == null) return;
-                    await CommunityService().createPost(
-                      authorId: _uid!,
-                      authorName: _userName,
-                      authorRole: _userRole,
-                      content: text,
-                      authorImageUrl: _userProfileImageUrl,
-                    );
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _ExpatHomeColors.accentGreen,
-                    foregroundColor: _ExpatHomeColors.primaryDark,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Post',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        return CommunityPostComposerSheet(
+          title: 'Share your experience',
+          accentGreen: _ExpatHomeColors.accentGreen,
+          primaryDark: _ExpatHomeColors.primaryDark,
+          helper: _ExpatHomeColors.helper,
+          bodyText: _ExpatHomeColors.bodyText,
+          onSubmit: (content, images) async {
+            if (_uid == null) return;
+            await CommunityService().createPost(
+              authorId: _uid!,
+              authorName: _userName,
+              authorRole: _userRole,
+              content: content,
+              imageFiles: images.isNotEmpty ? images : null,
+              authorImageUrl: _userProfileImageUrl,
+            );
+          },
         );
       },
     );

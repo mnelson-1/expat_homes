@@ -1,7 +1,14 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/post.dart';
 import '../models/post_comment.dart';
+
+/// Storage path prefix for post images: `posts/{authorId}/{postId}/{index}`.
+const String kPostImagesStoragePrefix = 'posts';
 
 class CommunityService {
   CommunityService._();
@@ -9,6 +16,7 @@ class CommunityService {
   factory CommunityService() => _instance;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   CollectionReference<Map<String, dynamic>> get _postsRef =>
       _firestore.collection('posts');
@@ -59,29 +67,64 @@ class CommunityService {
     return Post.fromFirestore(doc);
   }
 
-  /// Create a new post (feed or bowl-scoped).
+  /// Create a new post (feed or bowl-scoped). Uploads [imageFiles] to Storage
+  /// under `posts/{authorId}/{postId}/{index}` then writes Firestore.
   Future<Post> createPost({
     required String authorId,
     required String authorName,
     required String authorRole,
     required String content,
+    List<XFile>? imageFiles,
+    /// Legacy: single URL without upload (e.g. tests). Ignored if [imageFiles] is non-empty.
     String? imageUrl,
     String? authorImageUrl,
     String scope = 'feed',
     String? bowlId,
   }) async {
+    final docRef = _postsRef.doc();
+    final postId = docRef.id;
+
+    final uploadedUrls = <String>[];
+    const perImageTimeout = Duration(seconds: 45);
+
+    if (imageFiles != null && imageFiles.isNotEmpty) {
+      for (var i = 0; i < imageFiles.length; i++) {
+        final bytes = await imageFiles[i].readAsBytes();
+        final path = '$kPostImagesStoragePrefix/$authorId/$postId/$i';
+        final task = _storage.ref(path).putData(
+              bytes,
+              SettableMetadata(contentType: 'image/jpeg'),
+            );
+        final snapshot = await task.timeout(
+          perImageTimeout,
+          onTimeout: () => throw TimeoutException(
+            'Image ${i + 1} upload timed out. Try smaller photos or check your connection.',
+          ),
+        );
+        final url = await snapshot.ref.getDownloadURL().timeout(
+              const Duration(seconds: 10),
+              onTimeout: () =>
+                  throw TimeoutException('Getting image URL timed out.'),
+            );
+        uploadedUrls.add(url);
+      }
+    } else if (imageUrl != null && imageUrl.isNotEmpty) {
+      uploadedUrls.add(imageUrl);
+    }
+
     final post = Post(
-      id: '',
+      id: postId,
       authorId: authorId,
       authorName: authorName,
       authorRole: authorRole,
       content: content,
-      imageUrl: imageUrl,
+      imageUrls: uploadedUrls,
       authorImageUrl: authorImageUrl,
       scope: scope,
       bowlId: bowlId,
     );
-    final docRef = await _postsRef.add(post.toFirestoreCreate());
+
+    await docRef.set(post.toFirestoreCreate());
     final created = await docRef.get();
     return Post.fromFirestore(created);
   }

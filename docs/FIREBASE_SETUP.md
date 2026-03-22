@@ -103,6 +103,7 @@ Enable **Storage** in Firebase Console (Build → Storage → Get started). The 
 
 - **Listings:** `listings/{listingId}/{index}` → stored in each listing’s `mediaUrls`.
 - **Profile photos:** `users/{uid}/profile` (and similar under that user folder) → URL saved on the user’s Firestore `users/{uid}` document as `profileImageUrl`.
+- **Community post images:** `posts/{authorUid}/{postId}/{index}` → download URLs stored in the Firestore `posts` document as `imageUrls` (and `imageUrl` for the first image, for older readers).
 
 If uploads fail with **`firebase_storage/unauthorized`**, your **Storage rules** do not allow that path. Copy the rules below into **Storage → Rules** → **Publish** (or deploy the repo’s `storage.rules` with Firebase CLI).
 
@@ -118,6 +119,11 @@ service firebase.storage {
     match /users/{userId}/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    // Community posts (Share your experience / bowls)
+    match /posts/{authorUid}/{postId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == authorUid;
     }
   }
 }
@@ -234,7 +240,17 @@ After editing rules, deploy them from the repo root:
 firebase deploy --only firestore:rules
 ```
 
-## 10. Next steps (from BACKEND_CHECKLIST)
+## 10. Bowl cover images (My Bowls list)
+
+Default bowls use `imageUrl` on each `bowls/{bowlId}` document.
+
+- The app ships **default image URLs** in code (`lib/constants/bowl_cover_defaults.dart`) for `bowl_expat_life`, `bowl_job_hunting`, and `bowl_nigeria`. If `imageUrl` is empty, the UI uses those until you set a value in Firestore.
+- **`BowlsService.seedDefaultBowls()`** creates new bowl docs with those URLs and **backfills** `imageUrl` on existing seeded bowls when it was `null`.
+- **Optional:** Upload your own images to Firebase Storage (or any HTTPS URL) and set **`imageUrl`** on the bowl document in Firestore — that value overrides the defaults everywhere (list + bowl thread hero).
+
+No extra Storage rules are required for bowl covers if you only use external URLs.
+
+## 11. Next steps (from BACKEND_CHECKLIST)
 
 After auth and listings are working:
 

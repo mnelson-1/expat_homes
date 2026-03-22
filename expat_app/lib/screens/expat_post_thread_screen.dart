@@ -4,6 +4,7 @@ import 'package:expat_app/models/post.dart';
 import 'package:expat_app/models/post_comment.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/community_service.dart';
+import 'package:expat_app/widgets/post_media_gallery.dart';
 
 class ExpatPostThreadScreen extends StatefulWidget {
   const ExpatPostThreadScreen({super.key, required this.postId});
@@ -242,6 +243,10 @@ class _ExpatPostThreadScreenState extends State<ExpatPostThreadScreen> {
         Text(post.content,
             style: textTheme.bodyMedium
                 ?.copyWith(color: _ThreadColors.bodyText)),
+        if (post.imageUrls.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          PostMediaGallery(imageUrls: post.imageUrls),
+        ],
         const SizedBox(height: 12),
         Row(
           children: [
