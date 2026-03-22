@@ -721,15 +721,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   ),
                 ],
               ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () {},
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.add, color: Colors.white, size: 30),
-                ),
-              ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
                 child: Container(
                   height: 48,
