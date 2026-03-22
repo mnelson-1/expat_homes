@@ -234,33 +234,33 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final allAgents = snapshot.data ?? [];
-          final query = _activeRegion.toLowerCase();
+      final query = _activeRegion.toLowerCase();
           final matches = allAgents
               .where((a) => a.region.toLowerCase().contains(query))
-              .toList();
+          .toList();
 
-          if (matches.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  'No agents found for "$_activeRegion".',
-                  textAlign: TextAlign.center,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: _LandlordHomeColors.helper,
-                  ),
-                ),
+      if (matches.isEmpty) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              'No agents found for "$_activeRegion".',
+              textAlign: TextAlign.center,
+              style: textTheme.bodySmall?.copyWith(
+                color: _LandlordHomeColors.helper,
               ),
-            );
-          }
+            ),
+          ),
+        );
+      }
 
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            itemCount: matches.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final agent = matches[index];
-              return _buildAgentCard(context, agent, textTheme);
+      return ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        itemCount: matches.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final agent = matches[index];
+          return _buildAgentCard(context, agent, textTheme);
             },
           );
         },
@@ -381,52 +381,52 @@ Widget _buildMakeListingButton(BuildContext context, TextTheme textTheme) {
   return Builder(
     builder: (ctx) {
       return SizedBox(
-        height: 56,
-        width: width * 0.45,
-        child: ElevatedButton(
-          onPressed: () {
+      height: 56,
+      width: width * 0.45,
+      child: ElevatedButton(
+        onPressed: () {
             Navigator.of(ctx).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const LandlordMakeListingScreen(),
-              ),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: accentGreen,
-            foregroundColor: bodyText,
-            elevation: 6,
-            side: const BorderSide(
-              color: Colors.black,
-              width: 2,
+            MaterialPageRoute<void>(
+              builder: (_) => const LandlordMakeListingScreen(),
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(32),
-            ),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: accentGreen,
+          foregroundColor: bodyText,
+          elevation: 6,
+          side: const BorderSide(
+            color: Colors.black,
+            width: 2,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  'Make a Listing',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: bodyText,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.add,
-                size: 26,
-                color: bodyText,
-              ),
-            ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(32),
           ),
         ),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                'Make a Listing',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleMedium?.copyWith(
+                  color: bodyText,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.add,
+              size: 26,
+              color: bodyText,
+            ),
+          ],
+        ),
+      ),
       );
     },
   );

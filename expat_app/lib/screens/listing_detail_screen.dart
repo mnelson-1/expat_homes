@@ -6,6 +6,7 @@ import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/conversations_service.dart';
 import 'package:expat_app/services/edit_requests_service.dart';
 import 'package:expat_app/services/listings_service.dart';
+import 'package:expat_app/utils/listing_price_display.dart';
 import 'landlord_make_listing_screen.dart';
 import 'messages_screen.dart' show ConversationScreen, kRoleAgent, kRoleExpat;
 
@@ -17,6 +18,7 @@ class ListingDetailScreen extends StatelessWidget {
     required this.title,
     required this.location,
     required this.price,
+    required this.listingType,
     required this.typeLabel,
     required this.imagePaths,
     required this.description,
@@ -35,7 +37,9 @@ class ListingDetailScreen extends StatelessWidget {
 
   final String title;
   final String location;
-  final String price; // e.g. "\$2268/mo"
+  /// Raw value from Firestore (often digits only); formatted with [listingType].
+  final String price;
+  final ListingType listingType;
   final String typeLabel; // e.g. "Apartment", "House", "Short-Stay"
   final List<String> imagePaths;
   final String description;
@@ -238,20 +242,8 @@ class ListingDetailScreen extends StatelessWidget {
     );
   }
 
-  /// Normalizes price suffix for display: "per month" -> "mo", "per night" -> "night".
-  static String _normalizePriceSuffix(String suffix) {
-    final s = suffix.trim().toLowerCase();
-    if (s == 'per month') return 'mo';
-    if (s == 'per night') return 'night';
-    return suffix;
-  }
-
   Widget _buildPriceAndType(TextTheme textTheme) {
-    final parts = price.split('/');
-    final amount = parts.isNotEmpty ? parts[0] : price;
-    final rawSuffix = parts.length > 1 ? parts[1] : '';
-    final suffix =
-        rawSuffix.isEmpty ? '' : '/${_normalizePriceSuffix(rawSuffix)}';
+    final priceParts = splitListingPriceForDisplay(listingType, price);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -268,17 +260,16 @@ class ListingDetailScreen extends StatelessWidget {
                   ),
                   children: [
                     TextSpan(
-                      text: amount,
+                      text: priceParts.amountWithSymbol,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    if (suffix.isNotEmpty)
-                      TextSpan(
-                        text: suffix,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF1A2E35),
-                          fontWeight: FontWeight.normal,
-                        ),
+                    TextSpan(
+                      text: priceParts.slashSuffix,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF1A2E35),
+                        fontWeight: FontWeight.normal,
                       ),
+                    ),
                   ],
                 ),
               ),
@@ -578,35 +569,50 @@ class ListingDetailScreen extends StatelessWidget {
                   child: FilledButton(
                     onPressed: () async {
                       final myUid = AuthService().currentUser?.uid;
-                      if (myUid == null || listingId == null || landlordId == null) return;
+                      if (myUid == null ||
+                          listingId == null ||
+                          landlordId == null)
+                        return;
 
-                      final myProfile = await AuthService().getCurrentUserProfile();
+                      final myProfile =
+                          await AuthService().getCurrentUserProfile();
                       final myName = myProfile?.legalName ?? 'Agent';
                       final landlordName = representativeName ?? 'Landlord';
 
-                      final convo = await ConversationsService().getOrCreateConversation(
-                        listingId: listingId!,
-                        participantIds: [myUid, landlordId!],
-                        participantNames: {myUid: myName, landlordId!: landlordName},
-                        listingTitle: title,
-                        listingImage: imagePaths.isNotEmpty ? imagePaths.first : '',
-                        listingPrice: price,
-                        listingLocation: location,
-                      );
+                      final convo = await ConversationsService()
+                          .getOrCreateConversation(
+                            listingId: listingId!,
+                            participantIds: [myUid, landlordId!],
+                            participantNames: {
+                              myUid: myName,
+                              landlordId!: landlordName,
+                            },
+                            listingTitle: title,
+                            listingImage:
+                                imagePaths.isNotEmpty ? imagePaths.first : '',
+                            listingPrice:
+                                formatListingPricePlain(listingType, price),
+                            listingLocation: location,
+                          );
 
                       if (!context.mounted) return;
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => ConversationScreen(
-                            conversationId: convo.id,
-                            listingTitle: title,
-                            location: location,
-                            price: price,
-                            imagePath: imagePaths.isNotEmpty ? imagePaths.first : '',
-                            contactName: landlordName,
-                            returnToAgentMessagesOnBack: true,
-                            listingDetailRole: kRoleAgent,
-                          ),
+                          builder:
+                              (_) => ConversationScreen(
+                                conversationId: convo.id,
+                                listingTitle: title,
+                                location: location,
+                                price:
+                                    formatListingPricePlain(listingType, price),
+                                imagePath:
+                                    imagePaths.isNotEmpty
+                                        ? imagePaths.first
+                                        : '',
+                                contactName: landlordName,
+                                returnToAgentMessagesOnBack: true,
+                                listingDetailRole: kRoleAgent,
+                              ),
                         ),
                       );
                     },
@@ -705,24 +711,34 @@ class ListingDetailScreen extends StatelessWidget {
                 child: FilledButton(
                   onPressed: () async {
                     final myUid = AuthService().currentUser?.uid;
-                    if (myUid == null || listingId == null || landlordId == null) return;
+                    if (myUid == null ||
+                        listingId == null ||
+                        landlordId == null)
+                      return;
 
                     const defaultInquiryMessage =
                         'Hey there! I would like to get more\ninformation on this Listing.';
                     final contactName = representativeName ?? 'Representative';
 
-                    final myProfile = await AuthService().getCurrentUserProfile();
+                    final myProfile =
+                        await AuthService().getCurrentUserProfile();
                     final myName = myProfile?.legalName ?? 'Expat';
 
-                    final convo = await ConversationsService().getOrCreateConversation(
-                      listingId: listingId!,
-                      participantIds: [myUid, landlordId!],
-                      participantNames: {myUid: myName, landlordId!: contactName},
-                      listingTitle: title,
-                      listingImage: imagePaths.isNotEmpty ? imagePaths.first : '',
-                      listingPrice: price,
-                      listingLocation: location,
-                    );
+                    final convo = await ConversationsService()
+                        .getOrCreateConversation(
+                          listingId: listingId!,
+                          participantIds: [myUid, landlordId!],
+                          participantNames: {
+                            myUid: myName,
+                            landlordId!: contactName,
+                          },
+                          listingTitle: title,
+                          listingImage:
+                              imagePaths.isNotEmpty ? imagePaths.first : '',
+                          listingPrice:
+                              formatListingPricePlain(listingType, price),
+                          listingLocation: location,
+                        );
 
                     // Only send the default inquiry on first contact.
                     if (convo.lastMessage == null) {
@@ -736,15 +752,18 @@ class ListingDetailScreen extends StatelessWidget {
                     if (!context.mounted) return;
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => ConversationScreen(
-                          conversationId: convo.id,
-                          listingTitle: title,
-                          location: location,
-                          price: price,
-                          imagePath: imagePaths.isNotEmpty ? imagePaths.first : '',
-                          contactName: contactName,
-                          listingDetailRole: kRoleExpat,
-                        ),
+                        builder:
+                            (_) => ConversationScreen(
+                              conversationId: convo.id,
+                              listingTitle: title,
+                              location: location,
+                              price:
+                                  formatListingPricePlain(listingType, price),
+                              imagePath:
+                                  imagePaths.isNotEmpty ? imagePaths.first : '',
+                              contactName: contactName,
+                              listingDetailRole: kRoleExpat,
+                            ),
                       ),
                     );
                   },
@@ -1036,6 +1055,7 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
       title: listing.title,
       location: listing.location,
       price: listing.price,
+      listingType: listing.type,
       typeLabel: listing.typeLabel,
       imagePaths: imagePaths,
       description: listing.description,

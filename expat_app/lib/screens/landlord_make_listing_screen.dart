@@ -9,6 +9,7 @@ import 'package:expat_app/models/listing.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/edit_requests_service.dart';
 import 'package:expat_app/services/listings_service.dart';
+import 'package:expat_app/utils/listing_price_display.dart';
 
 class LandlordMakeListingScreen extends StatefulWidget {
   const LandlordMakeListingScreen({
@@ -73,13 +74,17 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
     }
   }
 
+  String get _priceFieldLabel =>
+      _selectedType == 'Short-Stay' ? 'Price per night' : 'Price per month';
+
   Future<void> _submitListing(
     BuildContext context,
     bool isEditMode,
     TextTheme textTheme,
   ) async {
     final title = _titleController.text.trim();
-    final price = _priceController.text.trim();
+    final priceInput = _priceController.text.trim();
+    final priceStored = listingPriceNumericCore(priceInput);
     final location = _locationController.text.trim();
     final description = _descriptionController.text.trim();
     final upi = _upiController.text.trim();
@@ -90,7 +95,7 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
       );
       return;
     }
-    if (price.isEmpty) {
+    if (priceStored.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Please enter price')));
@@ -124,7 +129,9 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
         if (lstId == null) {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cannot save: listing ID is missing.')),
+            const SnackBar(
+              content: Text('Cannot save: listing ID is missing.'),
+            ),
           );
           setState(() => _isLoading = false);
           return;
@@ -136,7 +143,7 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
           landlordId: user.uid,
           proposedFields: {
             'title': title,
-            'price': price,
+            'price': priceStored,
             'location': location,
             'description':
                 description.isEmpty ? 'No description.' : description,
@@ -167,7 +174,7 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
               description:
                   description.isEmpty ? 'No description.' : description,
               location: location,
-              price: price,
+              price: priceStored,
               upi: upi.isEmpty ? null : upi,
               imageFiles: _selectedImages,
             )
@@ -230,7 +237,9 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
   void initState() {
     super.initState();
     _titleController.text = widget.initialTitle ?? '';
-    _priceController.text = widget.initialPrice ?? '';
+    _priceController.text = listingPriceNumericCore(
+      widget.initialPrice ?? '',
+    );
     _upiController.text = widget.initialUpi ?? '';
     _locationController.text = widget.initialLocation ?? '';
     _descriptionController.text = widget.initialDescription ?? '';
@@ -292,11 +301,11 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
               const SizedBox(height: 8),
               _buildTypeDropdown(textTheme),
               const SizedBox(height: 16),
-              _buildLabel(textTheme, 'Price per month'),
+              _buildLabel(textTheme, _priceFieldLabel),
               const SizedBox(height: 8),
               _buildTextField(
                 controller: _priceController,
-                hint: 'price in usd (Fx‑rate aware)',
+                hint: 'Amount in USD (numbers only, e.g. 857)',
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),

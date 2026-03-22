@@ -5,6 +5,7 @@ import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/conversations_service.dart';
 import 'package:expat_app/services/listings_service.dart';
+import 'package:expat_app/utils/listing_price_display.dart';
 import 'messages_screen.dart' show ConversationScreen, kRoleLandlord;
 
 /// Screen where a Landlord selects one of their listings
@@ -199,8 +200,10 @@ class _LandlordAssignPropertyScreenState
         : 'assets/images/placeholder.png';
     final isNetwork =
         imagePath.startsWith('http://') || imagePath.startsWith('https://');
-    final priceSuffix =
-        listing.type == ListingType.shortStay ? '/night' : '/mo';
+    final priceParts = splitListingPriceForDisplay(
+      listing.type,
+      listing.price,
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -253,13 +256,13 @@ class _LandlordAssignPropertyScreenState
                   const SizedBox(height: 4),
                   Text.rich(TextSpan(children: [
                     TextSpan(
-                        text: listing.price,
+                        text: priceParts.amountWithSymbol,
                         style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: textTheme.titleSmall?.fontSize,
                             color: _AssignColors.bodyText)),
                     TextSpan(
-                        text: ' $priceSuffix',
+                        text: priceParts.slashSuffix,
                         style: TextStyle(
                             fontWeight: FontWeight.normal,
                             fontSize: textTheme.bodySmall?.fontSize,
@@ -302,9 +305,8 @@ class _LandlordAssignPropertyScreenState
     final imagePath = listing.mediaUrls.isNotEmpty
         ? listing.mediaUrls.first
         : 'assets/images/placeholder.png';
-    final priceSuffix =
-        listing.type == ListingType.shortStay ? '/night' : '/mo';
-    final priceWithSuffix = '${listing.price}$priceSuffix';
+    final priceWithSuffix =
+        formatListingPricePlain(listing.type, listing.price);
     final message =
         'Hi ${widget.agentName}. I would like for you to represent me in the sale of this listing.';
 

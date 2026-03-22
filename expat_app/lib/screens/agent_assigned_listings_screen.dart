@@ -5,6 +5,7 @@ import 'package:expat_app/models/listing_assignment.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/listings_service.dart';
+import 'package:expat_app/utils/listing_price_display.dart';
 import 'listing_detail_screen.dart';
 
 /// Assigned listings for agents: filter by type, accept or decline each assignment.
@@ -301,8 +302,10 @@ class _AssignmentCardState extends State<_AssignmentCard> {
         : 'assets/images/placeholder.png';
     final isNetwork =
         imagePath.startsWith('http://') || imagePath.startsWith('https://');
-    final priceSuffix =
-        listing.type == ListingType.shortStay ? '/night' : '/mo';
+    final priceParts = splitListingPriceForDisplay(
+      listing.type,
+      listing.price,
+    );
 
     return GestureDetector(
       onTap: () {
@@ -375,11 +378,11 @@ class _AssignmentCardState extends State<_AssignmentCard> {
                             color: _AgentAssignedListingsColors.bodyText),
                         children: [
                           TextSpan(
-                              text: listing.price,
+                              text: priceParts.amountWithSymbol,
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold)),
                           TextSpan(
-                              text: priceSuffix,
+                              text: priceParts.slashSuffix,
                               style: TextStyle(
                                   fontWeight: FontWeight.normal,
                                   fontSize: textTheme.bodySmall?.fontSize)),

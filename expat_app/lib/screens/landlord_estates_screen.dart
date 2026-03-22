@@ -5,6 +5,7 @@ import 'package:expat_app/models/listing_edit_request.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/edit_requests_service.dart';
 import 'package:expat_app/services/listings_service.dart';
+import 'package:expat_app/utils/listing_price_display.dart';
 import 'landlord_make_listing_screen.dart';
 import 'listing_detail_screen.dart';
 
@@ -287,18 +288,15 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
                         const SizedBox(height: 4),
                         Builder(
                           builder: (_) {
-                            final parts = estate.price.split('/');
-                            final amount =
-                                parts.isNotEmpty
-                                    ? parts[0]
-                                    : estate.price; // "$857"
-                            final suffix =
-                                parts.length > 1 ? '/${parts[1]}' : '';
+                            final p = splitListingPriceForDisplay(
+                              estate.type,
+                              estate.price,
+                            );
                             return Text.rich(
                               TextSpan(
                                 children: [
                                   TextSpan(
-                                    text: amount,
+                                    text: p.amountWithSymbol,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: textTheme.titleSmall?.fontSize,
@@ -306,7 +304,7 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
                                     ),
                                   ),
                                   TextSpan(
-                                    text: suffix,
+                                    text: p.slashSuffix,
                                     style: TextStyle(
                                       fontWeight: FontWeight.normal,
                                       fontSize: textTheme.bodySmall?.fontSize,

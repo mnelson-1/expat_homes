@@ -8,6 +8,7 @@ import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/listings_service.dart';
 import 'package:expat_app/services/community_service.dart';
 import 'package:expat_app/services/bowls_service.dart';
+import 'package:expat_app/utils/listing_price_display.dart';
 import 'listing_detail_screen.dart';
 import 'messages_screen.dart' show MessagesScreen, kRoleExpat;
 import 'package:expat_app/widgets/bowl_cover_avatar.dart';
@@ -158,7 +159,8 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                                   right: 0,
                                   child: Center(
                                     child: _buildShareExperienceButton(
-                                        textTheme),
+                                      textTheme,
+                                    ),
                                   ),
                                 ),
                             ],
@@ -428,22 +430,23 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
               CircleAvatar(
                 radius: 18,
                 backgroundColor: Colors.grey.shade200,
-                backgroundImage: post.authorImageUrl != null &&
-                        post.authorImageUrl!.isNotEmpty
-                    ? NetworkImage(post.authorImageUrl!)
-                    : null,
-                child: post.authorImageUrl == null ||
-                        post.authorImageUrl!.isEmpty
-                    ? Text(
-                        post.authorName.isNotEmpty
-                            ? post.authorName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: _ExpatHomeColors.bodyText,
-                        ),
-                      )
-                    : null,
+                backgroundImage:
+                    post.authorImageUrl != null &&
+                            post.authorImageUrl!.isNotEmpty
+                        ? NetworkImage(post.authorImageUrl!)
+                        : null,
+                child:
+                    post.authorImageUrl == null || post.authorImageUrl!.isEmpty
+                        ? Text(
+                          post.authorName.isNotEmpty
+                              ? post.authorName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: _ExpatHomeColors.bodyText,
+                          ),
+                        )
+                        : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -900,7 +903,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    _buildPriceText(textTheme, estate.price),
+                    _buildListingPriceRichText(textTheme, estate.type, estate.price),
                   ],
                 ),
               ],
@@ -995,24 +998,38 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     );
   }
 
-  /// Renders price with currency/amount in bold and suffix (e.g. "/mo") in regular weight.
-  Widget _buildPriceText(TextTheme textTheme, String price) {
-    final parts = price.split('/');
-    final amount = parts.isNotEmpty ? parts[0] : price;
-    final suffix = parts.length > 1 ? '/${parts[1]}' : '';
+  /// Mock estate `type` string → [ListingType] for price formatting.
+  static ListingType _listingTypeFromEstateMockType(String t) {
+    switch (t) {
+      case 'short_stay':
+        return ListingType.shortStay;
+      case 'apartment':
+        return ListingType.apartment;
+      default:
+        return ListingType.house;
+    }
+  }
+
+  /// Bold `$amount` + smaller `/per month` or `/per night` (reference design).
+  Widget _buildListingPriceRichText(
+    TextTheme textTheme,
+    ListingType type,
+    String rawPrice,
+  ) {
+    final p = splitListingPriceForDisplay(type, rawPrice);
     return RichText(
       text: TextSpan(
         style: textTheme.titleSmall?.copyWith(color: _ExpatHomeColors.bodyText),
         children: [
           TextSpan(
-            text: amount,
+            text: p.amountWithSymbol,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: _ExpatHomeColors.bodyText,
             ),
           ),
           TextSpan(
-            text: suffix,
+            text: p.slashSuffix,
             style: TextStyle(
               fontWeight: FontWeight.normal,
               fontSize: textTheme.bodySmall?.fontSize,
@@ -1383,6 +1400,7 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
             : estate.type == 'apartment'
             ? 'Apartment'
             : 'House';
+    final listingType = _listingTypeFromEstateMockType(estate.type);
 
     return GestureDetector(
       onTap: () {
@@ -1393,6 +1411,7 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
                   title: estate.title,
                   location: estate.location,
                   price: estate.price,
+                  listingType: listingType,
                   typeLabel: typeLabel,
                   imagePaths: [estate.imagePath],
                   description: estate.description,
@@ -1468,7 +1487,11 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
                       ),
                     ),
                     const SizedBox(height: 4),
-                    _buildPriceText(textTheme, estate.price),
+                    _buildListingPriceRichText(
+                      textTheme,
+                      _listingTypeFromEstateMockType(estate.type),
+                      estate.price,
+                    ),
                   ],
                 ),
               ],
@@ -1566,10 +1589,7 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
           backgroundColor: _ExpatHomeColors.accentGreen,
           foregroundColor: _ExpatHomeColors.primaryDark,
           elevation: 6,
-          side: const BorderSide(
-            color: _ExpatHomeColors.primaryDark,
-            width: 2,
-          ),
+          side: const BorderSide(color: _ExpatHomeColors.primaryDark, width: 2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(32),
           ),
@@ -1771,9 +1791,9 @@ class _ProfilePopupDialogState extends State<_ProfilePopupDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _uploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to upload: $e')));
       }
     }
   }
@@ -1799,13 +1819,13 @@ class _ProfilePopupDialogState extends State<_ProfilePopupDialog> {
               children: [
                 _uploading
                     ? const SizedBox(
-                        width: 72,
-                        height: 72,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          color: accentGreen,
-                        ),
-                      )
+                      width: 72,
+                      height: 72,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: accentGreen,
+                      ),
+                    )
                     : _buildAvatar(72),
                 Positioned(
                   bottom: 0,
@@ -1841,9 +1861,7 @@ class _ProfilePopupDialogState extends State<_ProfilePopupDialog> {
             const SizedBox(height: 4),
             Text(
               widget.userEmail,
-              style: textTheme.bodySmall?.copyWith(
-                color: Colors.white70,
-              ),
+              style: textTheme.bodySmall?.copyWith(color: Colors.white70),
             ),
             const SizedBox(height: 20),
             const Divider(height: 1, color: Colors.white24),
@@ -1880,9 +1898,7 @@ class _ProfilePopupDialogState extends State<_ProfilePopupDialog> {
       radius: radius / 2,
       backgroundColor: const Color(0xFF8ED966),
       child: Text(
-        widget.userName.isNotEmpty
-            ? widget.userName[0].toUpperCase()
-            : '?',
+        widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?',
         style: TextStyle(
           color: const Color(0xFF1A2E35),
           fontWeight: FontWeight.w600,

@@ -4,19 +4,11 @@ import 'package:expat_app/models/conversation.dart';
 import 'package:expat_app/models/chat_message.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/conversations_service.dart';
+import 'package:expat_app/utils/listing_price_display.dart';
+import 'package:expat_app/models/listing.dart';
 import 'agent_home_screen.dart';
 import 'landlord_home_screen.dart';
 import 'listing_detail_screen.dart';
-
-String _normalizePriceForDisplay(String price) {
-  if (!price.contains('/')) return price;
-  final parts = price.split('/');
-  final amount = parts[0];
-  final suffix = parts.length > 1 ? parts[1].trim().toLowerCase() : '';
-  if (suffix == 'per month') return '$amount/mo';
-  if (suffix == 'per night') return '$amount/night';
-  return price;
-}
 
 const String kRoleLandlord = 'landlord';
 const String kRoleAgent = 'agent';
@@ -41,11 +33,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   double _scrollOffset = 0;
 
   static const List<BoxShadow> _headerShadow = [
-    BoxShadow(
-      color: Color(0x33000000),
-      offset: Offset(0, 6),
-      blurRadius: 10,
-    ),
+    BoxShadow(color: Color(0x33000000), offset: Offset(0, 6), blurRadius: 10),
   ];
 
   String? _uid;
@@ -57,8 +45,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
     _scrollController.addListener(_onScroll);
     _uid = AuthService().currentUser?.uid;
     if (_uid != null) {
-      _conversationsStream =
-          ConversationsService().conversationsStream(_uid!);
+      _conversationsStream = ConversationsService().conversationsStream(_uid!);
     }
   }
 
@@ -102,29 +89,30 @@ class _MessagesScreenState extends State<MessagesScreen> {
         ),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
         Expanded(
-          child: _uid == null || _conversationsStream == null
-              ? _buildEmptyState(textTheme)
-              : StreamBuilder<List<Conversation>>(
-                  stream: _conversationsStream,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final convos = snapshot.data ?? [];
-                    if (convos.isEmpty) {
-                      return _buildEmptyState(textTheme);
-                    }
-                    return ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.only(bottom: 56),
-                      itemCount: convos.length,
-                      itemBuilder: (context, index) {
-                        final convo = convos[index];
-                        return _buildThreadRow(context, textTheme, convo);
-                      },
-                    );
-                  },
-                ),
+          child:
+              _uid == null || _conversationsStream == null
+                  ? _buildEmptyState(textTheme)
+                  : StreamBuilder<List<Conversation>>(
+                    stream: _conversationsStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final convos = snapshot.data ?? [];
+                      if (convos.isEmpty) {
+                        return _buildEmptyState(textTheme);
+                      }
+                      return ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(bottom: 56),
+                        itemCount: convos.length,
+                        itemBuilder: (context, index) {
+                          final convo = convos[index];
+                          return _buildThreadRow(context, textTheme, convo);
+                        },
+                      );
+                    },
+                  ),
         ),
       ],
     );
@@ -161,22 +149,22 @@ class _MessagesScreenState extends State<MessagesScreen> {
     final lastTime = convo.lastMessageAt ?? convo.createdAt;
 
     final now = DateTime.now();
-    final timeLabel =
-        lastTime != null ? _formatThreadTime(lastTime, now) : '';
+    final timeLabel = lastTime != null ? _formatThreadTime(lastTime, now) : '';
 
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => ConversationScreen(
-              conversationId: convo.id,
-              listingTitle: convo.listingTitle,
-              location: convo.listingLocation,
-              price: convo.listingPrice,
-              imagePath: convo.listingImage,
-              contactName: contactName,
-              listingDetailRole: widget.currentUserRole,
-            ),
+            builder:
+                (_) => ConversationScreen(
+                  conversationId: convo.id,
+                  listingTitle: convo.listingTitle,
+                  location: convo.listingLocation,
+                  price: formatConversationListingPrice(convo.listingPrice),
+                  imagePath: convo.listingImage,
+                  contactName: contactName,
+                  listingDetailRole: widget.currentUserRole,
+                ),
           ),
         );
       },
@@ -224,11 +212,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Color(0xFF9CA5A8),
-                ),
+                const Icon(Icons.more_vert, size: 18, color: Color(0xFF9CA5A8)),
               ],
             ),
           ],
@@ -247,12 +231,12 @@ String _formatTime(DateTime dt) {
 String _formatThreadTime(DateTime then, DateTime now) {
   final diff = now.difference(then);
   if (diff.inMinutes < 1) return 'now';
-  final sameDay = then.year == now.year &&
-      then.month == now.month &&
-      then.day == now.day;
+  final sameDay =
+      then.year == now.year && then.month == now.month && then.day == now.day;
   if (sameDay) return _formatTime(then);
   final yesterday = now.subtract(const Duration(days: 1));
-  final isYesterday = then.year == yesterday.year &&
+  final isYesterday =
+      then.year == yesterday.year &&
       then.month == yesterday.month &&
       then.day == yesterday.day;
   if (isYesterday) return 'Yesterday';
@@ -303,8 +287,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
   void initState() {
     super.initState();
     _myUid = AuthService().currentUser?.uid;
-    _messagesStream =
-        ConversationsService().messagesStream(widget.conversationId);
+    _messagesStream = ConversationsService().messagesStream(
+      widget.conversationId,
+    );
   }
 
   @override
@@ -363,9 +348,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       final isMe = m.senderId == _myUid;
                       return Padding(
                         padding: const EdgeInsets.only(top: 12),
-                        child: isMe
-                            ? _buildOutgoingBubble(textTheme, m.content)
-                            : _buildIncomingBubble(textTheme, m.content),
+                        child:
+                            isMe
+                                ? _buildOutgoingBubble(textTheme, m.content)
+                                : _buildIncomingBubble(textTheme, m.content),
                       );
                     }),
                   ],
@@ -388,23 +374,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new,
-                  color: Colors.white, size: 18),
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 18,
+              ),
               onPressed: () {
                 if (widget.returnToLandlordOnBack) {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute<void>(
-                      builder: (_) => const LandlordHomeScreen(
-                        initialIndex: 2,
-                      ),
+                      builder: (_) => const LandlordHomeScreen(initialIndex: 2),
                     ),
                   );
                 } else if (widget.returnToAgentMessagesOnBack) {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute<void>(
-                      builder: (_) => const AgentHomeScreen(
-                        initialIndex: 2,
-                      ),
+                      builder: (_) => const AgentHomeScreen(initialIndex: 2),
                     ),
                   );
                 } else {
@@ -412,9 +397,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 }
               },
             ),
-            Expanded(
-              child: _buildHeaderContactRow(context, textTheme),
-            ),
+            Expanded(child: _buildHeaderContactRow(context, textTheme)),
           ],
         ),
       ),
@@ -469,16 +452,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
       children: [
         Text(
           dateLabel,
-          style: textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF1A2E35),
-          ),
+          style: textTheme.bodySmall?.copyWith(color: const Color(0xFF1A2E35)),
         ),
         const SizedBox(height: 4),
         Text(
           'This chat is end-end encrypted',
-          style: textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF1A2E35),
-          ),
+          style: textTheme.bodySmall?.copyWith(color: const Color(0xFF1A2E35)),
         ),
       ],
     );
@@ -525,10 +504,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     ),
                   ),
                 ),
-                AspectRatio(
-                  aspectRatio: 4 / 3,
-                  child: _buildCardImage(),
-                ),
+                AspectRatio(aspectRatio: 4 / 3, child: _buildCardImage()),
                 Container(
                   color: const Color(0xFF1A2E35),
                   padding: const EdgeInsets.symmetric(
@@ -542,7 +518,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _normalizePriceForDisplay(widget.price),
+                              formatConversationListingPrice(widget.price),
                               style: textTheme.titleMedium?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -591,18 +567,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (path.isEmpty) {
       return Container(color: Colors.grey.shade300);
     }
-    final isNetwork =
-        path.startsWith('http://') || path.startsWith('https://');
+    final isNetwork = path.startsWith('http://') || path.startsWith('https://');
     if (isNetwork) {
-      return Image.network(path,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
-              Container(color: Colors.grey.shade300));
-    }
-    return Image.asset(path,
+      return Image.network(
+        path,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) =>
-            Container(color: Colors.grey.shade300));
+        errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade300),
+      );
+    }
+    return Image.asset(
+      path,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade300),
+    );
   }
 
   void _onListingCardTap(BuildContext context) {
@@ -612,20 +589,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ListingDetailScreen(
-          title: widget.listingTitle,
-          location: widget.location,
-          price: _normalizePriceForDisplay(widget.price),
-          typeLabel: 'Apartment',
-          imagePaths: widget.imagePath.isNotEmpty ? [widget.imagePath] : [],
-          description:
-              'Detailed information about this listing will appear here once connected to the backend.',
-          upi: showRequestEditOnly ? null : 'RHA Land UPI (placeholder)',
-          isVerifiedByRdb: true,
-          representativeName: widget.contactName,
-          showRequestEditOnly: showRequestEditOnly,
-          showAgentActions: showAgentActions,
-        ),
+        builder:
+            (_) => ListingDetailScreen(
+              title: widget.listingTitle,
+              location: widget.location,
+              price: widget.price,
+              listingType: ListingType.apartment,
+              typeLabel: 'Apartment',
+              imagePaths: widget.imagePath.isNotEmpty ? [widget.imagePath] : [],
+              description:
+                  'Detailed information about this listing will appear here once connected to the backend.',
+              upi: showRequestEditOnly ? null : 'RHA Land UPI (placeholder)',
+              isVerifiedByRdb: true,
+              representativeName: widget.contactName,
+              showRequestEditOnly: showRequestEditOnly,
+              showAgentActions: showAgentActions,
+            ),
       ),
     );
   }
@@ -642,9 +621,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
         child: Text(
           text,
-          style: textTheme.bodyMedium?.copyWith(
-            color: Colors.white,
-          ),
+          style: textTheme.bodyMedium?.copyWith(color: Colors.white),
         ),
       ),
     );
@@ -662,9 +639,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
         child: Text(
           text,
-          style: textTheme.bodyMedium?.copyWith(
-            color: const Color(0xFF1A2E35),
-          ),
+          style: textTheme.bodyMedium?.copyWith(color: const Color(0xFF1A2E35)),
         ),
       ),
     );
@@ -709,9 +684,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         duration: const Duration(milliseconds: 180),
                         curve: Curves.easeInOut,
                         decoration: BoxDecoration(
-                          color: _liveTranslateEnabled
-                              ? accentGreen
-                              : hintColor.withValues(alpha: 0.4),
+                          color:
+                              _liveTranslateEnabled
+                                  ? accentGreen
+                                  : hintColor.withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Stack(
@@ -720,12 +696,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
                             AnimatedAlign(
                               duration: const Duration(milliseconds: 180),
                               curve: Curves.easeInOut,
-                              alignment: _liveTranslateEnabled
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
+                              alignment:
+                                  _liveTranslateEnabled
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
                               child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                ),
                                 child: Container(
                                   width: 18,
                                   height: 18,
@@ -748,11 +726,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 onTap: () {},
                 child: const Padding(
                   padding: EdgeInsets.all(4),
-                  child: Icon(
-                    Icons.add,
-                    color: Colors.white,
-                    size: 30,
-                  ),
+                  child: Icon(Icons.add, color: Colors.white, size: 30),
                 ),
               ),
               const SizedBox(width: 8),
@@ -774,8 +748,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       Expanded(
                         child: TextField(
                           controller: _messageController,
-                          style: textTheme.bodyMedium
-                              ?.copyWith(color: Colors.white),
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: Colors.white,
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Type something...',
                             hintStyle: textTheme.bodyMedium?.copyWith(
