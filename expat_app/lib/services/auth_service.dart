@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/user_profile.dart';
+import 'bowls_service.dart';
 
 /// Firestore collection name for user profiles (BACKEND_CHECKLIST §1.1).
 const String kUsersCollection = 'users';
@@ -94,6 +95,15 @@ class AuthService {
             .collection('licensed_agents')
             .doc(profile.agentId)
             .update({'registeredUid': user.uid});
+      } catch (_) {}
+    }
+
+    if (role == UserRole.expat) {
+      try {
+        await BowlsService().autoJoinOnSignUp(
+          user.uid,
+          profile.countryOfCitizenship,
+        );
       } catch (_) {}
     }
 

@@ -82,5 +82,31 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isSignedIn();
     }
+
+    // Community posts: any signed-in user can read; author can create/update/delete.
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+
+    // Post comments: any signed-in user can read and create; author can update.
+    match /post_comments/{commentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+    }
+
+    // Bowls: any signed-in user can read; writes for seeding.
+    match /bowls/{bowlId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Bowl membership: any signed-in user can read, join, or leave.
+    match /bowl_members/{memberId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isSignedIn();
+    }
   }
 }

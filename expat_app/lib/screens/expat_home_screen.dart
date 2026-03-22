@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/models/post.dart';
+import 'package:expat_app/models/bowl.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/listings_service.dart';
+import 'package:expat_app/services/community_service.dart';
+import 'package:expat_app/services/bowls_service.dart';
 import 'listing_detail_screen.dart';
 import 'messages_screen.dart' show MessagesScreen, kRoleExpat;
 import 'expat_post_thread_screen.dart';
@@ -33,7 +37,8 @@ class ExpatHomeScreen extends StatefulWidget {
 class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   int _selectedTabIndex = 0; // 0 = Feed, 1 = Bowls
   int _selectedBottomIndex = 0; // 0 = Community, 2 = Estates, etc.
-  int _selectedEstateFilter = 0; // 0 = All, 1 = Apartments, 2 = Houses, 3 = Short-Stay
+  int _selectedEstateFilter =
+      0; // 0 = All, 1 = Apartments, 2 = Houses, 3 = Short-Stay
   String _estateSearchQuery = '';
   final TextEditingController _estateSearchController = TextEditingController();
 
@@ -44,6 +49,10 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   double _bowlsScrollOffset = 0;
   double _estatesScrollOffset = 0;
   late final Stream<List<Listing>> _publishedListingsStream;
+  late final Stream<List<Post>> _feedPostsStream;
+  String? _uid;
+  String _userName = '';
+  String _userRole = 'Expat';
 
   static const List<BoxShadow> _tabBarShadow = [
     BoxShadow(
@@ -58,9 +67,25 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   void initState() {
     super.initState();
     _publishedListingsStream = ListingsService().publishedListingsStream();
+    _feedPostsStream = CommunityService().feedPostsStream();
+    _uid = AuthService().currentUser?.uid;
+    _loadUserProfile();
+    BowlsService().seedDefaultBowls();
     _feedScrollController.addListener(_onFeedScroll);
     _bowlsScrollController.addListener(_onBowlsScroll);
     _estatesScrollController.addListener(_onEstatesScroll);
+  }
+
+  Future<void> _loadUserProfile() async {
+    final profile = await AuthService().getCurrentUserProfile();
+    if (profile != null && mounted) {
+      setState(() {
+        _userName = profile.legalName;
+        _userRole =
+            profile.role.value.substring(0, 1).toUpperCase() +
+            profile.role.value.substring(1);
+      });
+    }
   }
 
   @override
@@ -90,8 +115,10 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     // Only rebuild when crossing zero so the header shadow show/hide updates; avoids refresh-like rebuilds on every scroll.
     final hadShadow = _estatesScrollOffset > 0;
     final hasShadow = o > 0;
-    if (hadShadow != hasShadow) setState(() => _estatesScrollOffset = o);
-    else if (_estatesScrollOffset != o) _estatesScrollOffset = o;
+    if (hadShadow != hasShadow)
+      setState(() => _estatesScrollOffset = o);
+    else if (_estatesScrollOffset != o)
+      _estatesScrollOffset = o;
   }
 
   @override
@@ -104,37 +131,48 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
         children: [
           _buildHeader(textTheme),
           Expanded(
-            child: _selectedBottomIndex == 0
-                ? Column(
-                    children: [
-                      _buildTabBar(textTheme),
-                      const Divider(height: 1, color: Color(0xFFE0E0E0)),
-                      Expanded(
-                        child: _selectedTabIndex == 0
-                            ? _buildFeedList(textTheme)
-                            : _buildBowlsContent(textTheme),
-                      ),
-                    ],
-                  )
-                : _selectedBottomIndex == 2
+            child:
+                _selectedBottomIndex == 0
+                    ? Column(
+                      children: [
+                        _buildTabBar(textTheme),
+                        const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              _selectedTabIndex == 0
+                                  ? _buildFeedList(textTheme)
+                                  : _buildBowlsContent(textTheme),
+                              if (_selectedTabIndex == 0)
+                                Positioned(
+                                  bottom: 16,
+                                  left: 0,
+                                  right: 0,
+                                  child: Center(
+                                    child: _buildShareExperienceButton(
+                                        textTheme),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                    : _selectedBottomIndex == 2
                     ? _buildEstatesContentWithStream(textTheme)
                     : _selectedBottomIndex == 3
-                        ? MessagesScreen(currentUserRole: kRoleExpat)
-                        : Center(
-                            child: Text(
-                              'Content for other tabs will live here.',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: _ExpatHomeColors.helper,
-                              ),
-                            ),
-                          ),
+                    ? MessagesScreen(currentUserRole: kRoleExpat)
+                    : Center(
+                      child: Text(
+                        'Content for other tabs will live here.',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: _ExpatHomeColors.helper,
+                        ),
+                      ),
+                    ),
           ),
         ],
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
-      floatingActionButton: _selectedBottomIndex == 0 && _selectedTabIndex == 0
-          ? _buildShareExperienceButton(textTheme)
-          : null,
       bottomNavigationBar: _buildBottomNav(textTheme),
     );
   }
@@ -178,15 +216,16 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
           AuthService().signOut();
         }
       },
-      itemBuilder: (context) => [
-        const PopupMenuItem<String>(
-          value: 'logout',
-          child: ListTile(
-            leading: Icon(Icons.logout),
-            title: Text('Log out'),
-          ),
-        ),
-      ],
+      itemBuilder:
+          (context) => [
+            const PopupMenuItem<String>(
+              value: 'logout',
+              child: ListTile(
+                leading: Icon(Icons.logout),
+                title: Text('Log out'),
+              ),
+            ),
+          ],
     );
   }
 
@@ -217,7 +256,8 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   }
 
   Widget _buildTabBar(TextTheme textTheme) {
-    final showShadow = (_selectedTabIndex == 0 && _feedScrollOffset > 0) ||
+    final showShadow =
+        (_selectedTabIndex == 0 && _feedScrollOffset > 0) ||
         (_selectedTabIndex == 1 && _bowlsScrollOffset > 0);
     return Container(
       decoration: BoxDecoration(
@@ -281,133 +321,293 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   }
 
   Widget _buildFeedList(TextTheme textTheme) {
-    return ListView(
-      controller: _feedScrollController,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
-      children: [
-        GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ExpatPostThreadScreen(),
+    return StreamBuilder<List<Post>>(
+      stream: _feedPostsStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final posts = snapshot.data ?? [];
+        if (posts.isEmpty) {
+          return ListView(
+            controller: _feedScrollController,
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
+            children: [
+              const SizedBox(height: 80),
+              Center(
+                child: Text(
+                  'No posts yet.\nBe the first to share your experience!',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: _ExpatHomeColors.helper,
+                  ),
+                ),
               ),
+            ],
+          );
+        }
+        return ListView.separated(
+          controller: _feedScrollController,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+          itemCount: posts.length,
+          separatorBuilder:
+              (_, __) => const Column(
+                children: [
+                  SizedBox(height: 24),
+                  Divider(height: 1, color: Color(0xFFE0E0E0)),
+                ],
+              ),
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            return GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ExpatPostThreadScreen(postId: post.id),
+                  ),
+                );
+              },
+              child: _buildPostCard(textTheme, post),
             );
           },
-          child: _buildPostBlock(
-            textTheme,
-            avatarPath: 'assets/images/avatar_benjamin_nelson.png',
-            name: 'Benjamin Nelson',
-            role: 'Expat',
-            timeAgo: '7m',
-            content:
-                'Hi everyone 👋,\nI just arrived in Kigali last week and I’m still getting used to things. Quick question: what’s the best way to handle short-term housing before committing long-term? Did you start with Airbnb, serviced apartments, or something else?\n\nWould really appreciate advice from people who’ve already been through this.',
-            comments: [
-              _InlineComment(
-                avatarPath: 'assets/images/avatar_ama_boateng.png',
-                name: 'Ama Boateng',
-                role: 'Expat',
-                timeAgo: '7m',
-                text:
-                    'Welcome, Benjamin! I started with a serviced apartment for a month before finding a longer-term place. It gave me time to understand neighborhoods.',
+        );
+      },
+    );
+  }
+
+  String _timeAgo(DateTime? dt) {
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}d';
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+
+  Widget _buildPostCard(TextTheme textTheme, Post post) {
+    final liked = _uid != null && post.isLikedBy(_uid!);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.grey.shade200,
+                child: Text(
+                  post.authorName.isNotEmpty
+                      ? post.authorName[0].toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: _ExpatHomeColors.bodyText,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.authorName,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: _ExpatHomeColors.bodyText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      post.authorRole,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _ExpatHomeColors.roleBlue,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                _timeAgo(post.createdAt),
+                style: textTheme.bodySmall?.copyWith(
+                  color: _ExpatHomeColors.helper,
+                ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 24),
-        const Divider(height: 1, color: Color(0xFFE0E0E0)),
-        _buildPostBlock(
-          textTheme,
-          avatarPath: 'assets/images/avatar_natalie_brooks.png',
-          name: 'Natalie Brooks',
-          role: 'Expat',
-          timeAgo: '2m',
-          content:
-              'Just came back from gorilla trekking and honestly… I’m still processing it 🦍 It’s one of the most surreal experiences I’ve ever had. Early start, long hike, but absolutely worth it.\n\nIf you’re in Rwanda and considering it — do it.',
-          imagePath: 'assets/images/post_gorilla_experience.png',
-          comments: [
-            _InlineComment(
-              avatarPath: 'assets/images/avatar_kwame_mensah.png',
-              name: 'Kwame Mensah',
-              role: 'Expat',
-              timeAgo: '4m',
-              text:
-                  'Exploring different neighborhoods this week and loving how each area has its own vibe. Any recommendations on must-visit spots?',
+          const SizedBox(height: 12),
+          Text(
+            post.content,
+            style: textTheme.bodyMedium?.copyWith(
+              color: _ExpatHomeColors.bodyText,
+            ),
+          ),
+          if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                post.imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (_, __, ___) =>
+                        Container(height: 180, color: Colors.grey.shade300),
+              ),
             ),
           ],
-        ),
-      ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (_uid != null) {
+                    CommunityService().toggleLike(post.id, _uid!);
+                  }
+                },
+                child: Row(
+                  children: [
+                    Icon(
+                      liked ? Icons.favorite : Icons.favorite_border,
+                      size: 18,
+                      color:
+                          liked ? Colors.redAccent : _ExpatHomeColors.bodyText,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      post.likeCount > 0 ? '${post.likeCount}' : 'Like',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _ExpatHomeColors.bodyText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ExpatPostThreadScreen(postId: post.id),
+                    ),
+                  );
+                },
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.chat_bubble_outline,
+                      size: 18,
+                      color: _ExpatHomeColors.bodyText,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      post.commentCount > 0
+                          ? '${post.commentCount}'
+                          : 'Comment',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _ExpatHomeColors.bodyText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildBowlsContent(TextTheme textTheme) {
-    final myBowls = <_Bowl>[
-      const _Bowl(
-        title: 'Nigeria',
-        description:
-            'A community for all Nigerian Expats in Rwanda. Bi-weekly Nigerian-themed events and many more.',
-        imagePath: 'assets/images/bowl_nigeria.png',
-      ),
-      const _Bowl(
-        title: 'Job Hunting',
-        description:
-            'A community to discuss the job market, as well as finding, applying for, posting, and interviewing for roles within and, if possible, outside the Rwandan job market.',
-        imagePath: 'assets/images/bowl_job_hunting.png',
-      ),
-      const _Bowl(
-        title: 'Expatriate Life in Rwanda',
-        description:
-            'A community recommended for all Expats, to share and review experiences in Rwanda. Connect, plan and have fun together.',
-        imagePath: 'assets/images/bowl_expat_life.png',
-      ),
-    ];
+    if (_uid == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return StreamBuilder<List<Bowl>>(
+      stream: BowlsService().allBowlsStream(),
+      builder: (context, allSnap) {
+        if (allSnap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final allBowls = allSnap.data ?? [];
+        return StreamBuilder<Set<String>>(
+          stream: BowlsService().userBowlIdsStream(_uid!),
+          builder: (context, memberSnap) {
+            final joinedIds = memberSnap.data ?? {};
+            final myBowls =
+                allBowls.where((b) => joinedIds.contains(b.id)).toList();
+            final otherBowls =
+                allBowls.where((b) => !joinedIds.contains(b.id)).toList();
 
-    return ListView(
-      controller: _bowlsScrollController,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-      children: [
-        const SizedBox(height: 16),
-        Text(
-          'My Bowls',
-          style: textTheme.titleMedium?.copyWith(
-            color: _ExpatHomeColors.bodyText,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...myBowls.expand(
-          (bowl) => [
-            _buildBowlRow(textTheme, bowl),
-            const Divider(height: 1, color: Color(0xFFE0E0E0)),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'Other Bowls',
-          style: textTheme.titleMedium?.copyWith(
-            color: _ExpatHomeColors.bodyText,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 40),
-        Center(
-          child: Text(
-            "Sorry that's all for now. Bowls are being\ncreated in real-time based on data we have\nand are still collecting.",
-            textAlign: TextAlign.center,
-            style: textTheme.bodySmall?.copyWith(
-              color: _ExpatHomeColors.bodyText,
-            ),
-          ),
-        ),
-      ],
+            return ListView(
+              controller: _bowlsScrollController,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+              children: [
+                const SizedBox(height: 16),
+                Text(
+                  'My Bowls',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: _ExpatHomeColors.bodyText,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (myBowls.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'You haven\'t joined any bowls yet.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _ExpatHomeColors.helper,
+                      ),
+                    ),
+                  ),
+                ...myBowls.expand(
+                  (bowl) => [
+                    _buildBowlRow(textTheme, bowl, joined: true),
+                    const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Other Bowls',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: _ExpatHomeColors.bodyText,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (otherBowls.isEmpty)
+                  Center(
+                    child: Text(
+                      "No more bowls to discover right now.\nNew bowls are created as the community grows.",
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _ExpatHomeColors.bodyText,
+                      ),
+                    ),
+                  ),
+                ...otherBowls.expand(
+                  (bowl) => [
+                    _buildBowlRow(textTheme, bowl, joined: false),
+                    const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
-  Widget _buildBowlRow(TextTheme textTheme, _Bowl bowl) {
+  Widget _buildBowlRow(TextTheme textTheme, Bowl bowl, {required bool joined}) {
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => const ExpatBowlThreadScreen(),
+            builder: (_) => ExpatBowlThreadScreen(bowlId: bowl.id),
           ),
         );
       },
@@ -418,8 +618,14 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundImage: AssetImage(bowl.imagePath),
               backgroundColor: Colors.grey.shade200,
+              child: Text(
+                bowl.name.isNotEmpty ? bowl.name[0].toUpperCase() : '?',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: _ExpatHomeColors.bodyText,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -427,7 +633,7 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    bowl.title,
+                    bowl.name,
                     style: textTheme.titleMedium?.copyWith(
                       color: _ExpatHomeColors.bodyText,
                       fontWeight: FontWeight.w600,
@@ -436,6 +642,8 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                   const SizedBox(height: 2),
                   Text(
                     bowl.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: textTheme.bodySmall?.copyWith(
                       color: _ExpatHomeColors.bodyText,
                     ),
@@ -443,6 +651,15 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                 ],
               ),
             ),
+            if (!joined)
+              TextButton(
+                onPressed: () {
+                  if (_uid != null) {
+                    BowlsService().joinBowl(bowl.id, _uid!);
+                  }
+                },
+                child: const Text('Join'),
+              ),
           ],
         ),
       ),
@@ -471,15 +688,24 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
         }
         if (_estateSearchQuery.trim().isNotEmpty) {
           final q = _estateSearchQuery.trim().toLowerCase();
-          list = list.where((l) =>
-              l.title.toLowerCase().contains(q) ||
-              l.location.toLowerCase().contains(q) ||
-              l.description.toLowerCase().contains(q)).toList();
+          list =
+              list
+                  .where(
+                    (l) =>
+                        l.title.toLowerCase().contains(q) ||
+                        l.location.toLowerCase().contains(q) ||
+                        l.description.toLowerCase().contains(q),
+                  )
+                  .toList();
         }
         if (_selectedEstateFilter == 0) {
           list = List.from(list)..sort((a, b) => a.title.compareTo(b.title));
         }
-        return _buildEstatesContentFromList(textTheme, list, snapshot.connectionState);
+        return _buildEstatesContentFromList(
+          textTheme,
+          list,
+          snapshot.connectionState,
+        );
       },
     );
   }
@@ -513,55 +739,73 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                 onChanged: (v) => setState(() => _estateSearchQuery = v),
                 decoration: InputDecoration(
                   hintText: 'Search by title, location...',
-                  hintStyle: TextStyle(color: _ExpatHomeColors.hint, fontSize: 14),
+                  hintStyle: TextStyle(
+                    color: _ExpatHomeColors.hint,
+                    fontSize: 14,
+                  ),
                   prefixIcon: const Icon(Icons.search, size: 20),
                   isDense: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                 ),
                 style: const TextStyle(fontSize: 14),
               ),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: _estateFilterOptions
-                    .map((opt) => _buildEstateFilterItem(textTheme, opt))
-                    .toList(),
+                children:
+                    _estateFilterOptions
+                        .map((opt) => _buildEstateFilterItem(textTheme, opt))
+                        .toList(),
               ),
             ],
           ),
         ),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
         Expanded(
-          child: connectionState == ConnectionState.waiting
-              ? const Center(child: CircularProgressIndicator())
-              : estates.isEmpty
+          child:
+              connectionState == ConnectionState.waiting
+                  ? const Center(child: CircularProgressIndicator())
+                  : estates.isEmpty
                   ? Center(
-                      child: Text(
-                        'No published listings yet.\n(Set status to "published" in Firestore to see them here.)',
-                        style: textTheme.bodyMedium?.copyWith(color: _ExpatHomeColors.helper),
-                        textAlign: TextAlign.center,
+                    child: Text(
+                      'No published listings yet.\n(Set status to "published" in Firestore to see them here.)',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: _ExpatHomeColors.helper,
                       ),
-                    )
-                  : ListView.builder(
-                      controller: _estatesScrollController,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                      itemCount: estates.length,
-                      itemBuilder: (context, index) {
-                        if (index > 0) {
-                          return Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Divider(height: 1, color: Color(0xFFE0E0E0)),
-                              _buildEstateCardFromListing(context, textTheme, estates[index]),
-                            ],
-                          );
-                        }
-                        return _buildEstateCardFromListing(context, textTheme, estates[index]);
-                      },
+                      textAlign: TextAlign.center,
                     ),
+                  )
+                  : ListView.builder(
+                    controller: _estatesScrollController,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                    itemCount: estates.length,
+                    itemBuilder: (context, index) {
+                      if (index > 0) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                            _buildEstateCardFromListing(
+                              context,
+                              textTheme,
+                              estates[index],
+                            ),
+                          ],
+                        );
+                      }
+                      return _buildEstateCardFromListing(
+                        context,
+                        textTheme,
+                        estates[index],
+                      );
+                    },
+                  ),
         ),
       ],
     );
@@ -618,7 +862,10 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _ExpatHomeColors.helper,
                         borderRadius: BorderRadius.circular(8),
@@ -693,7 +940,9 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
       return Container(
         height: height,
         color: Colors.grey.shade300,
-        child: const Center(child: Icon(Icons.home, size: 48, color: Colors.grey)),
+        child: const Center(
+          child: Icon(Icons.home, size: 48, color: Colors.grey),
+        ),
       );
     }
     if (url.startsWith('http')) {
@@ -702,11 +951,12 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
         height: height,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-          height: height,
-          color: Colors.grey.shade300,
-          child: const Center(child: Icon(Icons.broken_image)),
-        ),
+        errorBuilder:
+            (_, __, ___) => Container(
+              height: height,
+              color: Colors.grey.shade300,
+              child: const Center(child: Icon(Icons.broken_image)),
+            ),
       );
     }
     return Image.asset(
@@ -714,11 +964,12 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
       height: height,
       width: double.infinity,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        height: height,
-        color: Colors.grey.shade300,
-        child: const Center(child: Icon(Icons.home, size: 48)),
-      ),
+      errorBuilder:
+          (_, __, ___) => Container(
+            height: height,
+            color: Colors.grey.shade300,
+            child: const Center(child: Icon(Icons.home, size: 48)),
+          ),
     );
   }
 
@@ -752,15 +1003,14 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   }
 
   Widget _buildEstatesContent(TextTheme textTheme) {
-    var estates = _estateList
-        .where((e) {
+    var estates =
+        _estateList.where((e) {
           if (_selectedEstateFilter == 0) return true;
           if (_selectedEstateFilter == 1) return e.type == 'apartment';
           if (_selectedEstateFilter == 2) return e.type == 'house';
           if (_selectedEstateFilter == 3) return e.type == 'short_stay';
           return true;
-        })
-        .toList();
+        }).toList();
     if (_selectedEstateFilter == 0) {
       estates.sort((a, b) => a.title.compareTo(b.title));
     }
@@ -783,9 +1033,10 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: _estateFilterOptions
-                .map((opt) => _buildEstateFilterItem(textTheme, opt))
-                .toList(),
+            children:
+                _estateFilterOptions
+                    .map((opt) => _buildEstateFilterItem(textTheme, opt))
+                    .toList(),
           ),
         ),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
@@ -812,7 +1063,10 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     );
   }
 
-  Widget _buildEstateFilterItem(TextTheme textTheme, _EstateFilterOption option) {
+  Widget _buildEstateFilterItem(
+    TextTheme textTheme,
+    _EstateFilterOption option,
+  ) {
     final bool selected = _selectedEstateFilter == option.index;
     return GestureDetector(
       onTap: () => setState(() => _selectedEstateFilter = option.index),
@@ -824,9 +1078,10 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
             Text(
               option.label,
               style: textTheme.titleMedium?.copyWith(
-                color: selected
-                    ? _ExpatHomeColors.bodyText
-                    : _ExpatHomeColors.hint,
+                color:
+                    selected
+                        ? _ExpatHomeColors.bodyText
+                        : _ExpatHomeColors.hint,
                 fontWeight: selected ? FontWeight.bold : FontWeight.w500,
               ),
             ),
@@ -843,204 +1098,220 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   }
 
   static List<_Estate> get _estateList => [
-        // Apartments
-        const _Estate(
-          title: 'Elizabeth Golf Apartments',
-          location: 'KG 439 Street, Kigali',
-          price: '\$2,430/mo',
-          type: 'apartment',
-          imagePath: 'assets/images/Apartments/Elizabeth G Apartments/1.jpg',
-          description: """Elizabeth Golf Apartment by Link in Kigali offers a garden, open-air bath, indoor swimming pool, and free Wi-Fi. Guests enjoy a lounge, lift, 24-hour front desk, and free on-site private parking.
+    // Apartments
+    const _Estate(
+      title: 'Elizabeth Golf Apartments',
+      location: 'KG 439 Street, Kigali',
+      price: '\$2,430/mo',
+      type: 'apartment',
+      imagePath: 'assets/images/Apartments/Elizabeth G Apartments/1.jpg',
+      description:
+          """Elizabeth Golf Apartment by Link in Kigali offers a garden, open-air bath, indoor swimming pool, and free Wi-Fi. Guests enjoy a lounge, lift, 24-hour front desk, and free on-site private parking.
 
 The apartment features a kitchenette, balcony, washing machine, private bathroom, and city views. Additional amenities include a dining area, a work desk, and free Wi-Fi.
 
 Located 7 km from Kigali International Airport, the property is a 12-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.2 km) and Kigali Convention Centre (5 km).""",
-        ),
-        const _Estate(
-          title: 'Greenland Apartments',
-          location: '249 KN 3 Street, Kigali',
-          price: '\$2,025/mo',
-          type: 'apartment',
-          imagePath: 'assets/images/Apartments/Greenland Apartments/1.jpg',
-          description: """Greenland Apartment by Link in Kigali offers a terrace and free Wi-Fi. The apartment features a balcony with city views, a fully equipped kitchen, and a private bathroom.
+    ),
+    const _Estate(
+      title: 'Greenland Apartments',
+      location: '249 KN 3 Street, Kigali',
+      price: '\$2,025/mo',
+      type: 'apartment',
+      imagePath: 'assets/images/Apartments/Greenland Apartments/1.jpg',
+      description:
+          """Greenland Apartment by Link in Kigali offers a terrace and free Wi-Fi. The apartment features a balcony with city views, a fully equipped kitchen, and a private bathroom.
 
 Guests benefit from a fitness room, lift, 24-hour front desk, daily housekeeping, family rooms, full-day security, and luggage storage. Free on-site private parking is available.
 
 Located 9 km from Kigali International Airport, the apartment is near Belgian Peacekeepers Memorial (2 km), Kigali City Tower (less than 1 km), and Kandt House Natural History Museum (1.9 km).""",
-        ),
-        const _Estate(
-          title: 'IZA Serene Apartments',
-          location: 'ECD Plaza, Kigali',
-          price: '\$1,842/mo',
-          type: 'apartment',
-          imagePath: 'assets/images/Apartments/IZA Serene Apartments/1.jpg',
-          description: """IZA Serene city centre apartments in Kigali offer spacious apartments with terraces, balconies, and city views. Each apartment includes air-conditioning, a fully equipped kitchen, and a private bathroom.
+    ),
+    const _Estate(
+      title: 'IZA Serene Apartments',
+      location: 'ECD Plaza, Kigali',
+      price: '\$1,842/mo',
+      type: 'apartment',
+      imagePath: 'assets/images/Apartments/IZA Serene Apartments/1.jpg',
+      description:
+          """IZA Serene city centre apartments in Kigali offer spacious apartments with terraces, balconies, and city views. Each apartment includes air-conditioning, a fully equipped kitchen, and a private bathroom.
 
 Guests can enjoy African and international cuisines at the on-site restaurant, which serves vegetarian meals for lunch and dinner. The terrace provides a relaxing outdoor space, complemented by free Wi-Fi throughout the property.
 
 Located 11 km from Kigali International Airport, the apartments are close to attractions such as the Belgian Peacekeepers Memorial (7-minute walk), Kandt House Natural History Museum (1.5 km), and Kigali City Tower (15-minute walk). Free on-site private parking is available.""",
-        ),
-        const _Estate(
-          title: 'Rose Garden Apartments',
-          location: 'KG 9 Avenue, Nyarutarama, Gasabo, Kigali',
-          price: '\$1,485/mo',
-          type: 'apartment',
-          imagePath: 'assets/images/Apartments/Rose Garden Apartments/1.jpg',
-          description: """Rose Garden Private Apartment by LINK in Kigali offers aparthotel-style accommodation with a garden and terrace. Guests enjoy free Wi-Fi, ensuring connectivity throughout their stay.
+    ),
+    const _Estate(
+      title: 'Rose Garden Apartments',
+      location: 'KG 9 Avenue, Nyarutarama, Gasabo, Kigali',
+      price: '\$1,485/mo',
+      type: 'apartment',
+      imagePath: 'assets/images/Apartments/Rose Garden Apartments/1.jpg',
+      description:
+          """Rose Garden Private Apartment by LINK in Kigali offers aparthotel-style accommodation with a garden and terrace. Guests enjoy free Wi-Fi, ensuring connectivity throughout their stay.
 
 Each apartment features a kitchenette, a balcony with city views, a washing machine, and a private bathroom. Additional amenities include a fitness room, a lift, a 24-hour front desk, concierge service, and free on-site parking.
 
 Located 5 km from Kigali International Airport, the property is an 8-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.5 km) and Kigali Convention Centre (4.1 km). Guests appreciate the attentive staff and room cleanliness.""",
-        ),
-        const _Estate(
-          title: 'AGASARO Apartments',
-          location: 'KG 768, Kigali',
-          price: '\$1,480/mo',
-          type: 'apartment',
-          imagePath: 'assets/images/Apartments/AGASARO Apartments/1.jpg',
-          description: """AGASARO LUXURY Apartment in Kigali offers a spacious two-bedroom apartment with two bathrooms. The living room features a sofa bed and a work desk, ensuring comfort and convenience.
+    ),
+    const _Estate(
+      title: 'AGASARO Apartments',
+      location: 'KG 768, Kigali',
+      price: '\$1,480/mo',
+      type: 'apartment',
+      imagePath: 'assets/images/Apartments/AGASARO Apartments/1.jpg',
+      description:
+          """AGASARO LUXURY Apartment in Kigali offers a spacious two-bedroom apartment with two bathrooms. The living room features a sofa bed and a work desk, ensuring comfort and convenience.
 
 Guests can relax in the year-round outdoor swimming pool with a view or enjoy the terrace and garden. The property includes a restaurant, bar, and free Wi-Fi, providing ample leisure options.
 
 The family-friendly restaurant serves African, Dutch, British, Ethiopian, French, American, Argentinian, Belgian, and Brazilian cuisines. Breakfast is continental with fruits, and lunch and dinner are available.
 
 Located 10 km from Kigali International Airport, the apartment is near attractions such as Kigali Genocide Memorial (3.5 km) and Kigali Golf Club (4.5 km). Free on-site private parking is provided.""",
-        ),
+    ),
 
-        // Houses
-        const _Estate(
-          title: '3-Bedroom Villa',
-          location: '25CR+V6P, Kigali',
-          price: '\$1,575/mo',
-          type: 'house',
-          imagePath: 'assets/images/Houses/3-Bedroom Villa/1.jpg',
-          description: """Rose Garden Luxury, Unique 3 Bedrooms House in Kigali offers a villa with three bedrooms and three bathrooms. Guests enjoy a spacious garden and terrace, complemented by free Wi-Fi throughout the property.
+    // Houses
+    const _Estate(
+      title: '3-Bedroom Villa',
+      location: '25CR+V6P, Kigali',
+      price: '\$1,575/mo',
+      type: 'house',
+      imagePath: 'assets/images/Houses/3-Bedroom Villa/1.jpg',
+      description:
+          """Rose Garden Luxury, Unique 3 Bedrooms House in Kigali offers a villa with three bedrooms and three bathrooms. Guests enjoy a spacious garden and terrace, complemented by free Wi-Fi throughout the property.
 
 The villa features a fully equipped kitchen, a balcony with mountain views, a washing machine, and a dining area. Additional amenities include a 24-hour front desk, a minimarket, a hairdresser/beautician, and family rooms.
 
 Located 5 km from Kigali International Airport, the property is close to attractions such as the Presidential Palace Museum (3.2 km) and Kigali Golf Club (15 km). Free on-site private parking is available.""",
-        ),
-        const _Estate(
-          title: 'Green Valley Villa',
-          location: '49 KG 706 Street 1, Kigali',
-          price: '\$2,754/mo',
-          type: 'house',
-          imagePath: 'assets/images/Houses/Green Valley Villa/1.jpg',
-          description: """Green Valley Residence By Serenova Retreats in Kigali offers a spacious villa with four bedrooms and three bathrooms. The property includes a living room, dining area, and a fully equipped kitchen.
+    ),
+    const _Estate(
+      title: 'Green Valley Villa',
+      location: '49 KG 706 Street 1, Kigali',
+      price: '\$2,754/mo',
+      type: 'house',
+      imagePath: 'assets/images/Houses/Green Valley Villa/1.jpg',
+      description:
+          """Green Valley Residence By Serenova Retreats in Kigali offers a spacious villa with four bedrooms and three bathrooms. The property includes a living room, dining area, and a fully equipped kitchen.
 
 Guests enjoy free WiFi, a terrace, balcony, and a kitchenette. Additional amenities include a washing machine, dishwasher, microwave, and a work desk. Free on-site private parking is available.
 
 Located 9 km from Kigali International Airport, the villa is 1.9 km from the Kigali Genocide Memorial. Nearby attractions include Kigali Centenary Park (3.7 km) and Nyamata Genocide Museum (33 km).""",
-        ),
-        const _Estate(
-          title: 'JAMOS Guest House',
-          location: 'Kigali-Gatuna Road, Kigali',
-          price: '\$4,200/mo',
-          type: 'house',
-          imagePath: 'assets/images/Houses/JAMOS Guest House/1.jpg',
-          description: """JAMOS Gest House in Kigali offers a spacious, adults-only villa with eight bedrooms and eight bathrooms. The property features a living room, private check-in and check-out services, and a 24-hour front desk.
+    ),
+    const _Estate(
+      title: 'JAMOS Guest House',
+      location: 'Kigali-Gatuna Road, Kigali',
+      price: '\$4,200/mo',
+      type: 'house',
+      imagePath: 'assets/images/Houses/JAMOS Guest House/1.jpg',
+      description:
+          """JAMOS Gest House in Kigali offers a spacious, adults-only villa with eight bedrooms and eight bathrooms. The property features a living room, private check-in and check-out services, and a 24-hour front desk.
 
 Guests can enjoy a sun terrace, bar, and free Wi-Fi. Additional amenities include an outdoor fireplace, lounge, coffee shop, and outdoor seating area. Free on-site private parking is available.
 
 Located 15 km from Kigali International Airport, the villa is near attractions such as Niyo Arts Gallery (8 km) and Kigali Genocide Memorial (7 km). The surrounding area offers mountain and city views.""",
-        ),
-        const _Estate(
-          title: '5-Bedroom Villa',
-          location: '6 KG 323 Street, Kigali',
-          price: '\$7,650/mo',
-          type: 'house',
-          imagePath: 'assets/images/Houses/5-Bedroom Villa/1.jpg',
-          description: """5 - Bedroom Villa in Kigali offers a spacious layout with five bedrooms and five bathrooms. The property includes a living room and family rooms, ensuring comfort for all guests.
+    ),
+    const _Estate(
+      title: '5-Bedroom Villa',
+      location: '6 KG 323 Street, Kigali',
+      price: '\$7,650/mo',
+      type: 'house',
+      imagePath: 'assets/images/Houses/5-Bedroom Villa/1.jpg',
+      description:
+          """5 - Bedroom Villa in Kigali offers a spacious layout with five bedrooms and five bathrooms. The property includes a living room and family rooms, ensuring comfort for all guests.
 
 The villa provides free Wi-Fi, a fully equipped kitchen, a washing machine, and a dishwasher. Additional amenities include a dining area, TV, and outdoor furniture.
 
 Located 5 km from Kigali International Airport and Kigali Convention Centre, the property is also close to attractions such as Kigali Golf Club (3.3 km) and Kigali Genocide Memorial (8 km).""",
-        ),
-        const _Estate(
-          title: "Villa d'exception Rebero",
-          location: 'Rebero KK 857 St 13, Kigali',
-          price: '\$2,693/mo',
-          type: 'house',
-          imagePath: 'assets/images/Houses/Villa Rebero/1.jpg',
-          description: """Villa d'exception Rebero in Kigali offers a spacious layout with five bedrooms and four bathrooms. The property includes a living room and family rooms, ensuring comfort for all guests.
+    ),
+    const _Estate(
+      title: "Villa d'exception Rebero",
+      location: 'Rebero KK 857 St 13, Kigali',
+      price: '\$2,693/mo',
+      type: 'house',
+      imagePath: 'assets/images/Houses/Villa Rebero/1.jpg',
+      description:
+          """Villa d'exception Rebero in Kigali offers a spacious layout with five bedrooms and four bathrooms. The property includes a living room and family rooms, ensuring comfort for all guests.
 
 The villa features free Wi-Fi, a fully equipped kitchen, a washing machine, and a seating area. Additional amenities include a balcony, TV, and private entrance.
 
 Located 9 km from Kigali International Airport, the villa is close to attractions such as Kigali Centenary Park and Kigali Genocide Memorial, each 8 km away. Free on-site private parking is available.""",
-        ),
+    ),
 
-        // Short-Stay
-        const _Estate(
-          title: 'Cascadia Hotel',
-          location: '7 KG 203 St, Kigali',
-          price: '\$110/night',
-          type: 'short_stay',
-          imagePath: 'assets/images/Short-Stay/Cascadia Hotel/1.jpg',
-          description: """Cascadia Hotel Apartments by GF Greenland in Kigali offers family rooms with private bathrooms, air-conditioning, and modern amenities. Each room includes a balcony or terrace with pool or city views.
+    // Short-Stay
+    const _Estate(
+      title: 'Cascadia Hotel',
+      location: '7 KG 203 St, Kigali',
+      price: '\$110/night',
+      type: 'short_stay',
+      imagePath: 'assets/images/Short-Stay/Cascadia Hotel/1.jpg',
+      description:
+          """Cascadia Hotel Apartments by GF Greenland in Kigali offers family rooms with private bathrooms, air-conditioning, and modern amenities. Each room includes a balcony or terrace with pool or city views.
 
 Guests can enjoy a rooftop swimming pool, indoor pool, fitness centre, and a lush garden. Additional facilities include a restaurant, bar, outdoor fireplace, and a business area.
 
 Located 1.8 km from Kigali Convention Centre and 3 km from Kigali International Airport, the hotel is near attractions such as Kigali Centenary Park and Nyamata Genocide Museum.""",
-        ),
-        const _Estate(
-          title: 'Mythos Boutique Hotel',
-          location: 'KN 50 Street Kiyovu, Kigali',
-          price: '\$112/night',
-          type: 'short_stay',
-          imagePath: 'assets/images/Short-Stay/Mythos Boutique Hotel/1.jpg',
-          description: """Mythos Boutique Hotel in Kigali offers family rooms with garden, pool, or mountain views. Each room includes air-conditioning, a private bathroom, and modern amenities.
+    ),
+    const _Estate(
+      title: 'Mythos Boutique Hotel',
+      location: 'KN 50 Street Kiyovu, Kigali',
+      price: '\$112/night',
+      type: 'short_stay',
+      imagePath: 'assets/images/Short-Stay/Mythos Boutique Hotel/1.jpg',
+      description:
+          """Mythos Boutique Hotel in Kigali offers family rooms with garden, pool, or mountain views. Each room includes air-conditioning, a private bathroom, and modern amenities.
 
 Guests enjoy a swimming pool with a view, fitness centre, sun terrace, and lush garden. The hotel features a restaurant, bar, and free Wi-Fi, ensuring a pleasant stay.
 
 Located 9 km from Kigali International Airport, the hotel is near attractions such as Kigali Centenary Park (3.2 km) and Kigali Genocide Memorial (6 km). Free on-site private parking is available.""",
-        ),
-        const _Estate(
-          title: 'Peponi Living Hotel',
-          location: 'KG 729 Street Kagugu, Kigali',
-          price: '\$50/night',
-          type: 'short_stay',
-          imagePath: 'assets/images/Short-Stay/Peponi Living Hotel/1.jpg',
-          description: """Peponi offers accommodation in Kigali. Guests can enjoy the on-site restaurant. Certain rooms feature a seating area to relax in after a busy day. The property offers a flat screen TV in all living rooms.
+    ),
+    const _Estate(
+      title: 'Peponi Living Hotel',
+      location: 'KG 729 Street Kagugu, Kigali',
+      price: '\$50/night',
+      type: 'short_stay',
+      imagePath: 'assets/images/Short-Stay/Peponi Living Hotel/1.jpg',
+      description:
+          """Peponi offers accommodation in Kigali. Guests can enjoy the on-site restaurant. Certain rooms feature a seating area to relax in after a busy day. The property offers a flat screen TV in all living rooms.
 
 Kigali International Community School is 1.9 km from Peponi, while Big Local food Market is 2.4 km away. The nearest airport is Kigali International Airport, 8 km from Peponi.""",
-        ),
-        const _Estate(
-          title: 'REBERO Resort',
-          location: 'KK 30 Avenue, Kigali',
-          price: '\$80/night',
-          type: 'short_stay',
-          imagePath: 'assets/images/Short-Stay/REBERO Resort/1.jpg',
-          description: """REBERO RESORT Ltd in Kigali offers an adults-only hotel with a rooftop swimming pool, sun terrace, and lush garden. Guests enjoy free Wi-Fi, a fitness centre, and complimentary bicycles.
+    ),
+    const _Estate(
+      title: 'REBERO Resort',
+      location: 'KK 30 Avenue, Kigali',
+      price: '\$80/night',
+      type: 'short_stay',
+      imagePath: 'assets/images/Short-Stay/REBERO Resort/1.jpg',
+      description:
+          """REBERO RESORT Ltd in Kigali offers an adults-only hotel with a rooftop swimming pool, sun terrace, and lush garden. Guests enjoy free Wi-Fi, a fitness centre, and complimentary bicycles.
 
 The property features a restaurant, bar, and coffee shop. Additional facilities include a hot tub, outdoor play area, and themed dinner nights. Free airport shuttle service is available 9 km from Kigali International Airport.
 
 Located on a quiet street, the hotel offers mountain and city views. Nearby attractions include the Belgian Peacekeepers Memorial (8 km) and Kigali Convention Centre (9 km). Guests appreciate the attentive staff and scenic surroundings.""",
-        ),
-        const _Estate(
-          title: 'Centric Hotel',
-          location: 'KG 213 Street, Kigali',
-          price: '\$100/night',
-          type: 'short_stay',
-          imagePath: 'assets/images/Short-Stay/Centric Hotel/1.jpg',
-          description: """Centric Hotel in Kigali offers family rooms with private bathrooms, air-conditioning, and free Wi-Fi. Each room includes a work desk, TV, and modern amenities.
+    ),
+    const _Estate(
+      title: 'Centric Hotel',
+      location: 'KG 213 Street, Kigali',
+      price: '\$100/night',
+      type: 'short_stay',
+      imagePath: 'assets/images/Short-Stay/Centric Hotel/1.jpg',
+      description:
+          """Centric Hotel in Kigali offers family rooms with private bathrooms, air-conditioning, and free Wi-Fi. Each room includes a work desk, TV, and modern amenities.
 
 Guests can enjoy a terrace, restaurant, and bar. The family-friendly restaurant serves African, American, Italian, and Thai cuisines. Additional facilities include a lounge, outdoor seating area, and live music.
 
 Located 3 km from Kigali International Airport, the hotel is near attractions such as Kigali Convention Centre (3.6 km) and Kigali Genocide Memorial (10 km). Free on-site parking is available.""",
-        ),
-        const _Estate(
-          title: 'M Hotel',
-          location: 'KN 1 Avenue Kiyovu, Kigali',
-          price: '\$200/night',
-          type: 'short_stay',
-          imagePath: 'assets/images/Short-Stay/M Hotel/1.jpg',
-          description: """M Hotel Kigali in Kigali offers comfortable rooms with air-conditioning, private bathrooms, and modern amenities. Each room features a balcony with garden or mountain views, ensuring a pleasant stay.
+    ),
+    const _Estate(
+      title: 'M Hotel',
+      location: 'KN 1 Avenue Kiyovu, Kigali',
+      price: '\$200/night',
+      type: 'short_stay',
+      imagePath: 'assets/images/Short-Stay/M Hotel/1.jpg',
+      description:
+          """M Hotel Kigali in Kigali offers comfortable rooms with air-conditioning, private bathrooms, and modern amenities. Each room features a balcony with garden or mountain views, ensuring a pleasant stay.
 
 The family-friendly restaurant serves African, Chinese, Indian, and local cuisines in a traditional and modern setting. Breakfast includes continental and buffet options with local specialities, fresh pastries, and more.
 
 Located 9 km from Kigali International Airport, the hotel is a 15-minute walk from Kigali City Tower. Nearby attractions include the Belgian Peacekeepers Memorial and Kigali Genocide Memorial, each within 3 km.""",
-        ),
-      ];
+    ),
+  ];
 
   // Listings kept aside for future testing (currently not shown in UI):
   // const _Estate(
@@ -1084,9 +1355,10 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
     TextTheme textTheme,
     _Estate estate,
   ) {
-    final typeLabel = estate.type == 'short_stay'
-        ? 'Short-Stay'
-        : estate.type == 'apartment'
+    final typeLabel =
+        estate.type == 'short_stay'
+            ? 'Short-Stay'
+            : estate.type == 'apartment'
             ? 'Apartment'
             : 'House';
 
@@ -1094,17 +1366,18 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => ListingDetailScreen(
-              title: estate.title,
-              location: estate.location,
-              price: estate.price,
-              typeLabel: typeLabel,
-              imagePaths: [estate.imagePath],
-              description: estate.description,
-              // Placeholder UPI for Expat workflow; real UPI
-              // will only be shown to landlords/agents later.
-              upi: 'RHA Land UPI (placeholder)',
-            ),
+            builder:
+                (_) => ListingDetailScreen(
+                  title: estate.title,
+                  location: estate.location,
+                  price: estate.price,
+                  typeLabel: typeLabel,
+                  imagePaths: [estate.imagePath],
+                  description: estate.description,
+                  // Placeholder UPI for Expat workflow; real UPI
+                  // will only be shown to landlords/agents later.
+                  upi: 'RHA Land UPI (placeholder)',
+                ),
           ),
         );
       },
@@ -1120,11 +1393,12 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
                 height: 180,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 180,
-                  color: Colors.grey.shade300,
-                  child: const Center(child: Icon(Icons.home, size: 48)),
-                ),
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      height: 180,
+                      color: Colors.grey.shade300,
+                      child: const Center(child: Icon(Icons.home, size: 48)),
+                    ),
               ),
             ),
             const SizedBox(height: 12),
@@ -1228,224 +1502,123 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
     );
   }
 
-  Widget _buildPostBlock(
-    TextTheme textTheme, {
-    required String avatarPath,
-    required String name,
-    required String role,
-    required String timeAgo,
-    required String content,
-    String? imagePath,
-    List<_InlineComment> comments = const [],
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+  void _showCreatePostDialog() {
+    final controller = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundImage: AssetImage(avatarPath),
-                backgroundColor: Colors.grey.shade200,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: textTheme.titleMedium?.copyWith(
-                        color: _ExpatHomeColors.bodyText,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      role,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: _ExpatHomeColors.roleBlue,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+              Text(
+                'Share your experience',
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: _ExpatHomeColors.bodyText,
                 ),
               ),
-              Text(
-                timeAgo,
-                style: textTheme.bodySmall?.copyWith(
-                  color: _ExpatHomeColors.helper,
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 5,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'What would you like to share?',
+                  hintStyle: TextStyle(color: _ExpatHomeColors.helper),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 48,
+                child: FilledButton(
+                  onPressed: () async {
+                    final text = controller.text.trim();
+                    if (text.isEmpty || _uid == null) return;
+                    await CommunityService().createPost(
+                      authorId: _uid!,
+                      authorName: _userName,
+                      authorRole: _userRole,
+                      content: text,
+                    );
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _ExpatHomeColors.accentGreen,
+                    foregroundColor: _ExpatHomeColors.primaryDark,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'Post',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            content,
-            style: textTheme.bodyMedium?.copyWith(
-              color: _ExpatHomeColors.bodyText,
-            ),
-          ),
-          if (imagePath != null) ...[
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                imagePath,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) =>
-                        Container(height: 180, color: Colors.grey.shade300),
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                Icons.favorite_border,
-                size: 18,
-                color: _ExpatHomeColors.bodyText,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'Like',
-                style: textTheme.bodySmall?.copyWith(
-                  color: _ExpatHomeColors.bodyText,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Icon(
-                Icons.chat_bubble_outline,
-                size: 18,
-                color: _ExpatHomeColors.bodyText,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'Comment',
-                style: textTheme.bodySmall?.copyWith(
-                  color: _ExpatHomeColors.bodyText,
-                ),
-              ),
-            ],
-          ),
-          if (comments.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _buildInlineComment(textTheme, comments.first),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInlineComment(TextTheme textTheme, _InlineComment comment) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _ExpatHomeColors.commentBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundImage: AssetImage(comment.avatarPath),
-            backgroundColor: Colors.grey.shade200,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        comment.name,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: _ExpatHomeColors.bodyText,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      comment.timeAgo,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF1A2E35),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  comment.role,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: _ExpatHomeColors.roleBlue,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  comment.text,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: _ExpatHomeColors.bodyText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildShareExperienceButton(TextTheme textTheme) {
     final width = MediaQuery.of(context).size.width;
-    return Transform.translate(
-      // Raise the pill further so it sits above the nav icons.
-      offset: const Offset(0, -48),
-      child: SizedBox(
-        height: 56,
-        width: width * 0.55,
-        child: ElevatedButton(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _ExpatHomeColors.accentGreen,
-            foregroundColor: _ExpatHomeColors.primaryDark,
-            elevation: 6,
-            side: const BorderSide(
-              color: _ExpatHomeColors.primaryDark,
-              width: 2,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(32),
-            ),
+    return SizedBox(
+      height: 56,
+      width: width * 0.55,
+      child: ElevatedButton(
+        onPressed: _showCreatePostDialog,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _ExpatHomeColors.accentGreen,
+          foregroundColor: _ExpatHomeColors.primaryDark,
+          elevation: 6,
+          side: const BorderSide(
+            color: _ExpatHomeColors.primaryDark,
+            width: 2,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  'Share your experience',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: _ExpatHomeColors.primaryDark,
-                    fontWeight: FontWeight.bold,
-                  ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(32),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                'Share your experience',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleMedium?.copyWith(
+                  color: _ExpatHomeColors.primaryDark,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.add,
-                size: 26,
-                color: _ExpatHomeColors.primaryDark,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.add,
+              size: 26,
+              color: _ExpatHomeColors.primaryDark,
+            ),
+          ],
         ),
       ),
     );
@@ -1470,41 +1643,41 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
           child: SizedBox(
             height: 64,
             child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildBottomItem(
-                textTheme,
-                index: 0,
-                imagePath: 'assets/images/Community Icon.png',
-                label: 'Community',
-              ),
-              _buildBottomItem(
-                textTheme,
-                index: 1,
-                imagePath: 'assets/images/Rides Icon.png',
-                label: 'Rides',
-              ),
-              _buildBottomItem(
-                textTheme,
-                index: 2,
-                imagePath: 'assets/images/Estates Icon.png',
-                label: 'Estates',
-              ),
-              _buildBottomItem(
-                textTheme,
-                index: 3,
-                imagePath: 'assets/images/Messages icon.png',
-                label: 'Messages',
-              ),
-              _buildBottomItem(
-                textTheme,
-                index: 4,
-                imagePath: 'assets/images/Explore Icon.png',
-                label: 'Explore',
-              ),
-            ],
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildBottomItem(
+                  textTheme,
+                  index: 0,
+                  imagePath: 'assets/images/Community Icon.png',
+                  label: 'Community',
+                ),
+                _buildBottomItem(
+                  textTheme,
+                  index: 1,
+                  imagePath: 'assets/images/Rides Icon.png',
+                  label: 'Rides',
+                ),
+                _buildBottomItem(
+                  textTheme,
+                  index: 2,
+                  imagePath: 'assets/images/Estates Icon.png',
+                  label: 'Estates',
+                ),
+                _buildBottomItem(
+                  textTheme,
+                  index: 3,
+                  imagePath: 'assets/images/Messages icon.png',
+                  label: 'Messages',
+                ),
+                _buildBottomItem(
+                  textTheme,
+                  index: 4,
+                  imagePath: 'assets/images/Explore Icon.png',
+                  label: 'Explore',
+                ),
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );
@@ -1530,7 +1703,8 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
             height: 22,
             color: color,
             colorBlendMode: BlendMode.srcIn,
-            errorBuilder: (_, __, ___) => Icon(Icons.circle, size: 22, color: color),
+            errorBuilder:
+                (_, __, ___) => Icon(Icons.circle, size: 22, color: color),
           ),
           const SizedBox(height: 4),
           Text(
@@ -1544,34 +1718,6 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
       ),
     );
   }
-}
-
-class _InlineComment {
-  const _InlineComment({
-    required this.avatarPath,
-    required this.name,
-    required this.role,
-    required this.timeAgo,
-    required this.text,
-  });
-
-  final String avatarPath;
-  final String name;
-  final String role;
-  final String timeAgo;
-  final String text;
-}
-
-class _Bowl {
-  const _Bowl({
-    required this.title,
-    required this.description,
-    required this.imagePath,
-  });
-
-  final String title;
-  final String description;
-  final String imagePath;
 }
 
 class _EstateFilterOption {
@@ -1595,6 +1741,6 @@ class _Estate {
   final String price;
   final String type; // 'apartment' | 'house' | 'short_stay'
   final String imagePath;
-   // Long-form listing description shown on the detail page.
+  // Long-form listing description shown on the detail page.
   final String description;
 }
