@@ -80,7 +80,7 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
           ),
         ],
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
+      floatingActionButtonLocation: const _LandlordMakeListingFabLocation(),
       floatingActionButton: _selectedBottomIndex == 1
           ? _buildMakeListingButton(context, textTheme)
           : null,
@@ -371,6 +371,24 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   }
 }
 
+/// [endDocked] overlaps the bottom bar by design; this uses [endFloat] plus extra
+/// lift so the wide "Make a Listing" control clears the landlord nav + home indicator.
+class _LandlordMakeListingFabLocation extends FloatingActionButtonLocation {
+  const _LandlordMakeListingFabLocation();
+
+  static const double _extraLift = 16;
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
+    final base =
+        FloatingActionButtonLocation.endFloat.getOffset(scaffoldGeometry);
+    return Offset(base.dx, base.dy - _extraLift);
+  }
+
+  @override
+  String toString() => 'LandlordMakeListingFabLocation';
+}
+
 Widget _buildMakeListingButton(BuildContext context, TextTheme textTheme) {
   const bodyText = _LandlordHomeColors.bodyText;
   const accentGreen = _LandlordHomeColors.accentGreen;
@@ -382,7 +400,7 @@ Widget _buildMakeListingButton(BuildContext context, TextTheme textTheme) {
     builder: (ctx) {
       return SizedBox(
       height: 56,
-      width: width * 0.45,
+      width: (width * 0.52).clamp(200.0, width - 24),
       child: ElevatedButton(
         onPressed: () {
             Navigator.of(ctx).push(
@@ -408,20 +426,23 @@ Widget _buildMakeListingButton(BuildContext context, TextTheme textTheme) {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Flexible(
-              child: Text(
-                'Make a Listing',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.titleMedium?.copyWith(
-                  color: bodyText,
-                  fontWeight: FontWeight.bold,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  'Make a Listing',
+                  maxLines: 1,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: bodyText,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             const Icon(
               Icons.add,
-              size: 26,
+              size: 24,
               color: bodyText,
             ),
           ],

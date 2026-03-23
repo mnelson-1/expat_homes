@@ -33,9 +33,29 @@ class AuthService {
   Future<UserProfile?> getCurrentUserProfile() async {
     final user = _auth.currentUser;
     if (user == null) return null;
-    final doc = await _firestore.collection(kUsersCollection).doc(user.uid).get();
+    final doc =
+        await _firestore.collection(kUsersCollection).doc(user.uid).get();
     if (!doc.exists || doc.data() == null) return null;
     return UserProfile.fromFirestore(doc);
+  }
+
+  /// One-time read of any user's profile by Firebase UID.
+  Future<UserProfile?> getUserProfile(String uid) async {
+    final doc = await _firestore.collection(kUsersCollection).doc(uid).get();
+    if (!doc.exists || doc.data() == null) return null;
+    return UserProfile.fromFirestore(doc);
+  }
+
+  /// Real-time stream of a user's profile (e.g. message thread avatars).
+  Stream<UserProfile?> userProfileStream(String uid) {
+    return _firestore
+        .collection(kUsersCollection)
+        .doc(uid)
+        .snapshots()
+        .map((snap) {
+      if (!snap.exists || snap.data() == null) return null;
+      return UserProfile.fromFirestore(snap);
+    });
   }
 
   /// Stream the current user's profile (updates when doc changes).
@@ -47,9 +67,9 @@ class AuthService {
           .doc(user.uid)
           .snapshots()
           .map((snap) {
-        if (!snap.exists || snap.data() == null) return null;
-        return UserProfile.fromFirestore(snap);
-      });
+            if (!snap.exists || snap.data() == null) return null;
+            return UserProfile.fromFirestore(snap);
+          });
     });
   }
 
@@ -75,21 +95,22 @@ class AuthService {
       );
     }
 
-    final createData = UserProfile(
-      id: user.uid,
-      email: user.email ?? email,
-      role: role,
-      preferredLanguage: profile.preferredLanguage,
-      emailVerifiedAt: user.emailVerified ? DateTime.now() : null,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      legalFirstName: profile.legalFirstName,
-      legalLastName: profile.legalLastName,
-      dateOfBirth: profile.dateOfBirth,
-      countryOfCitizenship: profile.countryOfCitizenship,
-      demographic: profile.demographic,
-      agentId: profile.agentId,
-    ).toFirestoreCreate();
+    final createData =
+        UserProfile(
+          id: user.uid,
+          email: user.email ?? email,
+          role: role,
+          preferredLanguage: profile.preferredLanguage,
+          emailVerifiedAt: user.emailVerified ? DateTime.now() : null,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          legalFirstName: profile.legalFirstName,
+          legalLastName: profile.legalLastName,
+          dateOfBirth: profile.dateOfBirth,
+          countryOfCitizenship: profile.countryOfCitizenship,
+          demographic: profile.demographic,
+          agentId: profile.agentId,
+        ).toFirestoreCreate();
 
     await _firestore.collection(kUsersCollection).doc(user.uid).set(createData);
 

@@ -37,6 +37,7 @@ class ListingDetailScreen extends StatelessWidget {
 
   final String title;
   final String location;
+
   /// Raw value from Firestore (often digits only); formatted with [listingType].
   final String price;
   final ListingType listingType;
@@ -590,8 +591,10 @@ class ListingDetailScreen extends StatelessWidget {
                             listingTitle: title,
                             listingImage:
                                 imagePaths.isNotEmpty ? imagePaths.first : '',
-                            listingPrice:
-                                formatListingPricePlain(listingType, price),
+                            listingPrice: formatListingPricePlain(
+                              listingType,
+                              price,
+                            ),
                             listingLocation: location,
                           );
 
@@ -603,13 +606,16 @@ class ListingDetailScreen extends StatelessWidget {
                                 conversationId: convo.id,
                                 listingTitle: title,
                                 location: location,
-                                price:
-                                    formatListingPricePlain(listingType, price),
+                                price: formatListingPricePlain(
+                                  listingType,
+                                  price,
+                                ),
                                 imagePath:
                                     imagePaths.isNotEmpty
                                         ? imagePaths.first
                                         : '',
                                 contactName: landlordName,
+                                contactUid: landlordId,
                                 returnToAgentMessagesOnBack: true,
                                 listingDetailRole: kRoleAgent,
                               ),
@@ -735,8 +741,10 @@ class ListingDetailScreen extends StatelessWidget {
                           listingTitle: title,
                           listingImage:
                               imagePaths.isNotEmpty ? imagePaths.first : '',
-                          listingPrice:
-                              formatListingPricePlain(listingType, price),
+                          listingPrice: formatListingPricePlain(
+                            listingType,
+                            price,
+                          ),
                           listingLocation: location,
                         );
 
@@ -757,11 +765,14 @@ class ListingDetailScreen extends StatelessWidget {
                               conversationId: convo.id,
                               listingTitle: title,
                               location: location,
-                              price:
-                                  formatListingPricePlain(listingType, price),
+                              price: formatListingPricePlain(
+                                listingType,
+                                price,
+                              ),
                               imagePath:
                                   imagePaths.isNotEmpty ? imagePaths.first : '',
                               contactName: contactName,
+                              contactUid: landlordId,
                               listingDetailRole: kRoleExpat,
                             ),
                       ),

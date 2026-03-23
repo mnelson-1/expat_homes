@@ -6,6 +6,7 @@ import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/conversations_service.dart';
 import 'package:expat_app/utils/listing_price_display.dart';
 import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/widgets/user_profile_avatar.dart';
 import 'agent_home_screen.dart';
 import 'landlord_home_screen.dart';
 import 'listing_detail_screen.dart';
@@ -145,6 +146,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   ) {
     final myUid = _uid!;
     final contactName = convo.contactName(myUid);
+    final contactUid = convo.otherUid(myUid);
     final lastMessage = convo.lastMessage ?? '';
     final lastTime = convo.lastMessageAt ?? convo.createdAt;
 
@@ -163,6 +165,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   price: formatConversationListingPrice(convo.listingPrice),
                   imagePath: convo.listingImage,
                   contactName: contactName,
+                  contactUid: contactUid,
                   listingDetailRole: widget.currentUserRole,
                 ),
           ),
@@ -172,11 +175,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.grey.shade300,
-              child: const Icon(Icons.person, color: Colors.white),
-            ),
+            contactUid != null
+                ? UserProfileAvatar(uid: contactUid, radius: 20)
+                : CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.grey.shade300,
+                    child: const Icon(Icons.person, color: Colors.white),
+                  ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -256,6 +261,7 @@ class ConversationScreen extends StatefulWidget {
     required this.price,
     required this.imagePath,
     this.contactName = 'Contact',
+    this.contactUid,
     this.returnToLandlordOnBack = false,
     this.returnToAgentMessagesOnBack = false,
     String? listingDetailRole,
@@ -267,6 +273,8 @@ class ConversationScreen extends StatefulWidget {
   final String price;
   final String imagePath;
   final String contactName;
+  /// Firebase UID of the other participant (for profile photo).
+  final String? contactUid;
   final bool returnToLandlordOnBack;
   final bool returnToAgentMessagesOnBack;
   final String listingDetailRole;
@@ -407,11 +415,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Widget _buildHeaderContactRow(BuildContext context, TextTheme textTheme) {
     final row = Row(
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: Colors.grey.shade300,
-          child: const Icon(Icons.person, color: Colors.white),
-        ),
+        widget.contactUid != null
+            ? UserProfileAvatar(uid: widget.contactUid!, radius: 18)
+            : CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.grey.shade300,
+                child: const Icon(Icons.person, color: Colors.white),
+              ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(

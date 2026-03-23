@@ -13,11 +13,13 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
     }
 
-    // Users: only the signed-in user can read/write their own profile.
-    // Note: we deliberately DO NOT call isSuperAdmin() here to avoid
-    // circular reads on the same document during rule evaluation.
+    // Users: any signed-in user can read profiles (needed for message thread
+    // avatars, etc.). Writes are limited to the document owner.
+    // Note: we deliberately DO NOT call isSuperAdmin() on this match to avoid
+    // circular reads during rule evaluation.
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
     // Listings: any signed-in user can read (agents need access to assigned listings,

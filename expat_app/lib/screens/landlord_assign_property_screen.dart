@@ -393,6 +393,7 @@ class _LandlordAssignPropertyScreenState
                             price: priceWithSuffix,
                             imagePath: imagePath,
                             contactName: widget.agentName,
+                            contactUid: agentUidValue,
                             returnToLandlordOnBack: true,
                             listingDetailRole: kRoleLandlord,
                           ),

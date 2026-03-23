@@ -107,33 +107,16 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
           child:
               estates.isEmpty
                   ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'No listings yet.',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: _LandlordEstatesColors.hint,
-                          ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        'No listings yet.\nUse Make a Listing below to add your first property.',
+                        textAlign: TextAlign.center,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: _LandlordEstatesColors.hint,
+                          height: 1.4,
                         ),
-                        const SizedBox(height: 16),
-                        FilledButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder:
-                                    (_) => const LandlordMakeListingScreen(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Create a listing'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF8ED966),
-                            foregroundColor: const Color(0xFF1A2E35),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   )
                   : ListView.builder(
