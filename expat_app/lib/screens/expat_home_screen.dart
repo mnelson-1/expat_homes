@@ -155,13 +155,8 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                               if (_selectedTabIndex == 0)
                                 Positioned(
                                   bottom: 16,
-                                  left: 0,
-                                  right: 0,
-                                  child: Center(
-                                    child: _buildShareExperienceButton(
-                                      textTheme,
-                                    ),
-                                  ),
+                                  right: 16,
+                                  child: _buildShareExperienceButton(textTheme),
                                 ),
                             ],
                           ),
@@ -903,7 +898,11 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    _buildListingPriceRichText(textTheme, estate.type, estate.price),
+                    _buildListingPriceRichText(
+                      textTheme,
+                      estate.type,
+                      estate.price,
+                    ),
                   ],
                 ),
               ],
@@ -1582,7 +1581,7 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
     final width = MediaQuery.of(context).size.width;
     return SizedBox(
       height: 56,
-      width: width * 0.55,
+      width: (width * 0.58).clamp(200.0, width - 32),
       child: ElevatedButton(
         onPressed: _showCreatePostDialog,
         style: ElevatedButton.styleFrom(
@@ -1599,20 +1598,23 @@ Located 9 km from Kigali International Airport, the hotel is a 15-minute walk fr
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Flexible(
-              child: Text(
-                'Share your experience',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.titleMedium?.copyWith(
-                  color: _ExpatHomeColors.primaryDark,
-                  fontWeight: FontWeight.bold,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  'Share your experience',
+                  maxLines: 1,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: _ExpatHomeColors.primaryDark,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             const Icon(
               Icons.add,
-              size: 26,
+              size: 24,
               color: _ExpatHomeColors.primaryDark,
             ),
           ],
