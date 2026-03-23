@@ -42,11 +42,13 @@ dependencies:
   firebase_auth: ^5.3.4
   cloud_firestore: ^5.5.2
   firebase_storage: ^12.3.6
+  google_maps_flutter: ^2.10.0
+  http: ^1.2.2
+  geolocator: ^13.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_launcher_icons: ^0.14.4
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -54,6 +56,12 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/images/App_Icon.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -117,14 +125,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-
-# Generate Android/iOS launcher icons from assets/images/App_Icon.png
-# Run: dart run flutter_launcher_icons
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: assets/images/App_Icon.png
-  # Adaptive icon (Android 8+): matches app primary dark behind foreground
-  adaptive_icon_background: "#1A2E35"
-  adaptive_icon_foreground: assets/images/App_Icon.png
-  remove_alpha_ios: true

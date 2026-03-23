@@ -14,6 +14,7 @@ import 'messages_screen.dart' show MessagesScreen, kRoleExpat;
 import 'package:expat_app/widgets/bowl_cover_avatar.dart';
 import 'package:expat_app/widgets/community_post_composer_sheet.dart';
 import 'package:expat_app/widgets/post_media_gallery.dart';
+import 'expat_map_explore_screen.dart';
 import 'expat_post_thread_screen.dart';
 import 'expat_bowl_thread_screen.dart';
 
@@ -163,10 +164,20 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                         ),
                       ],
                     )
+                    : _selectedBottomIndex == 1
+                    ? const ExpatMapExploreScreen(
+                        key: ValueKey<String>('expat_map_rides'),
+                        mode: ExpatMapTabMode.rides,
+                      )
                     : _selectedBottomIndex == 2
                     ? _buildEstatesContentWithStream(textTheme)
                     : _selectedBottomIndex == 3
                     ? MessagesScreen(currentUserRole: kRoleExpat)
+                    : _selectedBottomIndex == 4
+                    ? const ExpatMapExploreScreen(
+                        key: ValueKey<String>('expat_map_explore'),
+                        mode: ExpatMapTabMode.explore,
+                      )
                     : Center(
                       child: Text(
                         'Content for other tabs will live here.',
@@ -183,13 +194,14 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   }
 
   Widget _buildHeader(TextTheme textTheme) {
+    final mapMode =
+        _selectedBottomIndex == 1 || _selectedBottomIndex == 4;
     return Container(
       color: _ExpatHomeColors.primaryDark,
       padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
       child: SafeArea(
         bottom: false,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               'expat',
@@ -199,11 +211,20 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                 fontSize: 22,
               ),
             ),
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 140, maxWidth: 220),
-              child: _buildSearchBar(textTheme),
-            ),
+            SizedBox(width: mapMode ? 12 : 8),
+            if (mapMode)
+              Expanded(child: _buildSearchBar(textTheme))
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 140,
+                  maxWidth: 220,
+                ),
+                child: _buildSearchBar(textTheme),
+              ),
+            const SizedBox(width: 8),
             const Icon(Icons.notifications_none, color: Colors.white),
+            const SizedBox(width: 4),
             _buildProfileMenu(textTheme),
           ],
         ),

@@ -261,28 +261,3 @@ After auth and listings are working:
 5. **Payments** — commission_slips.
 
 See `docs/BACKEND_CHECKLIST.md` and `docs/BACKEND_IMPLEMENTATION_PLAN.md` for the full plan.
-
-## 12. Android APK and app icon
-
-The launcher icon source file is **`expat_app/assets/images/App_Icon.png`**. Icons for Android (including adaptive icons) and iOS are generated with **`flutter_launcher_icons`** (configured in `expat_app/pubspec.yaml`).
-
-**After you change `App_Icon.png`**, regenerate platform icons:
-
-```bash
-cd expat_app
-dart run flutter_launcher_icons
-```
-
-**Build a release APK** (from `expat_app`):
-
-```bash
-flutter build apk --release
-```
-
-The output APK is:
-
-`expat_app/build/app/outputs/flutter-apk/app-release.apk`
-
-For a smaller split APK per ABI: `flutter build apk --split-per-abi`.
-
-For Google Play, configure app signing in the Play Console or set up a **release keystore** in `android/app/build.gradle.kts` / `key.properties` (the default debug keystore is not for store uploads).
