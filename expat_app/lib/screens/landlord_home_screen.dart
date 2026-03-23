@@ -471,6 +471,7 @@ Widget _buildAgentCard(
             phone: agent.phone ?? '',
             rating: agent.rating,
             ratingCount: agent.ratingCount,
+            profileImageUrl: agent.profileImageUrl,
             showAssignProperty: true,
           ),
         ),
@@ -710,9 +711,9 @@ class _LandlordProfilePopupState extends State<_LandlordProfilePopup> {
                   style: textTheme.bodyMedium?.copyWith(color: Colors.white)),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
-              onTap: () {
-                Navigator.of(context).pop();
-                AuthService().signOut();
+              onTap: () async {
+                Navigator.of(context, rootNavigator: true).pop();
+                await AuthService().signOut();
               },
             ),
           ],

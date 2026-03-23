@@ -140,7 +140,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           onViewProfile: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => const AgentProfileScreen(showAssignProperty: false),
+                builder: (_) => const AgentSignedInProfileScreen(),
               ),
             );
           },
@@ -401,9 +401,9 @@ class _AgentProfilePopupState extends State<_AgentProfilePopup> {
                   style: textTheme.bodyMedium?.copyWith(color: Colors.white)),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
-              onTap: () {
-                Navigator.of(context).pop();
-                AuthService().signOut();
+              onTap: () async {
+                Navigator.of(context, rootNavigator: true).pop();
+                await AuthService().signOut();
               },
             ),
           ],

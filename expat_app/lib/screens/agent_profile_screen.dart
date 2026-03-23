@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/services/agents_service.dart';
+import 'package:expat_app/services/auth_service.dart';
 import 'landlord_assign_property_screen.dart';
 
 /// Agent profile screen shown when the user taps the agent's profile
@@ -16,6 +18,7 @@ class AgentProfileScreen extends StatelessWidget {
     this.rating = 4.5,
     this.ratingCount = 10,
     this.bannerImagePath,
+    this.profileImageUrl,
     this.reviews = const [],
     this.showAssignProperty = false,
   });
@@ -29,6 +32,8 @@ class AgentProfileScreen extends StatelessWidget {
   final double rating;
   final int ratingCount;
   final String? bannerImagePath;
+  /// Firebase user profile photo (same as header popup / Bio-View).
+  final String? profileImageUrl;
   final List<AgentProfileReview> reviews;
   final bool showAssignProperty;
 
@@ -62,7 +67,14 @@ class AgentProfileScreen extends StatelessWidget {
             CircleAvatar(
               radius: 18,
               backgroundColor: Colors.grey.shade400,
-              child: const Icon(Icons.person, color: Colors.white),
+              backgroundImage:
+                  profileImageUrl != null && profileImageUrl!.isNotEmpty
+                      ? NetworkImage(profileImageUrl!)
+                      : null,
+              child:
+                  profileImageUrl == null || profileImageUrl!.isEmpty
+                      ? const Icon(Icons.person, color: Colors.white)
+                      : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -149,13 +161,33 @@ class AgentProfileScreen extends StatelessWidget {
   Widget _buildBanner(BuildContext context) {
     return AspectRatio(
       aspectRatio: 16 / 9,
-      child: bannerImagePath != null && bannerImagePath!.isNotEmpty
-          ? Image.asset(
-              bannerImagePath!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _bannerPlaceholder(),
-            )
-          : _bannerPlaceholder(),
+      child: () {
+        final url = profileImageUrl;
+        if (url != null && url.isNotEmpty) {
+          return Image.network(
+            url,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) {
+              if (bannerImagePath != null && bannerImagePath!.isNotEmpty) {
+                return Image.asset(
+                  bannerImagePath!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _bannerPlaceholder(),
+                );
+              }
+              return _bannerPlaceholder();
+            },
+          );
+        }
+        if (bannerImagePath != null && bannerImagePath!.isNotEmpty) {
+          return Image.asset(
+            bannerImagePath!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _bannerPlaceholder(),
+          );
+        }
+        return _bannerPlaceholder();
+      }(),
     );
   }
 
@@ -541,6 +573,115 @@ class AgentProfileScreen extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Loads the signed-in agent’s registry + user profile, then shows [AgentProfileScreen].
+/// Use this from the agent header popup “Profile” action (not the placeholder defaults).
+class AgentSignedInProfileScreen extends StatefulWidget {
+  const AgentSignedInProfileScreen({super.key});
+
+  @override
+  State<AgentSignedInProfileScreen> createState() =>
+      _AgentSignedInProfileScreenState();
+}
+
+class _AgentSignedInProfileScreenState extends State<AgentSignedInProfileScreen> {
+  bool _loading = true;
+  String? _error;
+  String _agentName = '';
+  String _agentFullName = '';
+  String _agentId = '';
+  String _locationTag = '';
+  String? _bio;
+  String _phone = '';
+  double _rating = 0;
+  int _ratingCount = 0;
+  String? _profileImageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final profile = await AuthService().getCurrentUserProfile();
+    if (!mounted) return;
+    if (profile == null || profile.agentId == null) {
+      setState(() {
+        _loading = false;
+        _error = 'No agent account linked.';
+      });
+      return;
+    }
+
+    final agent = await AgentsService().getAgent(profile.agentId!);
+    if (!mounted) return;
+    if (agent == null) {
+      setState(() {
+        _loading = false;
+        _error = 'Agent profile could not be loaded.';
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = false;
+      _agentName = agent.fullName;
+      _agentFullName = agent.fullName;
+      _agentId = agent.agentId;
+      _locationTag = agent.region.isNotEmpty ? agent.region : '—';
+      _bio = agent.bio;
+      _phone = agent.phone ?? '';
+      _rating = agent.rating;
+      _ratingCount = agent.ratingCount;
+      _profileImageUrl = profile.profileImageUrl;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1A2E35),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new,
+                color: Colors.white, size: 18),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: const Text('Profile', style: TextStyle(color: Colors.white)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              _error!,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return AgentProfileScreen(
+      agentName: _agentName,
+      agentFullName: _agentFullName,
+      agentId: _agentId,
+      locationTag: _locationTag,
+      bio: _bio,
+      phone: _phone,
+      rating: _rating,
+      ratingCount: _ratingCount,
+      profileImageUrl: _profileImageUrl,
+      showAssignProperty: false,
     );
   }
 }

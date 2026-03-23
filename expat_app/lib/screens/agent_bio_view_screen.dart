@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
+import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'agent_edit_field_screen.dart';
@@ -25,6 +27,7 @@ class _AgentBioViewScreenState extends State<AgentBioViewScreen> {
   double _rating = 0.0;
   int _ratingCount = 0;
   bool _loading = true;
+  bool _uploadingPhoto = false;
 
   @override
   void initState() {
@@ -67,40 +70,7 @@ class _AgentBioViewScreenState extends State<AgentBioViewScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: GestureDetector(
-              onTap: () => _onEditPictureTap(context),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 72,
-                    backgroundColor: _hint.withValues(alpha: 0.4),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/agent_profile_placeholder.jpg',
-                        fit: BoxFit.cover,
-                        width: 144,
-                        height: 144,
-                        errorBuilder: (_, __, ___) => Icon(
-                          Icons.person,
-                          size: 72,
-                          color: Colors.grey.shade200,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Edit Picture',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: _bodyText,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          Center(child: _buildProfilePhotoHeader(context, textTheme)),
           const SizedBox(height: 24),
           const Divider(height: 1, color: Color(0xFFE0E0E0)),
           const SizedBox(height: 16),
@@ -408,12 +378,117 @@ class _AgentBioViewScreenState extends State<AgentBioViewScreen> {
     );
   }
 
-  void _onEditPictureTap(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Edit picture from gallery will be enabled in the next phase.'),
+  Widget _buildProfilePhotoHeader(BuildContext context, TextTheme textTheme) {
+    final uid = AuthService().currentUser?.uid;
+    if (uid == null) {
+      return _staticPlaceholderAvatar(textTheme);
+    }
+
+    return StreamBuilder<UserProfile?>(
+      stream: AuthService().userProfileStream(uid),
+      builder: (context, snapshot) {
+        final url = snapshot.data?.profileImageUrl;
+        final hasUrl = url != null && url.isNotEmpty;
+
+        return GestureDetector(
+          onTap: _uploadingPhoto ? null : () => _onEditPictureTap(context),
+          child: Column(
+            children: [
+              Stack(
+                alignment: Alignment.bottomRight,
+                clipBehavior: Clip.none,
+                children: [
+                  if (_uploadingPhoto)
+                    const SizedBox(
+                      width: 144,
+                      height: 144,
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 3),
+                      ),
+                    )
+                  else if (hasUrl)
+                    ClipOval(
+                      child: Image.network(
+                        url,
+                        width: 144,
+                        height: 144,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _staticPlaceholderAvatar(textTheme),
+                      ),
+                    )
+                  else
+                    _staticPlaceholderAvatar(textTheme),
+                  if (!_uploadingPhoto)
+                    Positioned(
+                      bottom: 4,
+                      right: 4,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: _primaryDark,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          size: 18,
+                          color: Color(0xFF8ED966),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Edit Picture',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: _bodyText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _staticPlaceholderAvatar(TextTheme textTheme) {
+    return CircleAvatar(
+      radius: 72,
+      backgroundColor: _hint.withValues(alpha: 0.4),
+      child: Text(
+        _agentName.isNotEmpty ? _agentName[0].toUpperCase() : '?',
+        style: TextStyle(
+          fontSize: 48,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey.shade700,
+        ),
       ),
     );
+  }
+
+  Future<void> _onEditPictureTap(BuildContext context) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    setState(() => _uploadingPhoto = true);
+    try {
+      await AuthService().uploadProfileImage(picked);
+      if (mounted) setState(() => _uploadingPhoto = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadingPhoto = false);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to upload: $e')),
+      );
+    }
   }
 
   Future<void> _onEditNameTap(BuildContext context) async {

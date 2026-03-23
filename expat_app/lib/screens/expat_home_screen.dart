@@ -1875,9 +1875,9 @@ class _ProfilePopupDialogState extends State<_ProfilePopupDialog> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
-              onTap: () {
-                Navigator.of(context).pop();
-                AuthService().signOut();
+              onTap: () async {
+                Navigator.of(context, rootNavigator: true).pop();
+                await AuthService().signOut();
               },
             ),
           ],

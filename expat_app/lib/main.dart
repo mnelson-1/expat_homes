@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -62,22 +63,37 @@ class _AppEntryState extends State<_AppEntry> {
     if (!_EntryState.splashCompleted) {
       return SplashScreen(onComplete: _onSplashComplete);
     }
-    // After splash: show Get Started or role-specific home based on auth
-    return StreamBuilder<UserProfile?>(
-      stream: AuthService().currentUserProfileStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+    // Auth stream drives sign-out: Firestore profile listeners can error when the
+    // token is revoked, which previously left StreamBuilder stuck on the last profile.
+    return StreamBuilder<User?>(
+      stream: AuthService().authStateChanges,
+      builder: (context, authSnap) {
+        if (authSnap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        final profile = snapshot.data;
-        if (profile != null) {
-          // Seed licensed agents once a user is authenticated (no-op if already seeded).
-          AgentsService().seedLicensedAgents();
-          return _buildHomeForRole(profile.role);
+        final user = authSnap.data;
+        if (user == null) {
+          return const GetStartedScreen();
         }
-        return const GetStartedScreen();
+
+        return StreamBuilder<UserProfile?>(
+          stream: AuthService().userProfileStream(user.uid),
+          builder: (context, profileSnap) {
+            if (profileSnap.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final profile = profileSnap.data;
+            if (profileSnap.hasError || profile == null) {
+              return const GetStartedScreen();
+            }
+            AgentsService().seedLicensedAgents();
+            return _buildHomeForRole(profile.role);
+          },
+        );
       },
     );
   }
