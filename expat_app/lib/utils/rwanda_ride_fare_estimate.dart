@@ -1,8 +1,8 @@
 // Rough ride fare estimate in Rwandan Francs (RWF), for UI only.
-// Uses a Move-style per-kilometre rate (~610 RWF/km) as a simple proxy for
-// cab/car-hailing in Kigali. Not an official Move quote.
+// Distance × [kRwandaRideEstimateRwfPerKm] — tune the constant to match market rates.
+// Not an official quote from any operator.
 
-/// Move-style rate for distance-based UI estimates (RWF per km).
+/// Per-kilometre rate for UI estimates (RWF per km). Change here to adjust all snackbars.
 const int kRwandaRideEstimateRwfPerKm = 1000;
 
 int estimateRwandaRideFareRwf({required int distanceMeters}) {
