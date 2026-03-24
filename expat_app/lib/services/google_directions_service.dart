@@ -72,10 +72,21 @@ class GoogleDirectionsService {
     final legs = route['legs'] as List<dynamic>?;
     String? durationText;
     String? distanceText;
+    int totalDurationSec = 0;
+    int totalDistanceM = 0;
     if (legs != null && legs.isNotEmpty) {
-      final leg = legs.first as Map<String, dynamic>;
-      durationText = (leg['duration'] as Map<String, dynamic>?)?['text'] as String?;
-      distanceText = (leg['distance'] as Map<String, dynamic>?)?['text'] as String?;
+      for (final l in legs) {
+        final leg = l as Map<String, dynamic>;
+        final dur = leg['duration'] as Map<String, dynamic>?;
+        final dist = leg['distance'] as Map<String, dynamic>?;
+        totalDurationSec += (dur?['value'] as num?)?.round() ?? 0;
+        totalDistanceM += (dist?['value'] as num?)?.round() ?? 0;
+      }
+      final first = legs.first as Map<String, dynamic>;
+      durationText =
+          (first['duration'] as Map<String, dynamic>?)?['text'] as String?;
+      distanceText =
+          (first['distance'] as Map<String, dynamic>?)?['text'] as String?;
     }
 
     return DrivingRouteResult(
@@ -83,6 +94,8 @@ class GoogleDirectionsService {
         points: points,
         durationText: durationText,
         distanceText: distanceText,
+        durationSeconds: totalDurationSec > 0 ? totalDurationSec : null,
+        distanceMeters: totalDistanceM > 0 ? totalDistanceM : null,
       ),
       errorDetail: null,
     );
@@ -102,11 +115,19 @@ class DirectionsRoute {
     required this.points,
     this.durationText,
     this.distanceText,
+    this.durationSeconds,
+    this.distanceMeters,
   });
 
   final List<LatLng> points;
   final String? durationText;
   final String? distanceText;
+
+  /// Sum of leg durations from Directions API (`duration.value`), seconds.
+  final int? durationSeconds;
+
+  /// Sum of leg distances from Directions API (`distance.value`), meters.
+  final int? distanceMeters;
 }
 
 /// Decodes Google's encoded polyline string into [LatLng] points.

@@ -9,6 +9,7 @@ import 'package:expat_app/services/google_directions_service.dart';
 import 'package:expat_app/services/google_geocoding_service.dart';
 import 'package:expat_app/services/google_places_service.dart';
 import 'package:expat_app/services/maps_api_key_channel.dart';
+import 'package:expat_app/utils/rwanda_ride_fare_estimate.dart';
 
 /// Rides: From/To panel + auto driving directions. Explore: map + place search only.
 enum ExpatMapTabMode { rides, explore }
@@ -30,6 +31,8 @@ class _ExpatMapColors {
   static const accentGreen = Color(0xFF8ED966);
   static const hint = Color(0xFF9CA5A8);
   static const fieldBorder = Color(0xFF9CA5A8);
+  /// Explore top band (off-white), per design — pills stay white inside.
+  static const explorePanelBackground = Color(0xFFF2F3F5);
 }
 
 class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
@@ -640,15 +643,23 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
       await _fitBounds(route.points, origin, dest);
 
       if (mounted &&
-          (route.durationText != null || route.distanceText != null)) {
-        final summary = [
-          if (route.distanceText != null) route.distanceText,
-          if (route.durationText != null) route.durationText,
-        ].join(' · ');
+          (route.durationText != null ||
+              route.distanceText != null ||
+              (route.distanceMeters != null && route.distanceMeters! > 0))) {
+        final parts = <String>[
+          if (route.distanceText != null) route.distanceText!,
+          if (route.durationText != null) route.durationText!,
+        ];
+        final meters = route.distanceMeters;
+        if (meters != null && meters > 0) {
+          final est = estimateRwandaRideFareRwf(distanceMeters: meters);
+          parts.add('~${formatRwfAmount(est)} RWF (est.)');
+        }
+        final summary = parts.join(' · ');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(summary),
-            duration: const Duration(seconds: 4),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -715,6 +726,7 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
         'Confirm Directions API + Geocoding API on the key, billing, and rebuild after changing local.properties (see docs).';
   }
 
+  /// Pill field used on Rides (From/To) and Explore (location search).
   InputDecoration _ridesPillDecoration({
     required String hint,
     Widget? suffix,
@@ -751,7 +763,7 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
       controller: _ridesFromController,
       focusNode: _ridesFromFocus,
       readOnly: loading,
-      maxLines: 2,
+      maxLines: 1,
       textInputAction: TextInputAction.search,
       style: textTheme.bodyLarge?.copyWith(
         color: _ExpatMapColors.primaryDark,
@@ -986,145 +998,143 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
     );
   }
 
-  Widget _buildExploreLayout(BuildContext context, TextTheme textTheme) {
-    return Stack(
-      key: const ValueKey(ExpatMapTabMode.explore),
-      fit: StackFit.expand,
-      children: [
-        GoogleMap(
-          initialCameraPosition: CameraPosition(
-            target: _cameraTarget,
-            zoom: 13,
-          ),
-          markers: _markers,
-          polylines: const <Polyline>{},
-          myLocationEnabled: false,
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
-          mapToolbarEnabled: false,
-          onMapCreated: (c) => _mapController = c,
-          onTap: (_) {
-            FocusScope.of(context).unfocus();
-            setState(() => _predictions = []);
-          },
-        ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Material(
-                  elevation: 4,
-                  borderRadius: BorderRadius.circular(28),
-                  color: Colors.white,
-                  child: TextField(
-                    controller: _exploreSearchController,
-                    focusNode: _exploreSearchFocus,
-                    textInputAction: TextInputAction.search,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: _ExpatMapColors.primaryDark,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Type your location...',
-                      hintStyle: textTheme.bodyMedium?.copyWith(
-                        color: _ExpatMapColors.hint,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        color: _ExpatMapColors.hint,
-                      ),
-                      suffixIcon:
-                          _exploreSearchController.text.isNotEmpty
-                              ? IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  _exploreSearchController.clear();
-                                  setState(() {
-                                    _predictions = [];
-                                    _markers.clear();
-                                  });
-                                },
-                              )
-                              : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 14,
-                      ),
-                    ),
-                    onChanged: (_) => setState(() {}),
+  Widget _buildExplorePredictionsPanel(TextTheme textTheme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 200),
+          child: ListView.separated(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            itemCount: _predictions.length,
+            separatorBuilder:
+                (_, __) => const Divider(height: 1, thickness: 0.5),
+            itemBuilder: (context, i) {
+              final p = _predictions[i];
+              final title =
+                  p.mainText?.isNotEmpty == true
+                      ? p.mainText!
+                      : p.description;
+              final sub = p.secondaryText;
+              return ListTile(
+                dense: true,
+                title: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: _ExpatMapColors.primaryDark,
                   ),
                 ),
-                if (_predictions.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Material(
-                      elevation: 6,
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.white,
-                      clipBehavior: Clip.antiAlias,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 240),
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          padding: EdgeInsets.zero,
-                          itemCount: _predictions.length,
-                          separatorBuilder:
-                              (_, __) =>
-                                  const Divider(height: 1, thickness: 0.5),
-                          itemBuilder: (context, i) {
-                            final p = _predictions[i];
-                            final title =
-                                p.mainText?.isNotEmpty == true
-                                    ? p.mainText!
-                                    : p.description;
-                            final sub = p.secondaryText;
-                            return ListTile(
-                              dense: true,
-                              title: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: _ExpatMapColors.primaryDark,
-                                ),
-                              ),
-                              subtitle:
-                                  sub != null && sub.isNotEmpty
-                                      ? Text(
-                                        sub,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: _ExpatMapColors.hint,
-                                        ),
-                                      )
-                                      : null,
-                              onTap: () => _onExploreSelectPrediction(p),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                subtitle:
+                    sub != null && sub.isNotEmpty
+                        ? Text(
+                          sub,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: _ExpatMapColors.hint,
+                          ),
+                        )
+                        : null,
+                onTap: () => _onExploreSelectPrediction(p),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExploreLayout(BuildContext context, TextTheme textTheme) {
+    final panelMaxH = MediaQuery.sizeOf(context).height * 0.48;
+    return Column(
+      key: const ValueKey(ExpatMapTabMode.explore),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          color: _ExpatMapColors.explorePanelBackground,
+          constraints: BoxConstraints(maxHeight: panelMaxH),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: _exploreSearchController,
+                  focusNode: _exploreSearchFocus,
+                  textInputAction: TextInputAction.search,
+                  maxLines: 1,
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: _ExpatMapColors.primaryDark,
                   ),
+                  decoration: _ridesPillDecoration(
+                    hint: 'Type your location...',
+                    suffix:
+                        _exploreSearchController.text.isNotEmpty
+                            ? IconButton(
+                              icon: const Icon(Icons.clear, size: 22),
+                              onPressed: () {
+                                _exploreSearchController.clear();
+                                setState(() {
+                                  _predictions = [];
+                                  _markers.clear();
+                                });
+                              },
+                            )
+                            : null,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                if (_predictions.isNotEmpty)
+                  _buildExplorePredictionsPanel(textTheme),
               ],
             ),
           ),
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 8,
-          child: Text(
-            'Powered by Google',
-            textAlign: TextAlign.center,
-            style: textTheme.bodySmall?.copyWith(
-              color: _ExpatMapColors.primaryDark.withValues(alpha: 0.55),
-              fontWeight: FontWeight.w500,
-            ),
+        Container(height: 2, color: _ExpatMapColors.accentGreen),
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: _cameraTarget,
+                  zoom: 13,
+                ),
+                markers: _markers,
+                polylines: const <Polyline>{},
+                myLocationEnabled: false,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                mapToolbarEnabled: false,
+                onMapCreated: (c) => _mapController = c,
+                onTap: (_) {
+                  FocusScope.of(context).unfocus();
+                  setState(() => _predictions = []);
+                },
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 8,
+                child: Text(
+                  'Powered by Google',
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: _ExpatMapColors.primaryDark.withValues(alpha: 0.55),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
