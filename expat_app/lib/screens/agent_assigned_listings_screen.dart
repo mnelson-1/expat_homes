@@ -42,6 +42,7 @@ class _AgentAssignedListingsScreenState
   ];
 
   String? _agentUid;
+  final Map<String, Future<Listing?>> _listingFutureCache = {};
 
   @override
   void initState() {
@@ -115,37 +116,93 @@ class _AgentAssignedListingsScreenState
             ),
           );
         }
+        return FutureBuilder<Map<String, Listing?>>(
+          future: _resolveListings(assignments),
+          builder: (context, listingsSnap) {
+            if (listingsSnap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final listingsById = listingsSnap.data ?? const <String, Listing?>{};
+            final visibleAssignments =
+                assignments.where((assignment) {
+                  final listing = listingsById[assignment.listingId];
+                  if (listing == null) return false;
+                  if (_selectedFilter == 0) return true;
+                  final key =
+                      _selectedFilter == 1
+                          ? ListingType.apartment
+                          : _selectedFilter == 2
+                          ? ListingType.house
+                          : ListingType.shortStay;
+                  return listing.type == key;
+                }).toList();
 
-        return ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          itemCount: assignments.length,
-          itemBuilder: (context, index) {
-            final assignment = assignments[index];
-            return _AssignmentCard(
-              key: ValueKey(assignment.id),
-              assignment: assignment,
-              isAcceptedTab: _selectedMainTab == 1,
-              selectedFilter: _selectedFilter,
-              onAccepted: () async {
-                await AgentsService().acceptAssignment(assignment.id);
-                if (context.mounted) {
-                  ListingDetailScreen.showListingAcceptedDialog(
-                      context, textTheme);
-                }
-              },
-              onDeclined: () async {
-                await AgentsService().declineAssignment(assignment.id);
-                if (context.mounted) {
-                  ListingDetailScreen.showListingDeclinedDialog(
-                      context, textTheme);
-                }
+            if (visibleAssignments.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    'No listings match the selected filter.',
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: _AgentAssignedListingsColors.hint,
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              itemCount: visibleAssignments.length,
+              itemBuilder: (context, index) {
+                final assignment = visibleAssignments[index];
+                final listing = listingsById[assignment.listingId]!;
+                return _AssignmentCard(
+                  key: ValueKey(assignment.id),
+                  listing: listing,
+                  isAcceptedTab: _selectedMainTab == 1,
+                  onAccepted: () async {
+                    await AgentsService().acceptAssignment(assignment.id);
+                    if (context.mounted) {
+                      ListingDetailScreen.showListingAcceptedDialog(
+                        context,
+                        textTheme,
+                      );
+                    }
+                  },
+                  onDeclined: () async {
+                    await AgentsService().declineAssignment(assignment.id);
+                    if (context.mounted) {
+                      ListingDetailScreen.showListingDeclinedDialog(
+                        context,
+                        textTheme,
+                      );
+                    }
+                  },
+                );
               },
             );
           },
         );
       },
     );
+  }
+
+  Future<Map<String, Listing?>> _resolveListings(
+    List<ListingAssignment> assignments,
+  ) async {
+    final ids = assignments.map((a) => a.listingId).toSet();
+    final futures =
+        ids.map((id) {
+          final future =
+              _listingFutureCache[id] ??=
+                  ListingsService().getListingByIdWithRepresentative(id);
+          return future.then((listing) => MapEntry(id, listing));
+        }).toList();
+    final entries = await Future.wait(futures);
+    return Map<String, Listing?>.fromEntries(entries);
   }
 
   Widget _buildMainTabs(TextTheme textTheme) {
@@ -233,69 +290,23 @@ class _AgentAssignedListingsScreenState
   }
 }
 
-/// Card for a single assignment. Fetches the listing data from Firestore.
-class _AssignmentCard extends StatefulWidget {
+/// Card for a single assignment listing.
+class _AssignmentCard extends StatelessWidget {
   const _AssignmentCard({
     super.key,
-    required this.assignment,
+    required this.listing,
     required this.isAcceptedTab,
-    required this.selectedFilter,
     required this.onAccepted,
     required this.onDeclined,
   });
 
-  final ListingAssignment assignment;
+  final Listing listing;
   final bool isAcceptedTab;
-  final int selectedFilter;
   final VoidCallback onAccepted;
   final VoidCallback onDeclined;
 
   @override
-  State<_AssignmentCard> createState() => _AssignmentCardState();
-}
-
-class _AssignmentCardState extends State<_AssignmentCard> {
-  Listing? _listing;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchListing();
-  }
-
-  Future<void> _fetchListing() async {
-    final listing = await ListingsService()
-        .getListingByIdWithRepresentative(widget.assignment.listingId);
-    if (mounted) {
-      setState(() {
-        _listing = listing;
-        _loading = false;
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-    final listing = _listing;
-    if (listing == null) return const SizedBox.shrink();
-
-    // Apply type filter
-    if (widget.selectedFilter != 0) {
-      final key = widget.selectedFilter == 1
-          ? ListingType.apartment
-          : widget.selectedFilter == 2
-              ? ListingType.house
-              : ListingType.shortStay;
-      if (listing.type != key) return const SizedBox.shrink();
-    }
-
     final textTheme = Theme.of(context).textTheme;
     final imagePath = listing.mediaUrls.isNotEmpty
         ? listing.mediaUrls.first
@@ -313,9 +324,9 @@ class _AssignmentCardState extends State<_AssignmentCard> {
           MaterialPageRoute<void>(
             builder: (_) => ListingDetailScreenById(
               listingId: listing.id,
-              showAgentActions: !widget.isAcceptedTab,
-              onListingAccepted: (_) => widget.onAccepted(),
-              onListingDeclined: (_) => widget.onDeclined(),
+              showAgentActions: !isAcceptedTab,
+              onListingAccepted: (_) => onAccepted(),
+              onListingDeclined: (_) => onDeclined(),
             ),
           ),
         );
@@ -394,7 +405,7 @@ class _AssignmentCardState extends State<_AssignmentCard> {
               ],
             ),
             const SizedBox(height: 12),
-            widget.isAcceptedTab
+            isAcceptedTab
                 ? SizedBox(
                     width: double.infinity,
                     child: FilledButton(
@@ -421,7 +432,7 @@ class _AssignmentCardState extends State<_AssignmentCard> {
                     children: [
                       Expanded(
                         child: FilledButton(
-                          onPressed: widget.onDeclined,
+                          onPressed: onDeclined,
                           style: FilledButton.styleFrom(
                             backgroundColor:
                                 _AgentAssignedListingsColors.declineRed,
@@ -438,7 +449,7 @@ class _AssignmentCardState extends State<_AssignmentCard> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: FilledButton(
-                          onPressed: widget.onAccepted,
+                          onPressed: onAccepted,
                           style: FilledButton.styleFrom(
                             backgroundColor:
                                 _AgentAssignedListingsColors.accentGreen,

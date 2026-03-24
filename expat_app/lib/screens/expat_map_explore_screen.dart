@@ -759,36 +759,41 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
 
   Widget _buildRidesFromField(TextTheme textTheme) {
     final loading = _ridesFromInitializing;
-    return TextField(
-      controller: _ridesFromController,
-      focusNode: _ridesFromFocus,
-      readOnly: loading,
-      maxLines: 1,
-      textInputAction: TextInputAction.search,
-      style: textTheme.bodyLarge?.copyWith(
-        color: _ExpatMapColors.primaryDark,
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _ridesFromController,
+      builder: (context, value, _) => TextField(
+        controller: _ridesFromController,
+        focusNode: _ridesFromFocus,
+        readOnly: loading,
+        maxLines: 1,
+        textInputAction: TextInputAction.search,
+        style: textTheme.bodyLarge?.copyWith(
+          color: _ExpatMapColors.primaryDark,
+        ),
+        decoration: _ridesPillDecoration(
+          hint:
+              loading
+                  ? 'From: Getting location…'
+                  : 'From: Type your starting point…',
+          suffix:
+              value.text.isNotEmpty && !loading
+                  ? IconButton(
+                    icon: const Icon(Icons.clear, size: 22),
+                    onPressed: () {
+                      _ridesFromController.clear();
+                      setState(() {
+                        _ridesOrigin = null;
+                        _markers.removeWhere(
+                          (m) => m.markerId == const MarkerId('origin'),
+                        );
+                        _polylines.clear();
+                      });
+                    },
+                  )
+                  : null,
+        ),
+        onSubmitted: (_) => _submitRidesFromFromKeyboard(),
       ),
-      decoration: _ridesPillDecoration(
-        hint: loading ? 'From: Getting location…' : 'From: Type your starting point…',
-        suffix:
-            _ridesFromController.text.isNotEmpty && !loading
-                ? IconButton(
-                  icon: const Icon(Icons.clear, size: 22),
-                  onPressed: () {
-                    _ridesFromController.clear();
-                    setState(() {
-                      _ridesOrigin = null;
-                      _markers.removeWhere(
-                        (m) => m.markerId == const MarkerId('origin'),
-                      );
-                      _polylines.clear();
-                    });
-                  },
-                )
-                : null,
-      ),
-      onChanged: (_) => setState(() {}),
-      onSubmitted: (_) => _submitRidesFromFromKeyboard(),
     );
   }
 
@@ -897,42 +902,45 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                 if (_predictions.isNotEmpty && _ridesPredictionsForFrom)
                   _buildRidesPredictionsPanel(textTheme),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: _ridesToController,
-                  focusNode: _ridesToFocus,
-                  textInputAction: TextInputAction.search,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: _ExpatMapColors.primaryDark,
-                  ),
-                  decoration: _ridesPillDecoration(
-                    hint: 'To: Type your destination...',
-                    suffix:
-                        _ridesToController.text.isNotEmpty
-                            ? IconButton(
-                              icon: const Icon(Icons.clear, size: 22),
-                              onPressed: () {
-                                _ridesToController.clear();
-                                setState(() {
-                                  _predictions = [];
-                                  _ridesDestination = null;
-                                  _polylines.clear();
-                                  _markers.removeWhere(
-                                    (m) =>
-                                        m.markerId ==
-                                        const MarkerId('selected'),
-                                  );
-                                  _markers.removeWhere(
-                                    (m) =>
-                                        m.markerId ==
-                                        const MarkerId('origin'),
-                                  );
-                                });
-                              },
-                            )
-                            : null,
-                  ),
-                  onChanged: (_) => setState(() {}),
-                  onSubmitted: (_) => _submitRidesToFromKeyboard(),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _ridesToController,
+                  builder:
+                      (context, value, _) => TextField(
+                        controller: _ridesToController,
+                        focusNode: _ridesToFocus,
+                        textInputAction: TextInputAction.search,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: _ExpatMapColors.primaryDark,
+                        ),
+                        decoration: _ridesPillDecoration(
+                          hint: 'To: Type your destination...',
+                          suffix:
+                              value.text.isNotEmpty
+                                  ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 22),
+                                    onPressed: () {
+                                      _ridesToController.clear();
+                                      setState(() {
+                                        _predictions = [];
+                                        _ridesDestination = null;
+                                        _polylines.clear();
+                                        _markers.removeWhere(
+                                          (m) =>
+                                              m.markerId ==
+                                              const MarkerId('selected'),
+                                        );
+                                        _markers.removeWhere(
+                                          (m) =>
+                                              m.markerId ==
+                                              const MarkerId('origin'),
+                                        );
+                                      });
+                                    },
+                                  )
+                                  : null,
+                        ),
+                        onSubmitted: (_) => _submitRidesToFromKeyboard(),
+                      ),
                 ),
                 if (_predictions.isNotEmpty && !_ridesPredictionsForFrom)
                   _buildRidesPredictionsPanel(textTheme),
@@ -1067,31 +1075,34 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
-                  controller: _exploreSearchController,
-                  focusNode: _exploreSearchFocus,
-                  textInputAction: TextInputAction.search,
-                  maxLines: 1,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: _ExpatMapColors.primaryDark,
-                  ),
-                  decoration: _ridesPillDecoration(
-                    hint: 'Type your location...',
-                    suffix:
-                        _exploreSearchController.text.isNotEmpty
-                            ? IconButton(
-                              icon: const Icon(Icons.clear, size: 22),
-                              onPressed: () {
-                                _exploreSearchController.clear();
-                                setState(() {
-                                  _predictions = [];
-                                  _markers.clear();
-                                });
-                              },
-                            )
-                            : null,
-                  ),
-                  onChanged: (_) => setState(() {}),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _exploreSearchController,
+                  builder:
+                      (context, value, _) => TextField(
+                        controller: _exploreSearchController,
+                        focusNode: _exploreSearchFocus,
+                        textInputAction: TextInputAction.search,
+                        maxLines: 1,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: _ExpatMapColors.primaryDark,
+                        ),
+                        decoration: _ridesPillDecoration(
+                          hint: 'Type your location...',
+                          suffix:
+                              value.text.isNotEmpty
+                                  ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 22),
+                                    onPressed: () {
+                                      _exploreSearchController.clear();
+                                      setState(() {
+                                        _predictions = [];
+                                        _markers.clear();
+                                      });
+                                    },
+                                  )
+                                  : null,
+                        ),
+                      ),
                 ),
                 if (_predictions.isNotEmpty)
                   _buildExplorePredictionsPanel(textTheme),

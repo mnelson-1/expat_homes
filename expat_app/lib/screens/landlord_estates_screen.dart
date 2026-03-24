@@ -66,9 +66,30 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
         }
         final all = snapshot.data ?? [];
         final estates = _filterListings(all);
-        return _buildContent(context, textTheme, estates);
+        return StreamBuilder<List<ListingEditRequest>>(
+          stream: EditRequestsService().landlordEditRequestsStream(uid),
+          builder: (context, reqSnap) {
+            final latestRequests = _latestRequestByListing(reqSnap.data ?? const []);
+            return _buildContent(context, textTheme, estates, latestRequests);
+          },
+        );
       },
     );
+  }
+
+  Map<String, ListingEditRequest> _latestRequestByListing(
+    List<ListingEditRequest> requests,
+  ) {
+    final map = <String, ListingEditRequest>{};
+    for (final req in requests) {
+      final existing = map[req.listingId];
+      final reqAt = req.createdAt ?? DateTime(0);
+      final existingAt = existing?.createdAt ?? DateTime(0);
+      if (existing == null || reqAt.isAfter(existingAt)) {
+        map[req.listingId] = req;
+      }
+    }
+    return map;
   }
 
   List<Listing> _filterListings(List<Listing> list) {
@@ -86,6 +107,7 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
     BuildContext context,
     TextTheme textTheme,
     List<Listing> estates,
+    Map<String, ListingEditRequest> latestRequests,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -119,21 +141,20 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
                       ),
                     ),
                   )
-                  : ListView.builder(
+                  : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                     itemCount: estates.length,
+                    separatorBuilder:
+                        (_, __) =>
+                            const Divider(height: 1, color: Color(0xFFE0E0E0)),
                     itemBuilder: (context, index) {
                       final estate = estates[index];
-                      if (index > 0) {
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Divider(height: 1, color: Color(0xFFE0E0E0)),
-                            _buildEstateCard(context, textTheme, estate),
-                          ],
-                        );
-                      }
-                      return _buildEstateCard(context, textTheme, estate);
+                      return _buildEstateCard(
+                        context,
+                        textTheme,
+                        estate,
+                        latestRequests[estate.id],
+                      );
                     },
                   ),
         ),
@@ -199,6 +220,7 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
     BuildContext context,
     TextTheme textTheme,
     Listing estate,
+    ListingEditRequest? request,
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -307,84 +329,79 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          _buildEditRequestButton(context, textTheme, estate),
+          _buildEditRequestButton(context, textTheme, estate, request),
         ],
       ),
     );
   }
 
-  /// Contextual edit-request button per listing. Streams the latest
-  /// edit request so the label and color update in real time.
+  /// Contextual edit-request button per listing using the latest request
+  /// supplied by parent stream.
   Widget _buildEditRequestButton(
     BuildContext context,
     TextTheme textTheme,
     Listing estate,
+    ListingEditRequest? req,
   ) {
-    return StreamBuilder<ListingEditRequest?>(
-      stream: EditRequestsService().listingEditRequestStream(estate.id),
-      builder: (context, snapshot) {
-        final req = snapshot.data;
-        final status = req?.status;
+    final status = req?.status;
 
-        final String label;
-        final Color bgColor;
-        final Color fgColor;
-        final VoidCallback? onPressed;
+    final String label;
+    final Color bgColor;
+    final Color fgColor;
+    final VoidCallback? onPressed;
 
-        if (status == EditRequestStatus.pending) {
-          label = 'Edit Request being Processed';
-          bgColor = const Color(0xFFFFD54F);
-          fgColor = _LandlordEstatesColors.bodyText;
-          onPressed = null;
-        } else if (status == EditRequestStatus.approved) {
-          label = 'Edit Request Approved';
-          bgColor = const Color(0xFF8ED966);
-          fgColor = _LandlordEstatesColors.bodyText;
-          onPressed = null;
-        } else {
-          label = 'Request Edit';
-          bgColor = _LandlordEstatesColors.bodyText;
-          fgColor = Colors.white;
-          onPressed = () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder:
-                    (_) => LandlordMakeListingScreen(
-                      isEdit: true,
-                      listingId: estate.id,
-                      initialTitle: estate.title,
-                      initialPrice: estate.price,
-                      initialLocation: estate.location,
-                      initialDescription: estate.description,
-                      initialUpi: estate.upi,
-                      initialOwnerName: estate.representativeName,
-                    ),
-              ),
-            );
-          };
-        }
-
-        return SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: FilledButton(
-            onPressed: onPressed,
-            style: FilledButton.styleFrom(
-              backgroundColor: bgColor,
-              foregroundColor: fgColor,
-              disabledBackgroundColor: bgColor,
-              disabledForegroundColor: fgColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(7),
-              ),
-              textStyle: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            child: Text(label),
+    if (status == EditRequestStatus.pending) {
+      label = 'Edit Request being Processed';
+      bgColor = const Color(0xFFFFD54F);
+      fgColor = _LandlordEstatesColors.bodyText;
+      onPressed = null;
+    } else if (status == EditRequestStatus.approved) {
+      label = 'Edit Request Approved';
+      bgColor = const Color(0xFF8ED966);
+      fgColor = _LandlordEstatesColors.bodyText;
+      onPressed = null;
+    } else {
+      label = 'Request Edit';
+      bgColor = _LandlordEstatesColors.bodyText;
+      fgColor = Colors.white;
+      onPressed = () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder:
+                (_) => LandlordMakeListingScreen(
+                  isEdit: true,
+                  listingId: estate.id,
+                  initialTitle: estate.title,
+                  initialPrice: estate.price,
+                  initialLocation: estate.location,
+                  initialDescription: estate.description,
+                  initialUpi: estate.upi,
+                  initialOwnerName: estate.representativeName,
+                ),
           ),
         );
-      },
+      };
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      height: 44,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: bgColor,
+          foregroundColor: fgColor,
+          disabledBackgroundColor: bgColor,
+          disabledForegroundColor: fgColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(7),
+          ),
+          textStyle: textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        child: Text(label),
+      ),
     );
   }
 

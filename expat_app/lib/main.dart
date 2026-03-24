@@ -53,9 +53,17 @@ class _AppEntry extends StatefulWidget {
 }
 
 class _AppEntryState extends State<_AppEntry> {
+  bool _seededLicensedAgents = false;
+
   void _onSplashComplete() {
     _EntryState.splashCompleted = true;
     setState(() {});
+  }
+
+  void _seedAgentsOnce() {
+    if (_seededLicensedAgents) return;
+    _seededLicensedAgents = true;
+    AgentsService().seedLicensedAgents();
   }
 
   @override
@@ -90,7 +98,7 @@ class _AppEntryState extends State<_AppEntry> {
             if (profileSnap.hasError || profile == null) {
               return const GetStartedScreen();
             }
-            AgentsService().seedLicensedAgents();
+            _seedAgentsOnce();
             return _buildHomeForRole(profile.role);
           },
         );

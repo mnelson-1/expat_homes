@@ -59,8 +59,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   void _onScroll() {
     final offset = _scrollController.offset;
-    if (_scrollOffset != offset) {
+    final hadShadow = _scrollOffset > 0;
+    final hasShadow = offset > 0;
+    if (hadShadow != hasShadow) {
       setState(() => _scrollOffset = offset);
+    } else if (_scrollOffset != offset) {
+      _scrollOffset = offset;
     }
   }
 
@@ -290,6 +294,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   String? _myUid;
   Stream<List<ChatMessage>>? _messagesStream;
+  int _lastMessageCount = 0;
 
   @override
   void initState() {
@@ -344,25 +349,30 @@ class _ConversationScreenState extends State<ConversationScreen> {
               stream: _messagesStream,
               builder: (context, snapshot) {
                 final messages = snapshot.data ?? [];
-                _scrollToBottom();
-                return ListView(
+                if (messages.length > _lastMessageCount) {
+                  _lastMessageCount = messages.length;
+                  _scrollToBottom();
+                }
+                final staticItemCount = 3;
+                return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                  children: [
-                    _buildDateAndEncryption(textTheme),
-                    const SizedBox(height: 24),
-                    _buildListingCard(context, textTheme),
-                    ...messages.map((m) {
-                      final isMe = m.senderId == _myUid;
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child:
-                            isMe
-                                ? _buildOutgoingBubble(textTheme, m.content)
-                                : _buildIncomingBubble(textTheme, m.content),
-                      );
-                    }),
-                  ],
+                  itemCount: staticItemCount + messages.length,
+                  itemBuilder: (context, index) {
+                    if (index == 0) return _buildDateAndEncryption(textTheme);
+                    if (index == 1) return const SizedBox(height: 24);
+                    if (index == 2) return _buildListingCard(context, textTheme);
+
+                    final m = messages[index - staticItemCount];
+                    final isMe = m.senderId == _myUid;
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child:
+                          isMe
+                              ? _buildOutgoingBubble(textTheme, m.content)
+                              : _buildIncomingBubble(textTheme, m.content),
+                    );
+                  },
                 );
               },
             ),

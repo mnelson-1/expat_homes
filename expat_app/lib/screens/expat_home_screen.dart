@@ -25,8 +25,6 @@ class _ExpatHomeColors {
   static const Color bodyText = Color(0xFF1A2E35);
   static const Color helper = Color(0xFF9CA5A8);
   static const Color hint = Color(0xFF9CA5A8);
-  // Background for inline comment bubble (Ama Boateng).
-  static const Color commentBackground = Color(0xFFE3E7E9);
   // Explore Area button on estate cards.
   static const Color exploreYellow = Color(0xFFFFD54F);
   // Role label (e.g. small "Expat" under each name) – blue.
@@ -112,12 +110,24 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
 
   void _onFeedScroll() {
     final o = _feedScrollController.offset;
-    if (_feedScrollOffset != o) setState(() => _feedScrollOffset = o);
+    final hadShadow = _feedScrollOffset > 0;
+    final hasShadow = o > 0;
+    if (hadShadow != hasShadow) {
+      setState(() => _feedScrollOffset = o);
+    } else if (_feedScrollOffset != o) {
+      _feedScrollOffset = o;
+    }
   }
 
   void _onBowlsScroll() {
     final o = _bowlsScrollController.offset;
-    if (_bowlsScrollOffset != o) setState(() => _bowlsScrollOffset = o);
+    final hadShadow = _bowlsScrollOffset > 0;
+    final hasShadow = o > 0;
+    if (hadShadow != hasShadow) {
+      setState(() => _bowlsScrollOffset = o);
+    } else if (_bowlsScrollOffset != o) {
+      _bowlsScrollOffset = o;
+    }
   }
 
   void _onEstatesScroll() {
@@ -125,10 +135,11 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     // Only rebuild when crossing zero so the header shadow show/hide updates; avoids refresh-like rebuilds on every scroll.
     final hadShadow = _estatesScrollOffset > 0;
     final hasShadow = o > 0;
-    if (hadShadow != hasShadow)
+    if (hadShadow != hasShadow) {
       setState(() => _estatesScrollOffset = o);
-    else if (_estatesScrollOffset != o)
+    } else if (_estatesScrollOffset != o) {
       _estatesScrollOffset = o;
+    }
   }
 
   @override
@@ -1018,18 +1029,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     );
   }
 
-  /// Mock estate `type` string → [ListingType] for price formatting.
-  static ListingType _listingTypeFromEstateMockType(String t) {
-    switch (t) {
-      case 'short_stay':
-        return ListingType.shortStay;
-      case 'apartment':
-        return ListingType.apartment;
-      default:
-        return ListingType.house;
-    }
-  }
-
   /// Bold `$amount` + smaller `/per month` or `/per night` (reference design).
   Widget _buildListingPriceRichText(
     TextTheme textTheme,
@@ -1061,67 +1060,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     );
   }
 
-  Widget _buildEstatesContent(TextTheme textTheme) {
-    var estates =
-        _estateList.where((e) {
-          if (_selectedEstateFilter == 0) return true;
-          if (_selectedEstateFilter == 1) return e.type == 'apartment';
-          if (_selectedEstateFilter == 2) return e.type == 'house';
-          if (_selectedEstateFilter == 3) return e.type == 'short_stay';
-          return true;
-        }).toList();
-    if (_selectedEstateFilter == 0) {
-      estates.sort((a, b) => a.title.compareTo(b.title));
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              const BoxShadow(
-                color: Color(0x26000000),
-                offset: Offset(0, 4),
-                blurRadius: 8,
-              ),
-              if (_estatesScrollOffset > 0) ..._tabBarShadow,
-            ],
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children:
-                _estateFilterOptions
-                    .map((opt) => _buildEstateFilterItem(textTheme, opt))
-                    .toList(),
-          ),
-        ),
-        const Divider(height: 1, color: Color(0xFFE0E0E0)),
-        Expanded(
-          child: ListView.builder(
-            controller: _estatesScrollController,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            itemCount: estates.length,
-            itemBuilder: (context, index) {
-              if (index > 0) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Divider(height: 1, color: Color(0xFFE0E0E0)),
-                    _buildEstateCard(context, textTheme, estates[index]),
-                  ],
-                );
-              }
-              return _buildEstateCard(context, textTheme, estates[index]);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildEstateFilterItem(
     TextTheme textTheme,
     _EstateFilterOption option,
@@ -1149,417 +1087,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
               height: 2,
               width: double.infinity,
               color: selected ? _ExpatHomeColors.bodyText : Colors.transparent,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static List<_Estate> get _estateList => [
-    // Apartments
-    const _Estate(
-      title: 'Elizabeth Golf Apartments',
-      location: 'KG 439 Street, Kigali',
-      price: '\$2,430/mo',
-      type: 'apartment',
-      imagePath: 'assets/images/Apartments/Elizabeth G Apartments/1.jpg',
-      description:
-          """Elizabeth Golf Apartment by Link in Kigali offers a garden, open-air bath, indoor swimming pool, and free Wi-Fi. Guests enjoy a lounge, lift, 24-hour front desk, and free on-site private parking.
-
-The apartment features a kitchenette, balcony, washing machine, private bathroom, and city views. Additional amenities include a dining area, a work desk, and free Wi-Fi.
-
-Located 7 km from Kigali International Airport, the property is a 12-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.2 km) and Kigali Convention Centre (5 km).""",
-    ),
-    const _Estate(
-      title: 'Greenland Apartments',
-      location: '249 KN 3 Street, Kigali',
-      price: '\$2,025/mo',
-      type: 'apartment',
-      imagePath: 'assets/images/Apartments/Greenland Apartments/1.jpg',
-      description:
-          """Greenland Apartment by Link in Kigali offers a terrace and free Wi-Fi. The apartment features a balcony with city views, a fully equipped kitchen, and a private bathroom.
-
-Guests benefit from a fitness room, lift, 24-hour front desk, daily housekeeping, family rooms, full-day security, and luggage storage. Free on-site private parking is available.
-
-Located 9 km from Kigali International Airport, the apartment is near Belgian Peacekeepers Memorial (2 km), Kigali City Tower (less than 1 km), and Kandt House Natural History Museum (1.9 km).""",
-    ),
-    const _Estate(
-      title: 'IZA Serene Apartments',
-      location: 'ECD Plaza, Kigali',
-      price: '\$1,842/mo',
-      type: 'apartment',
-      imagePath: 'assets/images/Apartments/IZA Serene Apartments/1.jpg',
-      description:
-          """IZA Serene city centre apartments in Kigali offer spacious apartments with terraces, balconies, and city views. Each apartment includes air-conditioning, a fully equipped kitchen, and a private bathroom.
-
-Guests can enjoy African and international cuisines at the on-site restaurant, which serves vegetarian meals for lunch and dinner. The terrace provides a relaxing outdoor space, complemented by free Wi-Fi throughout the property.
-
-Located 11 km from Kigali International Airport, the apartments are close to attractions such as the Belgian Peacekeepers Memorial (7-minute walk), Kandt House Natural History Museum (1.5 km), and Kigali City Tower (15-minute walk). Free on-site private parking is available.""",
-    ),
-    const _Estate(
-      title: 'Rose Garden Apartments',
-      location: 'KG 9 Avenue, Nyarutarama, Gasabo, Kigali',
-      price: '\$1,485/mo',
-      type: 'apartment',
-      imagePath: 'assets/images/Apartments/Rose Garden Apartments/1.jpg',
-      description:
-          """Rose Garden Private Apartment by LINK in Kigali offers aparthotel-style accommodation with a garden and terrace. Guests enjoy free Wi-Fi, ensuring connectivity throughout their stay.
-
-Each apartment features a kitchenette, a balcony with city views, a washing machine, and a private bathroom. Additional amenities include a fitness room, a lift, a 24-hour front desk, concierge service, and free on-site parking.
-
-Located 5 km from Kigali International Airport, the property is an 8-minute walk from Kigali Golf Club. Nearby attractions include Niyo Arts Gallery (3.5 km) and Kigali Convention Centre (4.1 km). Guests appreciate the attentive staff and room cleanliness.""",
-    ),
-    const _Estate(
-      title: 'AGASARO Apartments',
-      location: 'KG 768, Kigali',
-      price: '\$1,480/mo',
-      type: 'apartment',
-      imagePath: 'assets/images/Apartments/AGASARO Apartments/1.jpg',
-      description:
-          """AGASARO LUXURY Apartment in Kigali offers a spacious two-bedroom apartment with two bathrooms. The living room features a sofa bed and a work desk, ensuring comfort and convenience.
-
-Guests can relax in the year-round outdoor swimming pool with a view or enjoy the terrace and garden. The property includes a restaurant, bar, and free Wi-Fi, providing ample leisure options.
-
-The family-friendly restaurant serves African, Dutch, British, Ethiopian, French, American, Argentinian, Belgian, and Brazilian cuisines. Breakfast is continental with fruits, and lunch and dinner are available.
-
-Located 10 km from Kigali International Airport, the apartment is near attractions such as Kigali Genocide Memorial (3.5 km) and Kigali Golf Club (4.5 km). Free on-site private parking is provided.""",
-    ),
-
-    // Houses
-    const _Estate(
-      title: '3-Bedroom Villa',
-      location: '25CR+V6P, Kigali',
-      price: '\$1,575/mo',
-      type: 'house',
-      imagePath: 'assets/images/Houses/3-Bedroom Villa/1.jpg',
-      description:
-          """Rose Garden Luxury, Unique 3 Bedrooms House in Kigali offers a villa with three bedrooms and three bathrooms. Guests enjoy a spacious garden and terrace, complemented by free Wi-Fi throughout the property.
-
-The villa features a fully equipped kitchen, a balcony with mountain views, a washing machine, and a dining area. Additional amenities include a 24-hour front desk, a minimarket, a hairdresser/beautician, and family rooms.
-
-Located 5 km from Kigali International Airport, the property is close to attractions such as the Presidential Palace Museum (3.2 km) and Kigali Golf Club (15 km). Free on-site private parking is available.""",
-    ),
-    const _Estate(
-      title: 'Green Valley Villa',
-      location: '49 KG 706 Street 1, Kigali',
-      price: '\$2,754/mo',
-      type: 'house',
-      imagePath: 'assets/images/Houses/Green Valley Villa/1.jpg',
-      description:
-          """Green Valley Residence By Serenova Retreats in Kigali offers a spacious villa with four bedrooms and three bathrooms. The property includes a living room, dining area, and a fully equipped kitchen.
-
-Guests enjoy free WiFi, a terrace, balcony, and a kitchenette. Additional amenities include a washing machine, dishwasher, microwave, and a work desk. Free on-site private parking is available.
-
-Located 9 km from Kigali International Airport, the villa is 1.9 km from the Kigali Genocide Memorial. Nearby attractions include Kigali Centenary Park (3.7 km) and Nyamata Genocide Museum (33 km).""",
-    ),
-    const _Estate(
-      title: 'JAMOS Guest House',
-      location: 'Kigali-Gatuna Road, Kigali',
-      price: '\$4,200/mo',
-      type: 'house',
-      imagePath: 'assets/images/Houses/JAMOS Guest House/1.jpg',
-      description:
-          """JAMOS Gest House in Kigali offers a spacious, adults-only villa with eight bedrooms and eight bathrooms. The property features a living room, private check-in and check-out services, and a 24-hour front desk.
-
-Guests can enjoy a sun terrace, bar, and free Wi-Fi. Additional amenities include an outdoor fireplace, lounge, coffee shop, and outdoor seating area. Free on-site private parking is available.
-
-Located 15 km from Kigali International Airport, the villa is near attractions such as Niyo Arts Gallery (8 km) and Kigali Genocide Memorial (7 km). The surrounding area offers mountain and city views.""",
-    ),
-    const _Estate(
-      title: '5-Bedroom Villa',
-      location: '6 KG 323 Street, Kigali',
-      price: '\$7,650/mo',
-      type: 'house',
-      imagePath: 'assets/images/Houses/5-Bedroom Villa/1.jpg',
-      description:
-          """5 - Bedroom Villa in Kigali offers a spacious layout with five bedrooms and five bathrooms. The property includes a living room and family rooms, ensuring comfort for all guests.
-
-The villa provides free Wi-Fi, a fully equipped kitchen, a washing machine, and a dishwasher. Additional amenities include a dining area, TV, and outdoor furniture.
-
-Located 5 km from Kigali International Airport and Kigali Convention Centre, the property is also close to attractions such as Kigali Golf Club (3.3 km) and Kigali Genocide Memorial (8 km).""",
-    ),
-    const _Estate(
-      title: "Villa d'exception Rebero",
-      location: 'Rebero KK 857 St 13, Kigali',
-      price: '\$2,693/mo',
-      type: 'house',
-      imagePath: 'assets/images/Houses/Villa Rebero/1.jpg',
-      description:
-          """Villa d'exception Rebero in Kigali offers a spacious layout with five bedrooms and four bathrooms. The property includes a living room and family rooms, ensuring comfort for all guests.
-
-The villa features free Wi-Fi, a fully equipped kitchen, a washing machine, and a seating area. Additional amenities include a balcony, TV, and private entrance.
-
-Located 9 km from Kigali International Airport, the villa is close to attractions such as Kigali Centenary Park and Kigali Genocide Memorial, each 8 km away. Free on-site private parking is available.""",
-    ),
-
-    // Short-Stay
-    const _Estate(
-      title: 'Cascadia Hotel',
-      location: '7 KG 203 St, Kigali',
-      price: '\$110/night',
-      type: 'short_stay',
-      imagePath: 'assets/images/Short-Stay/Cascadia Hotel/1.jpg',
-      description:
-          """Cascadia Hotel Apartments by GF Greenland in Kigali offers family rooms with private bathrooms, air-conditioning, and modern amenities. Each room includes a balcony or terrace with pool or city views.
-
-Guests can enjoy a rooftop swimming pool, indoor pool, fitness centre, and a lush garden. Additional facilities include a restaurant, bar, outdoor fireplace, and a business area.
-
-Located 1.8 km from Kigali Convention Centre and 3 km from Kigali International Airport, the hotel is near attractions such as Kigali Centenary Park and Nyamata Genocide Museum.""",
-    ),
-    const _Estate(
-      title: 'Mythos Boutique Hotel',
-      location: 'KN 50 Street Kiyovu, Kigali',
-      price: '\$112/night',
-      type: 'short_stay',
-      imagePath: 'assets/images/Short-Stay/Mythos Boutique Hotel/1.jpg',
-      description:
-          """Mythos Boutique Hotel in Kigali offers family rooms with garden, pool, or mountain views. Each room includes air-conditioning, a private bathroom, and modern amenities.
-
-Guests enjoy a swimming pool with a view, fitness centre, sun terrace, and lush garden. The hotel features a restaurant, bar, and free Wi-Fi, ensuring a pleasant stay.
-
-Located 9 km from Kigali International Airport, the hotel is near attractions such as Kigali Centenary Park (3.2 km) and Kigali Genocide Memorial (6 km). Free on-site private parking is available.""",
-    ),
-    const _Estate(
-      title: 'Peponi Living Hotel',
-      location: 'KG 729 Street Kagugu, Kigali',
-      price: '\$50/night',
-      type: 'short_stay',
-      imagePath: 'assets/images/Short-Stay/Peponi Living Hotel/1.jpg',
-      description:
-          """Peponi offers accommodation in Kigali. Guests can enjoy the on-site restaurant. Certain rooms feature a seating area to relax in after a busy day. The property offers a flat screen TV in all living rooms.
-
-Kigali International Community School is 1.9 km from Peponi, while Big Local food Market is 2.4 km away. The nearest airport is Kigali International Airport, 8 km from Peponi.""",
-    ),
-    const _Estate(
-      title: 'REBERO Resort',
-      location: 'KK 30 Avenue, Kigali',
-      price: '\$80/night',
-      type: 'short_stay',
-      imagePath: 'assets/images/Short-Stay/REBERO Resort/1.jpg',
-      description:
-          """REBERO RESORT Ltd in Kigali offers an adults-only hotel with a rooftop swimming pool, sun terrace, and lush garden. Guests enjoy free Wi-Fi, a fitness centre, and complimentary bicycles.
-
-The property features a restaurant, bar, and coffee shop. Additional facilities include a hot tub, outdoor play area, and themed dinner nights. Free airport shuttle service is available 9 km from Kigali International Airport.
-
-Located on a quiet street, the hotel offers mountain and city views. Nearby attractions include the Belgian Peacekeepers Memorial (8 km) and Kigali Convention Centre (9 km). Guests appreciate the attentive staff and scenic surroundings.""",
-    ),
-    const _Estate(
-      title: 'Centric Hotel',
-      location: 'KG 213 Street, Kigali',
-      price: '\$100/night',
-      type: 'short_stay',
-      imagePath: 'assets/images/Short-Stay/Centric Hotel/1.jpg',
-      description:
-          """Centric Hotel in Kigali offers family rooms with private bathrooms, air-conditioning, and free Wi-Fi. Each room includes a work desk, TV, and modern amenities.
-
-Guests can enjoy a terrace, restaurant, and bar. The family-friendly restaurant serves African, American, Italian, and Thai cuisines. Additional facilities include a lounge, outdoor seating area, and live music.
-
-Located 3 km from Kigali International Airport, the hotel is near attractions such as Kigali Convention Centre (3.6 km) and Kigali Genocide Memorial (10 km). Free on-site parking is available.""",
-    ),
-    const _Estate(
-      title: 'M Hotel',
-      location: 'KN 1 Avenue Kiyovu, Kigali',
-      price: '\$200/night',
-      type: 'short_stay',
-      imagePath: 'assets/images/Short-Stay/M Hotel/1.jpg',
-      description:
-          """M Hotel Kigali in Kigali offers comfortable rooms with air-conditioning, private bathrooms, and modern amenities. Each room features a balcony with garden or mountain views, ensuring a pleasant stay.
-
-The family-friendly restaurant serves African, Chinese, Indian, and local cuisines in a traditional and modern setting. Breakfast includes continental and buffet options with local specialities, fresh pastries, and more.
-
-Located 9 km from Kigali International Airport, the hotel is a 15-minute walk from Kigali City Tower. Nearby attractions include the Belgian Peacekeepers Memorial and Kigali Genocide Memorial, each within 3 km.""",
-    ),
-  ];
-
-  // Listings kept aside for future testing (currently not shown in UI):
-  // const _Estate(
-  //   title: 'Phoenix Apartments',
-  //   location: 'KG 768, Kigali',
-  //   price: '\$2,309/mo',
-  //   type: 'apartment',
-  //   imagePath: 'assets/images/Apartments/Phoenix Apartment/1.jpg',
-  // ),
-  // const _Estate(
-  //   title: 'Comfort Deluxe Apartments',
-  //   location: 'KG 10 Avenue, Kigali',
-  //   price: '\$2,040/mo',
-  //   type: 'apartment',
-  //   imagePath: 'assets/images/Apartments/Comfort Deluxe Apartments/1.jpg',
-  // ),
-  // const _Estate(
-  //   title: 'Kigali Luxury Home',
-  //   location: 'KK 15 Road, Kigali',
-  //   price: '\$5,355/mo',
-  //   type: 'house',
-  //   imagePath: 'assets/images/Houses/Kigali Home/1.jpg',
-  // ),
-  // const _Estate(
-  //   title: 'Gloria Hotel',
-  //   location: 'KN 59 ST, Kigali',
-  //   price: '\$120/night',
-  //   type: 'short_stay',
-  //   imagePath: 'assets/images/Short-Stay/Gloria Hotel/1.jpg',
-  // ),
-  // const _Estate(
-  //   title: 'Olympic Hotel',
-  //   location: 'KG 11 Ave, Kigali',
-  //   price: '\$80/night',
-  //   type: 'short_stay',
-  //   imagePath: 'assets/images/Short-Stay/Olympic Hotel/1.jpg',
-  // );
-
-  Widget _buildEstateCard(
-    BuildContext context,
-    TextTheme textTheme,
-    _Estate estate,
-  ) {
-    final typeLabel =
-        estate.type == 'short_stay'
-            ? 'Short-Stay'
-            : estate.type == 'apartment'
-            ? 'Apartment'
-            : 'House';
-    final listingType = _listingTypeFromEstateMockType(estate.type);
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder:
-                (_) => ListingDetailScreen(
-                  title: estate.title,
-                  location: estate.location,
-                  price: estate.price,
-                  listingType: listingType,
-                  typeLabel: typeLabel,
-                  imagePaths: [estate.imagePath],
-                  description: estate.description,
-                  // Placeholder UPI for Expat workflow; real UPI
-                  // will only be shown to landlords/agents later.
-                  upi: 'RHA Land UPI (placeholder)',
-                ),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                estate.imagePath,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) => Container(
-                      height: 180,
-                      color: Colors.grey.shade300,
-                      child: const Center(child: Icon(Icons.home, size: 48)),
-                    ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        estate.title,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: _ExpatHomeColors.bodyText,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        estate.location,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: _ExpatHomeColors.bodyText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _ExpatHomeColors.helper,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        typeLabel,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: _ExpatHomeColors.bodyText,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    _buildListingPriceRichText(
-                      textTheme,
-                      _listingTypeFromEstateMockType(estate.type),
-                      estate.price,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {},
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _ExpatHomeColors.accentGreen,
-                      foregroundColor: _ExpatHomeColors.bodyText,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                    ),
-                    child: Text(
-                      'Get a Ride',
-                      style: textTheme.titleMedium?.copyWith(
-                        color: _ExpatHomeColors.bodyText,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {},
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _ExpatHomeColors.exploreYellow,
-                      foregroundColor: _ExpatHomeColors.bodyText,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                    ),
-                    child: Text(
-                      'Explore Area',
-                      style: textTheme.titleMedium?.copyWith(
-                        color: _ExpatHomeColors.bodyText,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -1744,25 +1271,6 @@ class _EstateFilterOption {
   const _EstateFilterOption({required this.label, required this.index});
   final String label;
   final int index;
-}
-
-class _Estate {
-  const _Estate({
-    required this.title,
-    required this.location,
-    required this.price,
-    required this.type,
-    required this.imagePath,
-    required this.description,
-  });
-
-  final String title;
-  final String location;
-  final String price;
-  final String type; // 'apartment' | 'house' | 'short_stay'
-  final String imagePath;
-  // Long-form listing description shown on the detail page.
-  final String description;
 }
 
 /// Gmail-style profile popup dialog, reusable across all home screens.
