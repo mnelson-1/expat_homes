@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/listing.dart';
 import 'package:expat_app/models/listing_edit_request.dart';
+import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/conversations_service.dart';
 import 'package:expat_app/services/edit_requests_service.dart';
 import 'package:expat_app/services/listings_service.dart';
+import 'package:expat_app/models/listing_assignment.dart';
 import 'package:expat_app/utils/listing_price_display.dart';
 import 'landlord_make_listing_screen.dart';
 import 'messages_screen.dart' show ConversationScreen, kRoleAgent, kRoleExpat;
@@ -27,8 +29,15 @@ class ListingDetailScreen extends StatelessWidget {
     this.representativeName,
     this.showRequestEditOnly = false,
     this.showAgentActions = false,
+    /// Firestore `listing_assignments` doc id for this agent + listing (when [showAgentActions]).
+    this.agentAssignmentId,
+    /// When [showAgentActions] and [agentAssignmentId] set: show Accept next to Decline (pending only).
+    this.agentShowsAcceptButton = false,
     this.listingId,
+    /// Expat "Inquire" recipient: representative UID or landlord. Agent flows may use [listingOwnerUid] for Chat Landlord.
     this.landlordId,
+    /// Listing document `landlordId` (owner). Agent "Chat Landlord" must use this so [getOrCreateConversation] matches the original thread.
+    this.listingOwnerUid,
     this.onListingAccepted,
     this.onListingDeclined,
     this.editRequest,
@@ -55,14 +64,23 @@ class ListingDetailScreen extends StatelessWidget {
   /// When true (landlord view), bottom bar shows only a single "Request Edit" button.
   final bool showRequestEditOnly;
 
-  /// When true (agent view), bottom bar shows Decline, Accept, and Chat Landlord.
+  /// When true (agent view), bottom bar shows agent actions (not expat enquire UI).
   final bool showAgentActions;
+
+  /// Assignment document id for Accept/Decline API; null → only "Chat Landlord".
+  final String? agentAssignmentId;
+
+  /// Pending assignment: Decline + Accept row. Accepted: full-width Decline only.
+  final bool agentShowsAcceptButton;
 
   /// When opening from agent Listings; used to notify when listing is accepted.
   final String? listingId;
 
-  /// UID of the listing's landlord (for creating conversations).
+  /// Primary messaging peer for Expat inquire (representative or landlord).
   final String? landlordId;
+
+  /// Owner's Firebase UID from listing (always the landlord). Used for agent ↔ landlord chat.
+  final String? listingOwnerUid;
 
   /// Called when agent taps Accept (so the listing can move to Accepted tab).
   final void Function(String listingId)? onListingAccepted;
@@ -418,10 +436,30 @@ class ListingDetailScreen extends StatelessWidget {
         fgColor = const Color(0xFF1A2E35);
         action = null;
       } else if (reqStatus == EditRequestStatus.approved) {
-        label = 'Edit Request Approved';
-        bgColor = const Color(0xFF8ED966);
-        fgColor = const Color(0xFF1A2E35);
-        action = null;
+        final er = editRequest;
+        if (er != null && er.showsLandlordApprovedBanner) {
+          label = 'Edit Request Approved';
+          bgColor = const Color(0xFF8ED966);
+          fgColor = const Color(0xFF1A2E35);
+          action = () async {
+            try {
+              await EditRequestsService().landlordAcknowledgeApprovedEdit(
+                er.id,
+              );
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Could not update: $e')),
+                );
+              }
+            }
+          };
+        } else {
+          label = 'Request Edit';
+          bgColor = const Color(0xFF1A2E35);
+          fgColor = Colors.white;
+          action = onRequestEdit;
+        }
       } else {
         label = 'Request Edit';
         bgColor = const Color(0xFF1A2E35);
@@ -476,6 +514,7 @@ class ListingDetailScreen extends StatelessWidget {
     }
 
     if (showAgentActions) {
+      final hasAssignment = agentAssignmentId != null;
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -497,96 +536,164 @@ class ListingDetailScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () {
-                          ListingDetailScreen.showListingDeclinedDialog(
-                            context,
-                            textTheme,
-                            () {
-                              if (listingId != null) {
-                                onListingDeclined?.call(listingId!);
-                              }
-                              Navigator.of(context).pop();
-                            },
-                          );
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFC62828),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(7),
+                if (hasAssignment && agentShowsAcceptButton)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            ListingDetailScreen.showListingDeclinedDialog(
+                              context,
+                              textTheme,
+                              () async {
+                                if (listingId != null) {
+                                  if (onListingDeclined != null) {
+                                    onListingDeclined!.call(listingId!);
+                                  } else if (agentAssignmentId != null) {
+                                    await AgentsService().declineAssignment(
+                                      agentAssignmentId!,
+                                    );
+                                  }
+                                }
+                                if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                }
+                              },
+                            );
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFC62828),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(7),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          'Decline',
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () {
-                          ListingDetailScreen.showListingAcceptedDialog(
-                            context,
-                            textTheme,
-                            () {
-                              if (listingId != null) {
-                                onListingAccepted?.call(listingId!);
-                              }
-                              Navigator.of(context).pop();
-                            },
-                          );
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF8ED966),
-                          foregroundColor: const Color(0xFF1A2E35),
-                          minimumSize: const Size.fromHeight(48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(7),
-                          ),
-                        ),
-                        child: Text(
-                          'Accept',
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A2E35),
+                          child: Text(
+                            'Decline',
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            ListingDetailScreen.showListingAcceptedDialog(
+                              context,
+                              textTheme,
+                              () async {
+                                if (listingId != null) {
+                                  if (onListingAccepted != null) {
+                                    onListingAccepted!.call(listingId!);
+                                  } else if (agentAssignmentId != null) {
+                                    await AgentsService().acceptAssignment(
+                                      agentAssignmentId!,
+                                    );
+                                  }
+                                }
+                                if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                }
+                              },
+                            );
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF8ED966),
+                            foregroundColor: const Color(0xFF1A2E35),
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                          ),
+                          child: Text(
+                            'Accept',
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A2E35),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (hasAssignment && !agentShowsAcceptButton) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        ListingDetailScreen.showListingDeclinedDialog(
+                          context,
+                          textTheme,
+                          () async {
+                            if (listingId != null) {
+                              if (onListingDeclined != null) {
+                                onListingDeclined!.call(listingId!);
+                              } else if (agentAssignmentId != null) {
+                                await AgentsService().declineAssignment(
+                                  agentAssignmentId!,
+                                );
+                              }
+                            }
+                            if (context.mounted) {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                        );
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFC62828),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                      ),
+                      child: Text(
+                        'Decline',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                  ),
+                ],
+                if (hasAssignment) const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: () async {
                       final myUid = AuthService().currentUser?.uid;
+                      final landlordUid = (listingOwnerUid != null &&
+                              listingOwnerUid!.trim().isNotEmpty)
+                          ? listingOwnerUid!.trim()
+                          : landlordId;
                       if (myUid == null ||
                           listingId == null ||
-                          landlordId == null)
+                          landlordUid == null ||
+                          landlordUid.isEmpty) {
                         return;
+                      }
 
                       final myProfile =
                           await AuthService().getCurrentUserProfile();
                       final myName = myProfile?.legalName ?? 'Agent';
-                      final landlordName = representativeName ?? 'Landlord';
+                      final landlordProfile =
+                          await AuthService().getUserProfile(landlordUid);
+                      final landlordName =
+                          landlordProfile?.legalName ?? 'Landlord';
 
                       final convo = await ConversationsService()
                           .getOrCreateConversation(
                             listingId: listingId!,
-                            participantIds: [myUid, landlordId!],
+                            participantIds: [myUid, landlordUid],
                             participantNames: {
                               myUid: myName,
-                              landlordId!: landlordName,
+                              landlordUid: landlordName,
                             },
                             listingTitle: title,
                             listingImage:
@@ -604,6 +711,7 @@ class ListingDetailScreen extends StatelessWidget {
                           builder:
                               (_) => ConversationScreen(
                                 conversationId: convo.id,
+                                listingId: listingId!,
                                 listingTitle: title,
                                 location: location,
                                 price: formatListingPricePlain(
@@ -615,7 +723,7 @@ class ListingDetailScreen extends StatelessWidget {
                                         ? imagePaths.first
                                         : '',
                                 contactName: landlordName,
-                                contactUid: landlordId,
+                                contactUid: landlordUid,
                                 returnToAgentMessagesOnBack: true,
                                 listingDetailRole: kRoleAgent,
                               ),
@@ -763,6 +871,7 @@ class ListingDetailScreen extends StatelessWidget {
                         builder:
                             (_) => ConversationScreen(
                               conversationId: convo.id,
+                              listingId: listingId!,
                               listingTitle: title,
                               location: location,
                               price: formatListingPricePlain(
@@ -983,13 +1092,51 @@ class ListingDetailScreenById extends StatefulWidget {
       _ListingDetailScreenByIdState();
 }
 
+class _ListingDetailBootstrap {
+  _ListingDetailBootstrap({
+    required this.listing,
+    this.agentAssignmentId,
+    required this.agentShowsAcceptButton,
+  });
+
+  final Listing listing;
+  final String? agentAssignmentId;
+  final bool agentShowsAcceptButton;
+}
+
 class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
+  late final Future<_ListingDetailBootstrap?> _bootstrapFuture =
+      _loadBootstrap();
+
+  Future<_ListingDetailBootstrap?> _loadBootstrap() async {
+    final listing =
+        await ListingsService().getListingByIdWithRepresentative(
+      widget.listingId,
+    );
+    if (listing == null) return null;
+
+    String? agentAid;
+    var agentShowAccept = false;
+    if (widget.showAgentActions) {
+      final assn = await AgentsService().getActiveAssignment(widget.listingId);
+      final uid = AuthService().currentUser?.uid;
+      if (assn != null && assn.agentUid == uid) {
+        agentAid = assn.id;
+        agentShowAccept = assn.status == AssignmentStatus.pending;
+      }
+    }
+
+    return _ListingDetailBootstrap(
+      listing: listing,
+      agentAssignmentId: agentAid,
+      agentShowsAcceptButton: agentShowAccept,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Listing?>(
-      future: ListingsService().getListingByIdWithRepresentative(
-        widget.listingId,
-      ),
+    return FutureBuilder<_ListingDetailBootstrap?>(
+      future: _bootstrapFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -1022,36 +1169,42 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
             ),
           );
         }
-        final listing = snapshot.data;
-        if (listing == null) {
+        final payload = snapshot.data;
+        if (payload == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Listing')),
             body: const Center(child: Text('Listing not found.')),
           );
         }
+        final listing = payload.listing;
         final imagePaths =
             listing.mediaUrls.isEmpty ? <String>[] : listing.mediaUrls;
 
-        // For the landlord view, embed two StreamBuilders to track edit request
-        // and revision states reactively without rebuilding the whole screen.
         if (widget.showRequestEditOnly) {
           return StreamBuilder<ListingEditRequest?>(
             stream: EditRequestsService().listingEditRequestStream(
               widget.listingId,
             ),
             builder: (context, reqSnap) {
-              final editRequest = reqSnap.data;
               return _buildDetail(
                 context,
                 listing,
                 imagePaths,
-                editRequest: editRequest,
+                editRequest: reqSnap.data,
+                agentAssignmentId: payload.agentAssignmentId,
+                agentShowsAcceptButton: payload.agentShowsAcceptButton,
               );
             },
           );
         }
 
-        return _buildDetail(context, listing, imagePaths);
+        return _buildDetail(
+          context,
+          listing,
+          imagePaths,
+          agentAssignmentId: payload.agentAssignmentId,
+          agentShowsAcceptButton: payload.agentShowsAcceptButton,
+        );
       },
     );
   }
@@ -1061,6 +1214,8 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
     Listing listing,
     List<String> imagePaths, {
     ListingEditRequest? editRequest,
+    String? agentAssignmentId,
+    bool agentShowsAcceptButton = false,
   }) {
     return ListingDetailScreen(
       title: listing.title,
@@ -1075,8 +1230,12 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
       representativeName: listing.representativeName,
       showRequestEditOnly: widget.showRequestEditOnly,
       showAgentActions: widget.showAgentActions,
+      agentAssignmentId: agentAssignmentId,
+      agentShowsAcceptButton: agentShowsAcceptButton,
       listingId: widget.listingId,
       landlordId: listing.representativeUid ?? listing.landlordId,
+      listingOwnerUid:
+          listing.landlordId.trim().isEmpty ? null : listing.landlordId,
       onListingAccepted: widget.onListingAccepted,
       onListingDeclined: widget.onListingDeclined,
       editRequest: editRequest,

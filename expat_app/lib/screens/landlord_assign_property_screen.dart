@@ -388,6 +388,7 @@ class _LandlordAssignPropertyScreenState
                         MaterialPageRoute<void>(
                           builder: (_) => ConversationScreen(
                             conversationId: convo.id,
+                            listingId: listing.id,
                             listingTitle: listing.title,
                             location: listing.location,
                             price: priceWithSuffix,

@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:expat_app/screens/sign_up_screen.dart';
+import 'package:expat_app/screens/get_started_screen.dart';
 import 'package:expat_app/services/auth_service.dart';
 
 /// Palette for Sign In (matches Get Started / Sign Up).
@@ -252,9 +252,9 @@ class _SignInScreenState extends State<SignInScreen> {
     return Center(
       child: GestureDetector(
         onTap: () {
-          Navigator.of(context).push(
+          Navigator.of(context).pushReplacement(
             MaterialPageRoute<void>(
-              builder: (_) => const SignUpScreen(),
+              builder: (_) => const GetStartedScreen(),
             ),
           );
         },

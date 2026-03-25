@@ -7,6 +7,8 @@ import 'package:expat_app/services/auth_service.dart';
 import 'agent_edit_field_screen.dart';
 import 'agent_reviews_screen.dart';
 
+/// Agent bio-view tab body in [AgentHomeScreen] (editable, current user only).
+/// Chat → agent uses `ContactAgentProfileScreen` (same UI as Find Agent).
 class AgentBioViewScreen extends StatefulWidget {
   const AgentBioViewScreen({super.key});
 
@@ -505,9 +507,29 @@ class _AgentBioViewScreenState extends State<AgentBioViewScreen> {
       ),
     );
     if (result != null && result.trim().isNotEmpty) {
-      setState(() {
-        _agentName = result.trim();
-      });
+      final trimmed = result.trim();
+      final parts = trimmed.split(RegExp(r'\s+'));
+      final first = parts.first;
+      final last =
+          parts.length > 1 ? parts.sublist(1).join(' ') : '';
+      try {
+        await AgentsService().updateLicensedAgentProfile(
+          _agentId,
+          firstName: first,
+          lastName: last,
+        );
+        await AuthService().updateAgentUserDocName(
+          legalFirstName: first,
+          legalLastName: last,
+        );
+        if (mounted) await _loadAgentProfile();
+      } catch (e) {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not save name: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -526,10 +548,20 @@ class _AgentBioViewScreenState extends State<AgentBioViewScreen> {
         ),
       ),
     );
-    if (result != null && result.trim().isNotEmpty) {
-      setState(() {
-        _bioText = result.trim();
-      });
+    if (result != null) {
+      try {
+        await AgentsService().updateLicensedAgentProfile(
+          _agentId,
+          bio: result.trim(),
+        );
+        if (mounted) await _loadAgentProfile();
+      } catch (e) {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not save bio: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -547,9 +579,19 @@ class _AgentBioViewScreenState extends State<AgentBioViewScreen> {
       ),
     );
     if (result != null && result.trim().isNotEmpty) {
-      setState(() {
-        _phone = result.trim();
-      });
+      try {
+        await AgentsService().updateLicensedAgentProfile(
+          _agentId,
+          phone: result.trim(),
+        );
+        if (mounted) await _loadAgentProfile();
+      } catch (e) {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not save phone: $e')),
+          );
+        }
+      }
     }
   }
 }

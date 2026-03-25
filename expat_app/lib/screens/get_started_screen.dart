@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:expat_app/constants/user_profile_options.dart';
 import 'package:expat_app/screens/agent_sign_up_screen.dart';
 import 'package:expat_app/screens/landlord_sign_up_screen.dart';
 import 'package:expat_app/screens/sign_in_screen.dart';
@@ -26,13 +27,6 @@ enum _UserRole {
   const _UserRole(this.label);
   final String label;
 }
-
-const List<String> _supportedLanguages = [
-  'English',
-  'Kinyarwanda',
-  'French',
-  'Swahili',
-];
 
 /// Get Started onboarding screen: role, language, email, Continue, Login, Google.
 class GetStartedScreen extends StatefulWidget {
@@ -108,7 +102,7 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
                   _buildDropdown<String>(
                     value: _selectedLanguage,
                     hint: 'Select language',
-                    items: _supportedLanguages
+                    items: kPreferredLanguages
                         .map(
                           (lang) => DropdownMenuItem<String>(
                             value: lang,

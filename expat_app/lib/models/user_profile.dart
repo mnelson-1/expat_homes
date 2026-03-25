@@ -41,6 +41,8 @@ class UserProfile {
     this.agentId,
     // Profile picture
     this.profileImageUrl,
+    /// Short bio / about (expat, landlord, optional for others).
+    this.bio,
   });
 
   final String id;
@@ -65,6 +67,9 @@ class UserProfile {
 
   /// Profile picture URL (Firebase Storage)
   final String? profileImageUrl;
+
+  /// Free-text bio shown on profile and peer view.
+  final String? bio;
 
   String get legalName {
     if (legalFirstName != null || legalLastName != null) {
@@ -94,6 +99,7 @@ class UserProfile {
       demographic: data['demographic'] as String?,
       agentId: data['agentId'] as String?,
       profileImageUrl: data['profileImageUrl'] as String?,
+      bio: data['bio'] as String?,
     );
   }
 
@@ -122,6 +128,7 @@ class UserProfile {
     if (demographic != null) map['demographic'] = demographic;
     if (agentId != null) map['agentId'] = agentId;
     if (profileImageUrl != null) map['profileImageUrl'] = profileImageUrl;
+    if (bio != null) map['bio'] = bio;
     return map;
   }
 

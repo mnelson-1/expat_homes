@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/commission_slip.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/utils/calendar_thread_labels.dart';
 import 'package:expat_app/services/commission_slips_service.dart';
 
 class AgentPaymentsScreen extends StatefulWidget {
@@ -42,19 +46,30 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
 
   String? _agentUid;
   Stream<List<CommissionSlip>>? _slipsStream;
+  StreamSubscription<User?>? _authSub;
+
+  void _bindSlipsStream(String? uid) {
+    _agentUid = uid;
+    _slipsStream =
+        uid != null && uid.isNotEmpty
+            ? CommissionSlipsService().agentSlipsStream(uid)
+            : null;
+  }
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    _agentUid = AuthService().currentUser?.uid;
-    if (_agentUid != null) {
-      _slipsStream = CommissionSlipsService().agentSlipsStream(_agentUid!);
-    }
+    _bindSlipsStream(AuthService().currentUser?.uid);
+    _authSub = AuthService().authStateChanges.listen((user) {
+      if (!mounted) return;
+      setState(() => _bindSlipsStream(user?.uid));
+    });
   }
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _commissionIdController.dispose();
@@ -210,7 +225,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
         for (final slip in slips) {
           final date = slip.createdAt ?? DateTime.now();
           final isNewDate =
-              lastDate == null || !_isSameDay(lastDate, date);
+              lastDate == null || !isSameCalendarDay(lastDate, date);
 
           if (isNewDate) {
             if (lastDate != null) {
@@ -218,7 +233,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
             }
             children.add(_buildDateHeader(textTheme, date));
             children.add(const SizedBox(height: 16));
-            lastDate = _startOfDay(date);
+            lastDate = dateOnlyLocal(date);
           } else {
             children.add(const Divider(height: 1, color: Color(0xFFE0E0E0)));
             children.add(const SizedBox(height: 12));
@@ -238,16 +253,13 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
   }
 
   Widget _buildDateHeader(TextTheme textTheme, DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    final year = date.year.toString();
-    final label = '$day/$month/$year';
-
+    final label = threadDayDividerLabel(dateOnlyLocal(date), DateTime.now());
     return Center(
       child: Text(
         label,
         style: textTheme.bodySmall?.copyWith(
           color: _AgentPaymentsColors.bodyText,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -549,15 +561,6 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     return 'RWF$formatted';
   }
 
-  bool _isSameDay(DateTime? a, DateTime b) {
-    if (a == null) return false;
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  DateTime _startOfDay(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
-  }
-
   void _onScroll() {
     final offset = _scrollController.offset;
     if (_scrollOffset != offset) {
@@ -594,25 +597,50 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     final profile = await AuthService().getCurrentUserProfile();
     final agentName = profile?.legalName ?? 'Agent';
     final agentId = profile?.agentId ?? '';
+    final uid = _agentUid ?? AuthService().currentUser?.uid;
+    if (uid == null || uid.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be signed in to create a commission slip.'),
+        ),
+      );
+      return;
+    }
 
-    await CommissionSlipsService().createSlip(
-      listingTitle: propertyTitle,
-      contractCode: houseUpi,
-      landlordId: ownerId,
-      landlordName: landlord,
-      agentId: agentId,
-      agentUid: _agentUid ?? '',
-      agentName: agentName,
-      amount: formattedAmount,
-      recipientPhone: phone,
-      homeOwnerId: ownerId,
-      paymentMethod: method,
-    );
+    try {
+      final created = await CommissionSlipsService().createSlip(
+        listingTitle: propertyTitle,
+        contractCode: houseUpi,
+        landlordId: ownerId,
+        landlordName: landlord,
+        agentId: agentId,
+        agentUid: uid,
+        agentName: agentName,
+        amount: formattedAmount,
+        recipientPhone: phone,
+        homeOwnerId: ownerId,
+        paymentMethod: method,
+      );
 
-    if (!mounted) return;
-    _showSlipCreatedDialog(ownerId);
-    _clearForm();
-    setState(() => _selectedTab = 0);
+      if (!mounted) return;
+      _showSlipCreatedDialog(
+        landlordId: ownerId,
+        slipReference: created.reference,
+      );
+      _clearForm();
+      setState(() => _selectedTab = 0);
+    } catch (e, st) {
+      debugPrint('createSlip failed: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not save commission slip. Check internet and Firestore rules. ($e)',
+          ),
+        ),
+      );
+    }
   }
 
   void _clearForm() {
@@ -625,11 +653,15 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     _phoneController.clear();
   }
 
-  void _showSlipCreatedDialog(String ownerId) {
+  void _showSlipCreatedDialog({
+    required String landlordId,
+    required String slipReference,
+  }) {
     final textTheme = Theme.of(context).textTheme;
 
     showDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
@@ -669,8 +701,8 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'You have successfully created your commission payment slip, '
-                  'and it has been issued to the landlord with ID-$ownerId.',
+                  'Commission slip created successfully for Landlord $landlordId.\n\n'
+                  'Reference: $slipReference',
                   style: textTheme.bodyMedium?.copyWith(
                     color: _AgentPaymentsColors.bodyText,
                   ),
@@ -745,6 +777,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
 
     showDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
@@ -818,6 +851,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
 
     showDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {

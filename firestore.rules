@@ -32,13 +32,19 @@ service cloud.firestore {
         (resource.data.landlordId == request.auth.uid || isSuperAdmin());
     }
 
-    // Edit requests: landlord creates; admin reads/updates status.
+    // Edit requests: landlord creates; admin updates status; landlord may only
+    // set landlordAcknowledgedApprovalAt (dismiss “approved” banner).
     match /edit_requests/{requestId} {
       allow read: if isSignedIn() &&
         (resource.data.landlordId == request.auth.uid || isSuperAdmin());
       allow create: if isSignedIn() &&
         request.resource.data.landlordId == request.auth.uid;
-      allow update: if isSignedIn() && isSuperAdmin();
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        (resource.data.landlordId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['landlordAcknowledgedApprovalAt']))
+      );
     }
 
     // Listing revisions: landlord creates (after edit request approved); admin reads/updates.

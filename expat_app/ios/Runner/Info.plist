@@ -49,5 +49,7 @@
 	<string>Expat needs your location to show directions to places on the map.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Expat needs your location to show directions to places on the map.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>To attach photos and videos in chat.</string>
 </dict>
 </plist>

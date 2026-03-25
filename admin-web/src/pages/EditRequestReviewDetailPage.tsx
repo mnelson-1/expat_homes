@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useEditRequests, type EditRequestReview } from '../context/EditRequestsContext'
+import { useEditRequests, type EditRequestPending } from '../context/EditRequestsContext'
+import type { Listing } from '../data/mockListings'
 
-// Field labels for display in the comparison grid.
-const FIELD_LABELS: Record<string, string> = {
+// Field labels for display in the comparison grid (keys match Firestore proposedFields).
+const FIELD_KEYS = ['title', 'price', 'location', 'description', 'type', 'upi'] as const
+
+const FIELD_LABELS: Record<(typeof FIELD_KEYS)[number], string> = {
   title: 'Title',
   price: 'Price',
   location: 'Address',
@@ -12,7 +15,30 @@ const FIELD_LABELS: Record<string, string> = {
   upi: 'UPI',
 }
 
-function CompareRow({ label, previous, updated }: {
+function currentValueForProposedKey(listing: Listing, key: (typeof FIELD_KEYS)[number]): string | undefined {
+  switch (key) {
+    case 'location':
+      return listing.address
+    case 'title':
+      return listing.title
+    case 'price':
+      return listing.price
+    case 'description':
+      return listing.description
+    case 'upi':
+      return listing.upi
+    case 'type':
+      return undefined
+    default:
+      return undefined
+  }
+}
+
+function CompareRow({
+  label,
+  previous,
+  updated,
+}: {
   label: string
   previous: string | undefined
   updated: string | undefined
@@ -28,14 +54,19 @@ function CompareRow({ label, previous, updated }: {
   )
 }
 
-function ReviewDetail({ item, onAccept, onDecline, saving }: {
-  item: EditRequestReview
+function ReviewDetail({
+  item,
+  onAccept,
+  onDecline,
+  saving,
+}: {
+  item: EditRequestPending
   onAccept: () => void
   onDecline: () => void
   saving: boolean
 }) {
   const proposed = item.proposedFields
-  const prev = item.previous
+  const prev = item.listing
 
   return (
     <div className="page listing-compare-page">
@@ -50,17 +81,22 @@ function ReviewDetail({ item, onAccept, onDecline, saving }: {
           <h3 className="detail-section-title">Current version</h3>
           {prev.images.length > 0 && (
             <div className="compare-images">
-              {prev.images.map((src, i) => (
+              {prev.images.map((src: string, i: number) => (
                 <img key={i} src={src} alt={`Current ${i + 1}`} className="detail-image" />
               ))}
             </div>
           )}
           <dl className="detail-dl">
-            <dt>Title</dt><dd>{prev.title || '—'}</dd>
-            <dt>Address</dt><dd>{prev.address || '—'}</dd>
-            <dt>Price</dt><dd>{prev.price ?? '—'}</dd>
-            <dt>UPI</dt><dd>{prev.upi ?? '—'}</dd>
-            <dt>Description</dt><dd>{prev.description ?? '—'}</dd>
+            <dt>Title</dt>
+            <dd>{prev.title || '—'}</dd>
+            <dt>Address</dt>
+            <dd>{prev.address || '—'}</dd>
+            <dt>Price</dt>
+            <dd>{prev.price ?? '—'}</dd>
+            <dt>UPI</dt>
+            <dd>{prev.upi ?? '—'}</dd>
+            <dt>Description</dt>
+            <dd>{prev.description ?? '—'}</dd>
           </dl>
         </section>
 
@@ -70,11 +106,11 @@ function ReviewDetail({ item, onAccept, onDecline, saving }: {
             (Highlighted = changed from current)
           </p>
           <dl className="detail-dl">
-            {Object.keys(FIELD_LABELS).map((key) => (
+            {FIELD_KEYS.map((key) => (
               <CompareRow
                 key={key}
                 label={FIELD_LABELS[key]}
-                previous={(prev as any)[key === 'address' ? 'address' : key] as string | undefined}
+                previous={currentValueForProposedKey(prev, key)}
                 updated={proposed[key]}
               />
             ))}
@@ -97,10 +133,10 @@ function ReviewDetail({ item, onAccept, onDecline, saving }: {
 export function EditRequestReviewDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { review, acceptChanges, declineChanges } = useEditRequests()
+  const { pending, approveRequest, rejectRequest } = useEditRequests()
   const [saving, setSaving] = useState(false)
 
-  const item = review.find((r) => r.id === id)
+  const item = pending.find((r: EditRequestPending) => r.id === id)
 
   if (!item) {
     return (
@@ -116,7 +152,7 @@ export function EditRequestReviewDetailPage() {
   const handleAccept = async () => {
     setSaving(true)
     try {
-      await acceptChanges(item.id)
+      await approveRequest(item.id)
       navigate('/admin/edit-requests')
     } finally {
       setSaving(false)
@@ -126,7 +162,7 @@ export function EditRequestReviewDetailPage() {
   const handleDecline = async () => {
     setSaving(true)
     try {
-      await declineChanges(item.id)
+      await rejectRequest(item.id)
       navigate('/admin/edit-requests')
     } finally {
       setSaving(false)

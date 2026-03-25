@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/models/post.dart';
 import 'package:expat_app/models/bowl.dart';
 import 'package:expat_app/services/auth_service.dart';
@@ -17,6 +17,7 @@ import 'package:expat_app/widgets/post_media_gallery.dart';
 import 'expat_map_explore_screen.dart';
 import 'expat_post_thread_screen.dart';
 import 'expat_bowl_thread_screen.dart';
+import 'account_profile_screen.dart';
 
 /// Palette for Expat home screen; mirrors auth/signup colors.
 class _ExpatHomeColors {
@@ -56,7 +57,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   late final Stream<List<Post>> _feedPostsStream;
   String? _uid;
   String _userName = '';
-  String _userEmail = '';
   String _userRole = 'Expat';
   String? _userProfileImageUrl;
 
@@ -87,7 +87,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     if (profile != null && mounted) {
       setState(() {
         _userName = profile.legalName;
-        _userEmail = profile.email;
         _userRole =
             profile.role.value.substring(0, 1).toUpperCase() +
             profile.role.value.substring(1);
@@ -267,25 +266,21 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
 
   Widget _buildProfileMenu(TextTheme textTheme) {
     return GestureDetector(
-      onTap: () => _showProfilePopup(textTheme),
+      onTap: () => _openAccountProfile(),
       child: _buildProfileAvatar(),
     );
   }
 
-  void _showProfilePopup(TextTheme textTheme) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return _ProfilePopupDialog(
-          userName: _userName,
-          userEmail: _userEmail,
-          profileImageUrl: _userProfileImageUrl,
-          onImageUpdated: (url) {
-            setState(() => _userProfileImageUrl = url);
-          },
-        );
-      },
-    );
+  void _openAccountProfile() {
+    Navigator.of(context)
+        .push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => const AccountProfileScreen(role: UserRole.expat),
+          ),
+        )
+        .then((_) {
+          if (mounted) _loadUserProfile();
+        });
   }
 
   Widget _buildSearchBar(TextTheme textTheme) {
@@ -1271,171 +1266,4 @@ class _EstateFilterOption {
   const _EstateFilterOption({required this.label, required this.index});
   final String label;
   final int index;
-}
-
-/// Gmail-style profile popup dialog, reusable across all home screens.
-class _ProfilePopupDialog extends StatefulWidget {
-  const _ProfilePopupDialog({
-    required this.userName,
-    required this.userEmail,
-    required this.profileImageUrl,
-    required this.onImageUpdated,
-  });
-
-  final String userName;
-  final String userEmail;
-  final String? profileImageUrl;
-  final ValueChanged<String> onImageUpdated;
-
-  @override
-  State<_ProfilePopupDialog> createState() => _ProfilePopupDialogState();
-}
-
-class _ProfilePopupDialogState extends State<_ProfilePopupDialog> {
-  String? _imageUrl;
-  bool _uploading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _imageUrl = widget.profileImageUrl;
-  }
-
-  Future<void> _pickAndUpload() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (picked == null) return;
-
-    setState(() => _uploading = true);
-    try {
-      final url = await AuthService().uploadProfileImage(picked);
-      if (mounted) {
-        setState(() {
-          _imageUrl = url;
-          _uploading = false;
-        });
-        widget.onImageUpdated(url);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _uploading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to upload: $e')));
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    const primaryDark = Color(0xFF1A2E35);
-    const accentGreen = Color(0xFF8ED966);
-
-    return Dialog(
-      alignment: Alignment.topRight,
-      backgroundColor: primaryDark,
-      insetPadding: const EdgeInsets.only(top: 70, right: 12, left: 80),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                _uploading
-                    ? const SizedBox(
-                      width: 72,
-                      height: 72,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        color: accentGreen,
-                      ),
-                    )
-                    : _buildAvatar(72),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: GestureDetector(
-                    onTap: _uploading ? null : _pickAndUpload,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: accentGreen,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        size: 14,
-                        color: primaryDark,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              widget.userName,
-              style: textTheme.titleMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.userEmail,
-              style: textTheme.bodySmall?.copyWith(color: Colors.white70),
-            ),
-            const SizedBox(height: 20),
-            const Divider(height: 1, color: Colors.white24),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.white),
-              title: Text(
-                'Log out',
-                style: textTheme.bodyMedium?.copyWith(color: Colors.white),
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              onTap: () async {
-                Navigator.of(context, rootNavigator: true).pop();
-                await AuthService().signOut();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAvatar(double radius) {
-    if (_imageUrl != null && _imageUrl!.isNotEmpty) {
-      return CircleAvatar(
-        radius: radius / 2,
-        backgroundImage: NetworkImage(_imageUrl!),
-        backgroundColor: Colors.grey.shade200,
-      );
-    }
-    return CircleAvatar(
-      radius: radius / 2,
-      backgroundColor: const Color(0xFF8ED966),
-      child: Text(
-        widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?',
-        style: TextStyle(
-          color: const Color(0xFF1A2E35),
-          fontWeight: FontWeight.w600,
-          fontSize: radius * 0.4,
-        ),
-      ),
-    );
-  }
 }

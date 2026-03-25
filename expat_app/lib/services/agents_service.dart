@@ -148,6 +148,24 @@ class AgentsService {
     return LicensedAgent.fromFirestore(doc);
   }
 
+  /// Update public agent fields on `licensed_agents` (bio-view / profile).
+  Future<void> updateLicensedAgentProfile(
+    String agentId, {
+    String? firstName,
+    String? lastName,
+    String? bio,
+    String? phone,
+  }) async {
+    final updates = <String, dynamic>{
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (firstName != null) updates['firstName'] = firstName;
+    if (lastName != null) updates['lastName'] = lastName;
+    if (bio != null) updates['bio'] = bio;
+    if (phone != null) updates['phone'] = phone;
+    await _agentsRef.doc(agentId).update(updates);
+  }
+
   // ---------------------------------------------------------------------------
   // Agent UID resolution
   // ---------------------------------------------------------------------------

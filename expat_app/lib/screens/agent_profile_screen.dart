@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'landlord_assign_property_screen.dart';
 
-/// Agent profile screen shown when the user taps the agent's profile
-/// in the chat view (when the listing representative is an agent).
+/// Agent profile (Find Agent card tap, or **contact profile** from chat).
 class AgentProfileScreen extends StatelessWidget {
   const AgentProfileScreen({
     super.key,
@@ -56,51 +56,58 @@ class AgentProfileScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: _headerDark,
         elevation: 0,
+        toolbarHeight: 76,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new,
               color: Colors.white, size: 18),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.grey.shade400,
-              backgroundImage:
-                  profileImageUrl != null && profileImageUrl!.isNotEmpty
-                      ? NetworkImage(profileImageUrl!)
-                      : null,
-              child:
-                  profileImageUrl == null || profileImageUrl!.isEmpty
-                      ? const Icon(Icons.person, color: Colors.white)
-                      : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    agentName,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    agentId,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.8),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+        titleSpacing: 10,
+        title: Padding(
+          padding: const EdgeInsets.only(right: 8, top: 6, bottom: 6),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: Colors.grey.shade400,
+                backgroundImage:
+                    profileImageUrl != null && profileImageUrl!.isNotEmpty
+                        ? NetworkImage(profileImageUrl!)
+                        : null,
+                child:
+                    profileImageUrl == null || profileImageUrl!.isEmpty
+                        ? const Icon(Icons.person, color: Colors.white, size: 22)
+                        : null,
               ),
-            ),
-          ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      agentName,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      agentId,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        height: 1.2,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       body: SingleChildScrollView(
@@ -573,6 +580,132 @@ class AgentProfileScreen extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// **Contact profile** from chat: loads an agent by Firebase UID and shows the same
+/// [AgentProfileScreen] as Find Agent. [showAssignProperty] is true for landlords only.
+class ContactAgentProfileScreen extends StatefulWidget {
+  const ContactAgentProfileScreen({
+    super.key,
+    required this.agentUserUid,
+    required this.showAssignProperty,
+  });
+
+  final String agentUserUid;
+  final bool showAssignProperty;
+
+  @override
+  State<ContactAgentProfileScreen> createState() =>
+      _ContactAgentProfileScreenState();
+}
+
+class _ContactAgentProfileScreenState extends State<ContactAgentProfileScreen> {
+  bool _loading = true;
+  String? _error;
+  String _agentName = '';
+  String _agentFullName = '';
+  String _agentId = '';
+  String _locationTag = '';
+  String? _bio;
+  String _phone = '';
+  double _rating = 0;
+  int _ratingCount = 0;
+  String? _profileImageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final profile = await AuthService().getUserProfile(widget.agentUserUid);
+    if (!mounted) return;
+    if (profile == null || profile.role != UserRole.agent) {
+      setState(() {
+        _loading = false;
+        _error = 'Profile not found.';
+      });
+      return;
+    }
+    final aid = profile.agentId;
+    if (aid == null || aid.isEmpty) {
+      setState(() {
+        _loading = false;
+        _error = 'Agent profile unavailable.';
+      });
+      return;
+    }
+
+    final agent = await AgentsService().getAgent(aid);
+    if (!mounted) return;
+    if (agent == null) {
+      setState(() {
+        _loading = false;
+        _error = 'Agent registry entry missing.';
+      });
+      return;
+    }
+
+    final userPhoto = profile.profileImageUrl;
+    final regPhoto = agent.profileImageUrl;
+    final photo =
+        (userPhoto != null && userPhoto.isNotEmpty) ? userPhoto : regPhoto;
+
+    setState(() {
+      _loading = false;
+      _agentName = agent.fullName;
+      _agentFullName = agent.fullName;
+      _agentId = agent.agentId;
+      _locationTag = agent.region.isNotEmpty ? agent.region : '—';
+      _bio = agent.bio;
+      _phone = agent.phone ?? '';
+      _rating = agent.rating;
+      _ratingCount = agent.ratingCount;
+      _profileImageUrl = photo;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1A2E35),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new,
+                color: Colors.white, size: 18),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          title: const Text('Profile', style: TextStyle(color: Colors.white)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(_error!, textAlign: TextAlign.center),
+          ),
+        ),
+      );
+    }
+
+    return AgentProfileScreen(
+      agentName: _agentName,
+      agentFullName: _agentFullName,
+      agentId: _agentId,
+      locationTag: _locationTag,
+      bio: _bio,
+      phone: _phone,
+      rating: _rating,
+      ratingCount: _ratingCount,
+      profileImageUrl: _profileImageUrl,
+      showAssignProperty: widget.showAssignProperty,
     );
   }
 }

@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/commission_slip.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/utils/calendar_thread_labels.dart';
 import 'package:expat_app/services/commission_slips_service.dart';
 
 class LandlordPaymentsScreen extends StatefulWidget {
@@ -40,25 +44,33 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
       TextEditingController(text: 'MTN Momo');
   final TextEditingController _phoneController = TextEditingController();
 
-  String? _landlordUid;
   Stream<List<CommissionSlip>>? _slipsStream;
+  StreamSubscription<User?>? _authSub;
 
   /// Currently selected slip (from Track tab "Pay" button).
   CommissionSlip? _activeSlip;
+
+  void _bindSlipsStream(String? uid) {
+    _slipsStream =
+        uid != null && uid.isNotEmpty
+            ? CommissionSlipsService().landlordSlipsStream(uid)
+            : null;
+  }
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    _landlordUid = AuthService().currentUser?.uid;
-    if (_landlordUid != null) {
-      _slipsStream =
-          CommissionSlipsService().landlordSlipsStream(_landlordUid!);
-    }
+    _bindSlipsStream(AuthService().currentUser?.uid);
+    _authSub = AuthService().authStateChanges.listen((user) {
+      if (!mounted) return;
+      setState(() => _bindSlipsStream(user?.uid));
+    });
   }
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _commissionIdController.dispose();
@@ -213,7 +225,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
         for (final slip in slips) {
           final date = slip.createdAt ?? DateTime.now();
           final isNewDate =
-              lastDate == null || !_isSameDay(lastDate, date);
+              lastDate == null || !isSameCalendarDay(lastDate, date);
 
           if (isNewDate) {
             if (lastDate != null) {
@@ -221,7 +233,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
             }
             children.add(_buildDateHeader(textTheme, date));
             children.add(const SizedBox(height: 16));
-            lastDate = _startOfDay(date);
+            lastDate = dateOnlyLocal(date);
           } else {
             children.add(const Divider(height: 1, color: Color(0xFFE0E0E0)));
             children.add(const SizedBox(height: 12));
@@ -241,16 +253,13 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
   }
 
   Widget _buildDateHeader(TextTheme textTheme, DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    final year = date.year.toString();
-    final label = '$day/$month/$year';
-
+    final label = threadDayDividerLabel(dateOnlyLocal(date), DateTime.now());
     return Center(
       child: Text(
         label,
         style: textTheme.bodySmall?.copyWith(
           color: _LandlordPaymentsColors.bodyText,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -503,15 +512,6 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
     );
   }
 
-  bool _isSameDay(DateTime? a, DateTime b) {
-    if (a == null) return false;
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  DateTime _startOfDay(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
-  }
-
   Future<void> _handlePay() async {
     final ref = _commissionIdController.text.trim();
     if (ref.isEmpty) {
@@ -618,6 +618,7 @@ class _LandlordPaymentsScreenState extends State<LandlordPaymentsScreen> {
 
     showDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {

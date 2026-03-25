@@ -82,6 +82,17 @@ class EditRequestsService {
     return list.first;
   }
 
+  /// Landlord taps “Edit Request Approved” to clear the banner; does not change [status].
+  Future<void> landlordAcknowledgeApprovedEdit(String editRequestId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw StateError('You must be signed in to acknowledge.');
+    }
+    await _requestsRef.doc(editRequestId).update({
+      'landlordAcknowledgedApprovalAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   /// Stream of the latest edit request for a specific listing.
   /// Includes a landlordId filter so the query satisfies Firestore rules.
   Stream<ListingEditRequest?> listingEditRequestStream(String listingId) {

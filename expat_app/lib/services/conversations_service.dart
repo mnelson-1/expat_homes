@@ -1,7 +1,16 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../models/conversation.dart';
 import '../models/chat_message.dart';
+
+/// Storage path: `chat_attachments/{senderId}/{conversationId}/{objectName}`.
+const String kChatAttachmentsStoragePrefix = 'chat_attachments';
+
+/// Max attachment size for chat uploads (bytes).
+const int kChatAttachmentMaxBytes = 25 * 1024 * 1024;
 
 /// Manages Firestore conversations and messages.
 class ConversationsService {
@@ -10,6 +19,7 @@ class ConversationsService {
   factory ConversationsService() => _instance;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   CollectionReference<Map<String, dynamic>> get _conversationsRef =>
       _firestore.collection('conversations');
@@ -93,11 +103,15 @@ class ConversationsService {
   }
 
   /// Sends a message and updates the conversation's last-message metadata.
+  ///
+  /// [lastMessagePreview] overrides the text shown in the conversation list
+  /// (e.g. `📎 filename` when [content] is empty but an attachment was sent).
   Future<ChatMessage> sendMessage({
     required String conversationId,
     required String senderId,
     required String content,
     Map<String, dynamic> payload = const {},
+    String? lastMessagePreview,
   }) async {
     final msg = ChatMessage(
       id: '',
@@ -109,12 +123,130 @@ class ConversationsService {
 
     final docRef = await _messagesRef.add(msg.toFirestore());
 
+    final preview =
+        (lastMessagePreview != null && lastMessagePreview.isNotEmpty)
+            ? lastMessagePreview
+            : content;
+
     await _conversationsRef.doc(conversationId).update({
-      'lastMessage': content,
+      'lastMessage': preview,
       'lastMessageAt': FieldValue.serverTimestamp(),
     });
 
     final created = await docRef.get();
     return ChatMessage.fromFirestore(created);
+  }
+
+  /// Uploads [fileBytes] to Storage, then sends a message with attachment metadata in [payload].
+  Future<ChatMessage> uploadAndSendChatAttachment({
+    required String conversationId,
+    required String senderId,
+    required Uint8List fileBytes,
+    required String fileName,
+    String caption = '',
+  }) async {
+    if (fileBytes.length > kChatAttachmentMaxBytes) {
+      throw StateError(
+        'File is too large (max ${kChatAttachmentMaxBytes ~/ (1024 * 1024)} MB).',
+      );
+    }
+
+    final mime = _guessMimeType(fileName);
+    final kind =
+        mime.startsWith('image/')
+            ? ChatMessage.kAttachmentKindImage
+            : ChatMessage.kAttachmentKindFile;
+
+    final objectName = _storageObjectName(fileName);
+    final storagePath =
+        '$kChatAttachmentsStoragePrefix/$senderId/$conversationId/$objectName';
+
+    final ref = _storage.ref(storagePath);
+    await ref.putData(
+      fileBytes,
+      SettableMetadata(contentType: mime),
+    );
+    final downloadUrl = await ref.getDownloadURL();
+
+    final safeDisplayName = _safeDisplayFileName(fileName);
+    final captionTrim = caption.trim();
+    final preview =
+        captionTrim.isNotEmpty ? captionTrim : '📎 $safeDisplayName';
+
+    return sendMessage(
+      conversationId: conversationId,
+      senderId: senderId,
+      content: captionTrim,
+      lastMessagePreview: preview,
+      payload: {
+        ChatMessage.kPayloadAttachmentUrl: downloadUrl,
+        ChatMessage.kPayloadAttachmentName: safeDisplayName,
+        ChatMessage.kPayloadAttachmentMime: mime,
+        ChatMessage.kPayloadAttachmentKind: kind,
+      },
+    );
+  }
+
+  static String _safeDisplayFileName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'attachment';
+    final parts = trimmed.split(RegExp(r'[/\\]'));
+    return parts.last.isEmpty ? 'attachment' : parts.last;
+  }
+
+  static String _storageObjectName(String fileName) {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final display = _safeDisplayFileName(fileName);
+    final dot = display.lastIndexOf('.');
+    String ext = '';
+    var base = display;
+    if (dot > 0) {
+      ext = display.substring(dot);
+      base = display.substring(0, dot);
+    }
+    ext = ext.replaceAll(RegExp(r'[^\w.]'), '');
+    final sanitized =
+        base.replaceAll(RegExp(r'[/\\]'), '_').replaceAll(' ', '_').trim();
+    final short =
+        sanitized.length > 80 ? sanitized.substring(0, 80) : sanitized;
+    final basePart = short.isEmpty ? 'file' : short;
+    return '${ts}_$basePart$ext';
+  }
+
+  static String _guessMimeType(String fileName) {
+    final ext =
+        fileName.contains('.')
+            ? fileName.split('.').last.toLowerCase()
+            : '';
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'heic':
+      case 'heif':
+        return 'image/heic';
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'txt':
+        return 'text/plain';
+      case 'zip':
+        return 'application/zip';
+      default:
+        return 'application/octet-stream';
+    }
   }
 }

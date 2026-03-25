@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:expat_app/constants/user_profile_options.dart';
 import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/services/auth_service.dart';
 
@@ -141,7 +142,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   _buildDropdown<String>(
                     value: _country,
                     hint: 'Select country',
-                    items: ['Nigeria', 'Rwanda', 'Kenya', 'Uganda', 'Tanzania']
+                    items: kCountryOfCitizenshipOptions
                         .map((c) => DropdownMenuItem(
                               value: c,
                               child: Text(c,

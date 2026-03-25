@@ -355,11 +355,23 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
       bgColor = const Color(0xFFFFD54F);
       fgColor = _LandlordEstatesColors.bodyText;
       onPressed = null;
-    } else if (status == EditRequestStatus.approved) {
+    } else if (status == EditRequestStatus.approved &&
+        req != null &&
+        req.showsLandlordApprovedBanner) {
       label = 'Edit Request Approved';
       bgColor = const Color(0xFF8ED966);
       fgColor = _LandlordEstatesColors.bodyText;
-      onPressed = null;
+      onPressed = () async {
+        try {
+          await EditRequestsService().landlordAcknowledgeApprovedEdit(req.id);
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not update: $e')),
+            );
+          }
+        }
+      };
     } else {
       label = 'Request Edit';
       bgColor = _LandlordEstatesColors.bodyText;

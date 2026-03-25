@@ -110,6 +110,7 @@ class AuthService {
           countryOfCitizenship: profile.countryOfCitizenship,
           demographic: profile.demographic,
           agentId: profile.agentId,
+          bio: profile.bio,
         ).toFirestoreCreate();
 
     await _firestore.collection(kUsersCollection).doc(user.uid).set(createData);
@@ -203,5 +204,81 @@ class AuthService {
     });
 
     return url;
+  }
+
+  /// Update legal name (expat / landlord). [legalLastName] may be empty.
+  Future<void> updateLegalName({
+    required String legalFirstName,
+    required String legalLastName,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Not signed in');
+    await _firestore.collection(kUsersCollection).doc(user.uid).update({
+      'legalFirstName': legalFirstName.trim(),
+      'legalLastName': legalLastName.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Update profile bio for the current user (`users` doc).
+  Future<void> updateUserBio(String bio) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Not signed in');
+    await _firestore.collection(kUsersCollection).doc(user.uid).update({
+      'bio': bio.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Updates email in Firestore and attempts Firebase Auth email update.
+  Future<void> updateUserEmail(String email) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Not signed in');
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) throw ArgumentError.value(email, 'email', 'empty');
+    await _firestore.collection(kUsersCollection).doc(user.uid).update({
+      'email': trimmed,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    try {
+      await user.verifyBeforeUpdateEmail(trimmed);
+    } on FirebaseAuthException {
+      // Profile document already updated; user may need to fix email or re-auth.
+      rethrow;
+    }
+  }
+
+  /// Sync agent display name on the user document (optional; agent registry is source of truth).
+  Future<void> updateAgentUserDocName({
+    required String legalFirstName,
+    required String legalLastName,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Not signed in');
+    await _firestore.collection(kUsersCollection).doc(user.uid).update({
+      'legalFirstName': legalFirstName.trim(),
+      'legalLastName': legalLastName.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Preferred language (same values as registration).
+  Future<void> updatePreferredLanguage(String language) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Not signed in');
+    await _firestore.collection(kUsersCollection).doc(user.uid).update({
+      'preferredLanguage': language.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Expat country of citizenship (same values as expat sign-up).
+  Future<void> updateCountryOfCitizenship(String country) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Not signed in');
+    await _firestore.collection(kUsersCollection).doc(user.uid).update({
+      'countryOfCitizenship': country.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }

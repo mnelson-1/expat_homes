@@ -3,6 +3,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// A single message within a conversation.
 /// Stored in the Firestore `messages` collection.
 class ChatMessage {
+  /// [payload] keys for a file or image shared in chat.
+  static const String kPayloadAttachmentUrl = 'attachmentUrl';
+  static const String kPayloadAttachmentName = 'attachmentName';
+  static const String kPayloadAttachmentMime = 'attachmentMime';
+  static const String kPayloadAttachmentKind = 'attachmentKind';
+
+  /// Values for [kPayloadAttachmentKind].
+  static const String kAttachmentKindImage = 'image';
+  static const String kAttachmentKindFile = 'file';
+
   ChatMessage({
     required this.id,
     required this.conversationId,

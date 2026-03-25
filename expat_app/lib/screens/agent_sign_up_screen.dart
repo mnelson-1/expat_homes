@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:expat_app/constants/user_profile_options.dart';
 import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
@@ -70,13 +71,6 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
     _agentIdController.dispose();
     super.dispose();
   }
-
-  static const List<String> _languages = [
-    'English',
-    'Kinyarwanda',
-    'French',
-    'Swahili',
-  ];
 
   /// Debounce token to avoid redundant Firestore lookups.
   int _validateGeneration = 0;
@@ -417,7 +411,7 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
         child: DropdownButton<String>(
           value: _selectedLanguage,
           isExpanded: true,
-          items: _languages
+          items: kPreferredLanguages
               .map(
                 (lang) => DropdownMenuItem<String>(
                   value: lang,

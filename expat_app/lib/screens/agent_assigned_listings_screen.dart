@@ -324,7 +324,8 @@ class _AssignmentCard extends StatelessWidget {
           MaterialPageRoute<void>(
             builder: (_) => ListingDetailScreenById(
               listingId: listing.id,
-              showAgentActions: !isAcceptedTab,
+              // Always agent UI in detail; pending vs accepted controls Accept via Firestore.
+              showAgentActions: true,
               onListingAccepted: (_) => onAccepted(),
               onListingDeclined: (_) => onDeclined(),
             ),

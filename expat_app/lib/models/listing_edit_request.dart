@@ -31,6 +31,7 @@ class ListingEditRequest {
     this.reviewedAt,
     this.createdAt,
     this.reason,
+    this.landlordAcknowledgedApprovalAt,
   });
 
   final String id;
@@ -43,6 +44,14 @@ class ListingEditRequest {
   final DateTime? reviewedAt;
   final DateTime? createdAt;
   final String? reason;
+
+  /// When set, the landlord has dismissed the “Edit Request Approved” banner.
+  final DateTime? landlordAcknowledgedApprovalAt;
+
+  /// Green approved banner until the landlord taps to acknowledge (then [Request Edit] returns).
+  bool get showsLandlordApprovedBanner =>
+      status == EditRequestStatus.approved &&
+      landlordAcknowledgedApprovalAt == null;
 
   factory ListingEditRequest.fromFirestore(
       DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -59,6 +68,8 @@ class ListingEditRequest {
       reviewedAt: (data['reviewedAt'] as Timestamp?)?.toDate(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       reason: data['reason'] as String?,
+      landlordAcknowledgedApprovalAt:
+          (data['landlordAcknowledgedApprovalAt'] as Timestamp?)?.toDate(),
     );
   }
 

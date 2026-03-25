@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'package:expat_app/models/licensed_agent.dart';
+import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'account_profile_screen.dart';
 import 'agent_profile_screen.dart';
 import 'landlord_estates_screen.dart';
 import 'landlord_make_listing_screen.dart';
@@ -38,7 +39,6 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
   final TextEditingController _regionController = TextEditingController();
   String _activeRegion = '';
   String _userName = '';
-  String _userEmail = '';
   String? _userProfileImageUrl;
 
   @override
@@ -53,7 +53,6 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
     if (profile != null && mounted) {
       setState(() {
         _userName = profile.legalName;
-        _userEmail = profile.email;
         _userProfileImageUrl = profile.profileImageUrl;
       });
     }
@@ -142,25 +141,21 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
 
   Widget _buildProfileMenu(TextTheme textTheme) {
     return GestureDetector(
-      onTap: () => _showProfilePopup(textTheme),
+      onTap: () => _openAccountProfile(),
       child: _buildProfileAvatar(),
     );
   }
 
-  void _showProfilePopup(TextTheme textTheme) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return _LandlordProfilePopup(
-          userName: _userName,
-          userEmail: _userEmail,
-          profileImageUrl: _userProfileImageUrl,
-          onImageUpdated: (url) {
-            setState(() => _userProfileImageUrl = url);
-          },
-        );
-      },
-    );
+  void _openAccountProfile() {
+    Navigator.of(context)
+        .push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => const AccountProfileScreen(role: UserRole.landlord),
+          ),
+        )
+        .then((_) {
+          if (mounted) _loadUserProfile();
+        });
   }
 
   Widget _buildSearchSection(TextTheme textTheme) {
@@ -586,139 +581,3 @@ Widget _buildAgentCard(
   );
 }
 
-class _LandlordProfilePopup extends StatefulWidget {
-  const _LandlordProfilePopup({
-    required this.userName,
-    required this.userEmail,
-    required this.profileImageUrl,
-    required this.onImageUpdated,
-  });
-
-  final String userName;
-  final String userEmail;
-  final String? profileImageUrl;
-  final ValueChanged<String> onImageUpdated;
-
-  @override
-  State<_LandlordProfilePopup> createState() => _LandlordProfilePopupState();
-}
-
-class _LandlordProfilePopupState extends State<_LandlordProfilePopup> {
-  String? _imageUrl;
-  bool _uploading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _imageUrl = widget.profileImageUrl;
-  }
-
-  Future<void> _pickAndUpload() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (picked == null) return;
-    setState(() => _uploading = true);
-    try {
-      final url = await AuthService().uploadProfileImage(picked);
-      if (mounted) {
-        setState(() { _imageUrl = url; _uploading = false; });
-        widget.onImageUpdated(url);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _uploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload: $e')),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    const primaryDark = Color(0xFF1A2E35);
-    const accentGreen = Color(0xFF8ED966);
-
-    return Dialog(
-      alignment: Alignment.topRight,
-      backgroundColor: primaryDark,
-      insetPadding: const EdgeInsets.only(top: 70, right: 12, left: 80),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                _uploading
-                    ? const SizedBox(
-                        width: 72, height: 72,
-                        child: CircularProgressIndicator(strokeWidth: 3))
-                    : CircleAvatar(
-                        radius: 36,
-                        backgroundColor: accentGreen,
-                        backgroundImage: _imageUrl != null && _imageUrl!.isNotEmpty
-                            ? NetworkImage(_imageUrl!)
-                            : null,
-                        child: _imageUrl == null || _imageUrl!.isEmpty
-                            ? Text(
-                                widget.userName.isNotEmpty
-                                    ? widget.userName[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(
-                                  color: primaryDark,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 28,
-                                ))
-                            : null,
-                      ),
-                Positioned(
-                  bottom: 0, right: 0,
-                  child: GestureDetector(
-                    onTap: _uploading ? null : _pickAndUpload,
-                    child: Container(
-                      width: 28, height: 28,
-                      decoration: BoxDecoration(
-                        color: accentGreen,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(Icons.camera_alt, size: 14, color: primaryDark),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(widget.userName,
-                style: textTheme.titleMedium?.copyWith(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text(widget.userEmail,
-                style: textTheme.bodySmall?.copyWith(color: Colors.white70)),
-            const SizedBox(height: 20),
-            const Divider(height: 1, color: Colors.white24),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.white),
-              title: Text('Log out',
-                  style: textTheme.bodyMedium?.copyWith(color: Colors.white)),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              onTap: () async {
-                Navigator.of(context, rootNavigator: true).pop();
-                await AuthService().signOut();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

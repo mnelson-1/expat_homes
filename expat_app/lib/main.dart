@@ -7,9 +7,11 @@ import 'package:expat_app/screens/agent_home_screen.dart';
 import 'package:expat_app/screens/expat_home_screen.dart';
 import 'package:expat_app/screens/get_started_screen.dart';
 import 'package:expat_app/screens/landlord_home_screen.dart';
+import 'package:expat_app/screens/listing_detail_screen.dart';
 import 'package:expat_app/screens/splash_screen.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/app_route_names.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +33,24 @@ class ExpatApp extends StatelessWidget {
     return MaterialApp(
       title: 'ExpatHomes',
       debugShowCheckedModeBanner: false,
+      onGenerateRoute: (RouteSettings settings) {
+        if (settings.name == AppRouteNames.listingDetailFromChat) {
+          final args = settings.arguments as Map<String, dynamic>?;
+          if (args == null) return null;
+          final listingId = args['listingId'] as String? ?? '';
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder:
+                (_) => ListingDetailScreenById(
+                  listingId: listingId,
+                  showRequestEditOnly:
+                      args['showRequestEditOnly'] as bool? ?? false,
+                  showAgentActions: args['showAgentActions'] as bool? ?? false,
+                ),
+          );
+        }
+        return null;
+      },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF212C2F),
