@@ -35,6 +35,7 @@ class CommissionSlip {
   CommissionSlip({
     required this.id,
     required this.reference,
+    this.listingId = '',
     required this.listingTitle,
     required this.contractCode,
     required this.landlordId,
@@ -54,6 +55,8 @@ class CommissionSlip {
 
   final String id;
   final String reference;
+  /// Firestore `listings` document id; used for one slip per listing per agent.
+  final String listingId;
   final String listingTitle;
   final String contractCode;
   final String landlordId;
@@ -82,6 +85,7 @@ class CommissionSlip {
     return CommissionSlip(
       id: doc.id,
       reference: data['reference'] as String? ?? '',
+      listingId: data['listingId'] as String? ?? '',
       listingTitle: data['listingTitle'] as String? ?? '',
       contractCode: data['contractCode'] as String? ?? '',
       landlordId: data['landlordId'] as String? ?? '',
@@ -102,6 +106,7 @@ class CommissionSlip {
 
   Map<String, dynamic> toFirestore() => {
         'reference': reference,
+        'listingId': listingId,
         'listingTitle': listingTitle,
         'contractCode': contractCode,
         'landlordId': landlordId,

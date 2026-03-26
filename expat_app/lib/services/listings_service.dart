@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../models/listing.dart';
 import '../models/listing_assignment.dart';
@@ -39,7 +39,7 @@ class ListingsService {
     required String location,
     required String price,
     String? upi,
-    required List<XFile> imageFiles,
+    List<Uint8List> imageBytes = const [],
   }) async {
     final ref = _listingsRef.doc();
     final listingId = ref.id;
@@ -47,14 +47,15 @@ class ListingsService {
     final mediaUrls = <String>[];
     const perImageTimeout = Duration(seconds: 45);
 
-    if (imageFiles.isNotEmpty) {
-      for (var i = 0; i < imageFiles.length; i++) {
-        onProgress?.call('Uploading image ${i + 1} of ${imageFiles.length}...');
+    if (imageBytes.isNotEmpty) {
+      for (var i = 0; i < imageBytes.length; i++) {
+        onProgress?.call(
+          'Uploading image ${i + 1} of ${imageBytes.length}...',
+        );
         final path = '$kStorageListingsPath/$listingId/$i';
-        final bytes = await imageFiles[i].readAsBytes();
         final task = _storage
             .ref(path)
-            .putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+            .putData(imageBytes[i], SettableMetadata(contentType: 'image/jpeg'));
         final snapshot = await task.timeout(
           perImageTimeout,
           onTimeout:
@@ -258,6 +259,55 @@ class ListingsService {
           });
           return list;
         });
+  }
+
+  /// Listings the landlord can assign to a new agent: excludes any property that
+  /// already has a pending or accepted assignment.
+  Stream<List<Listing>> landlordAssignableListingsStream(String landlordId) {
+    var all = <Listing>[];
+    var busyIds = <String>{};
+    StreamSubscription<List<Listing>>? subListings;
+    StreamSubscription<Set<String>>? subBusy;
+
+    late final StreamController<List<Listing>> controller;
+
+    void emit() {
+      final filtered = all.where((l) => !busyIds.contains(l.id)).toList();
+      filtered.sort((a, b) {
+        final aAt = a.createdAt ?? DateTime(0);
+        final bAt = b.createdAt ?? DateTime(0);
+        return bAt.compareTo(aAt);
+      });
+      if (!controller.isClosed) controller.add(filtered);
+    }
+
+    controller = StreamController<List<Listing>>(
+      onListen: () {
+        subListings = landlordListingsStream(landlordId).listen(
+          (list) {
+            all = list;
+            emit();
+          },
+          onError: controller.addError,
+        );
+        subBusy =
+            AgentsService().landlordBusyAssignmentListingIdsStream(landlordId).listen(
+          (ids) {
+            busyIds = ids;
+            emit();
+          },
+          onError: controller.addError,
+        );
+      },
+      onCancel: () {
+        subListings?.cancel();
+        subBusy?.cancel();
+        subListings = null;
+        subBusy = null;
+      },
+    );
+
+    return controller.stream;
   }
 
   /// One-time fetch published listings (e.g. for initial load without stream).

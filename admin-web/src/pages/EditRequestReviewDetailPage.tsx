@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEditRequests, type EditRequestPending } from '../context/EditRequestsContext'
 import type { Listing } from '../data/mockListings'
+import {
+  fetchLandlordVerification,
+  type LandlordVerification,
+} from '../lib/landlordProfile'
 
 // Field labels for display in the comparison grid (keys match Firestore proposedFields).
 const FIELD_KEYS = ['title', 'price', 'location', 'description', 'type', 'upi'] as const
@@ -67,6 +71,27 @@ function ReviewDetail({
 }) {
   const proposed = item.proposedFields
   const prev = item.listing
+  const [landlordVerification, setLandlordVerification] =
+    useState<LandlordVerification | null>(null)
+
+  useEffect(() => {
+    if (!item.landlordId) {
+      setLandlordVerification(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const v = await fetchLandlordVerification(item.landlordId)
+        if (!cancelled) setLandlordVerification(v)
+      } catch {
+        if (!cancelled) setLandlordVerification(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [item.id, item.landlordId])
 
   return (
     <div className="page listing-compare-page">
@@ -75,6 +100,36 @@ function ReviewDetail({
         Review proposed changes. Highlighted rows differ from the current listing.
         Accept to apply them; decline to reject without changes.
       </p>
+
+      {landlordVerification && (
+        <section
+          className="detail-section"
+          style={{
+            maxWidth: 720,
+            marginBottom: 24,
+            padding: 16,
+            background: '#f4f5f7',
+            borderRadius: 12,
+            border: '1px solid #e0e0e0',
+          }}
+        >
+          <h3 className="detail-section-title" style={{ marginTop: 0 }}>
+            Landlord account (admin)
+          </h3>
+          <dl className="detail-dl">
+            <dt>Legal name</dt>
+            <dd>{landlordVerification.displayName}</dd>
+            <dt>Email</dt>
+            <dd>{landlordVerification.email || '—'}</dd>
+            <dt>Phone</dt>
+            <dd>{landlordVerification.phone ?? '—'}</dd>
+            <dt>User ID</dt>
+            <dd>
+              <code style={{ wordBreak: 'break-all' }}>{landlordVerification.uid}</code>
+            </dd>
+          </dl>
+        </section>
+      )}
 
       <div className="compare-grid">
         <section className="compare-column">

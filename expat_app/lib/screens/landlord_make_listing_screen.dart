@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' show FileSystemException;
+import 'dart:typed_data';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -59,7 +60,8 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
 
   String _selectedType = 'Apartment';
   final ImagePicker _imagePicker = ImagePicker();
-  List<XFile> _selectedImages = [];
+  /// In-memory only — avoids Android clearing `code_cache` / picker paths before upload.
+  List<Uint8List> _selectedImageBytes = [];
   bool _isLoading = false;
   String _loadingMessage = '';
 
@@ -121,7 +123,7 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
     setState(() {
       _isLoading = true;
       _loadingMessage =
-          _selectedImages.isEmpty ? 'Saving listing...' : 'Preparing...';
+          _selectedImageBytes.isEmpty ? 'Saving listing...' : 'Preparing...';
     });
     try {
       if (isEditMode) {
@@ -176,7 +178,7 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
               location: location,
               price: priceStored,
               upi: upi.isEmpty ? null : upi,
-              imageFiles: _selectedImages,
+              imageBytes: _selectedImageBytes,
             )
             .timeout(
               const Duration(seconds: 120),
@@ -215,11 +217,12 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
       );
       debugPrint('createListing error: $e\n$st');
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
           _loadingMessage = '';
         });
+      }
     }
   }
 
@@ -228,9 +231,23 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
 
     if (!mounted || images.isEmpty) return;
 
-    setState(() {
-      _selectedImages = images;
-    });
+    try {
+      final out = <Uint8List>[];
+      for (final x in images) {
+        out.add(await x.readAsBytes());
+      }
+      if (!mounted) return;
+      setState(() => _selectedImageBytes = out);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not use those photos (${e is FileSystemException ? 'file missing — pick again' : e}).',
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -482,7 +499,7 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
           padding: const EdgeInsets.all(16),
           alignment: Alignment.center,
           child:
-              _selectedImages.isEmpty
+              _selectedImageBytes.isEmpty
                   ? Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -504,14 +521,14 @@ class _LandlordMakeListingScreenState extends State<LandlordMakeListingScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children:
-                          _selectedImages
+                          _selectedImageBytes
                               .map(
-                                (image) => Padding(
+                                (bytes) => Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
-                                    child: Image.file(
-                                      File(image.path),
+                                    child: Image.memory(
+                                      bytes,
                                       width: 80,
                                       height: 80,
                                       fit: BoxFit.cover,

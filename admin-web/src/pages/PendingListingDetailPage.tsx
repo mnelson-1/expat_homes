@@ -5,6 +5,10 @@ import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { ListingDetailView } from '../components/ListingDetailView'
 import type { Listing } from '../data/mockListings'
 import { auth, db } from '../firebase'
+import {
+  fetchLandlordVerification,
+  type LandlordVerification,
+} from '../lib/landlordProfile'
 
 export function PendingListingDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -13,6 +17,8 @@ export function PendingListingDetailPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [landlordVerification, setLandlordVerification] =
+    useState<LandlordVerification | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -28,6 +34,15 @@ export function PendingListingDetailPage() {
           return
         }
         const data = snap.data() as any
+        const landlordId = data.landlordId as string | undefined
+        let verification: LandlordVerification | null = null
+        if (landlordId) {
+          try {
+            verification = await fetchLandlordVerification(landlordId)
+          } catch {
+            verification = null
+          }
+        }
         const view: Listing = {
           id: snap.id,
           title: data.title ?? '',
@@ -44,6 +59,7 @@ export function PendingListingDetailPage() {
         }
         if (!cancelled) {
           setListing(view)
+          setLandlordVerification(verification)
           setLoading(false)
         }
       } catch (err: any) {
@@ -115,6 +131,7 @@ export function PendingListingDetailPage() {
   return (
     <ListingDetailView
       listing={listing}
+      landlordVerification={landlordVerification}
       onBack={() => navigate('/admin/listings/pending')}
       secondaryAction={{ label: 'Reject', onClick: handleReject, className: 'btn-reject' }}
       primaryAction={{

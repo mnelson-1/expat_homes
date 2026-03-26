@@ -13,6 +13,13 @@ class ChatMessage {
   static const String kAttachmentKindImage = 'image';
   static const String kAttachmentKindFile = 'file';
 
+  /// Listing mini-card (landlord assignment flow, etc.) — same [createdAt] as adjacent text.
+  static const String kPayloadListingId = 'listingId';
+  static const String kPayloadListingTitle = 'listingTitle';
+  static const String kPayloadListingImage = 'listingImage';
+  static const String kPayloadListingPrice = 'listingPrice';
+  static const String kPayloadListingLocation = 'listingLocation';
+
   ChatMessage({
     required this.id,
     required this.conversationId,
@@ -32,6 +39,12 @@ class ChatMessage {
   final Map<String, dynamic> payload;
 
   final DateTime? createdAt;
+
+  /// True when this message should render as a property mini-card in the thread.
+  bool get isListingCardMessage {
+    final id = payload[kPayloadListingId] as String?;
+    return id != null && id.trim().isNotEmpty;
+  }
 
   factory ChatMessage.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,

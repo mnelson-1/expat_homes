@@ -48,11 +48,12 @@ class _ExpatBowlThreadScreenState extends State<ExpatBowlThreadScreen> {
 
   Future<void> _loadBowl() async {
     final doc = await BowlsService().getBowl(widget.bowlId);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _bowl = doc;
         _loading = false;
       });
+    }
   }
 
   Future<void> _loadProfile() async {

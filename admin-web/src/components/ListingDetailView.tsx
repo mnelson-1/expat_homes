@@ -1,10 +1,13 @@
 import type { Listing } from '../data/mockListings'
+import type { LandlordVerification } from '../lib/landlordProfile'
 
 interface ListingDetailViewProps {
   listing: Listing
   onBack: () => void
   primaryAction?: { label: string; onClick: () => void; className: string }
   secondaryAction?: { label: string; onClick: () => void; className: string }
+  /** From Firestore `users/{landlordId}` when super admin reviews a listing */
+  landlordVerification?: LandlordVerification | null
 }
 
 export function ListingDetailView({
@@ -12,6 +15,7 @@ export function ListingDetailView({
   onBack,
   primaryAction,
   secondaryAction,
+  landlordVerification,
 }: ListingDetailViewProps) {
   return (
     <div className="page listing-detail-page">
@@ -71,6 +75,24 @@ export function ListingDetailView({
           )}
         </dl>
       </section>
+
+      {landlordVerification && (
+        <section className="detail-section landlord-verification">
+          <h3 className="detail-section-title">Landlord account (admin)</h3>
+          <dl className="detail-dl">
+            <dt>Legal name</dt>
+            <dd>{landlordVerification.displayName}</dd>
+            <dt>Email</dt>
+            <dd>{landlordVerification.email || '—'}</dd>
+            <dt>Phone</dt>
+            <dd>{landlordVerification.phone ?? '—'}</dd>
+            <dt>User ID</dt>
+            <dd>
+              <code style={{ wordBreak: 'break-all' }}>{landlordVerification.uid}</code>
+            </dd>
+          </dl>
+        </section>
+      )}
 
       {listing.description && (
         <section className="detail-section">

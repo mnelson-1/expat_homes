@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/listing.dart';
 import 'package:expat_app/models/listing_edit_request.dart';
+import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/conversations_service.dart';
@@ -42,6 +43,9 @@ class ListingDetailScreen extends StatelessWidget {
     this.onListingDeclined,
     this.editRequest,
     this.onRequestEdit,
+    /// Super admin: show landlord email / phone / uid from `users/{landlordId}`.
+    this.showLandlordContactSection = false,
+    this.landlordContactUid,
   });
 
   final String title;
@@ -95,6 +99,12 @@ class ListingDetailScreen extends StatelessWidget {
   /// Called when landlord taps "Request Edit" — opens the edit form.
   final void Function()? onRequestEdit;
 
+  /// When true (super admin), loads and shows [landlordContactUid] profile block.
+  final bool showLandlordContactSection;
+
+  /// Firestore user id of the listing owner (landlord).
+  final String? landlordContactUid;
+
   // Tracks whether content has been scrolled to show a drop shadow above buttons.
   final ValueNotifier<bool> _showBottomShadow = ValueNotifier<bool>(false);
 
@@ -135,6 +145,14 @@ class ListingDetailScreen extends StatelessWidget {
                     _buildDescriptionBlock(textTheme),
                     const SizedBox(height: 16),
                     _buildRepresentative(textTheme),
+                    if (showLandlordContactSection &&
+                        landlordContactUid != null &&
+                        landlordContactUid!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _LandlordContactAdminPanel(
+                        landlordUid: landlordContactUid!.trim(),
+                      ),
+                    ],
                     const SizedBox(height: 80),
                   ],
                 ),
@@ -425,6 +443,57 @@ class ListingDetailScreen extends StatelessWidget {
     if (showRequestEditOnly) {
       final reqStatus = editRequest?.status;
 
+      // Prevent requesting edits until the super admin has published the listing.
+      if (!isVerifiedByRdb) {
+        const label = 'Verification Pending';
+        const bgColor = Color(0xFFFFD54F);
+        const fgColor = Color(0xFF1A2E35);
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: showShadow
+                ? const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      offset: Offset(0, -6),
+                      blurRadius: 12,
+                    ),
+                  ]
+                : null,
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: bgColor,
+                    foregroundColor: fgColor,
+                    disabledBackgroundColor: bgColor,
+                    disabledForegroundColor: fgColor,
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: fgColor,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
       final String label;
       final Color bgColor;
       final Color fgColor;
@@ -703,6 +772,7 @@ class ListingDetailScreen extends StatelessWidget {
                               price,
                             ),
                             listingLocation: location,
+                            sharedLandlordAgentThread: true,
                           );
 
                       if (!context.mounted) return;
@@ -825,10 +895,9 @@ class ListingDetailScreen extends StatelessWidget {
                 child: FilledButton(
                   onPressed: () async {
                     final myUid = AuthService().currentUser?.uid;
-                    if (myUid == null ||
-                        listingId == null ||
-                        landlordId == null)
+                    if (myUid == null || listingId == null || landlordId == null) {
                       return;
+                    }
 
                     const defaultInquiryMessage =
                         'Hey there! I would like to get more\ninformation on this Listing.';
@@ -1067,6 +1136,118 @@ class ListingDetailScreen extends StatelessWidget {
   }
 }
 
+/// Loads landlord profile for super-admin verification (email, optional phone, uid).
+class _LandlordContactAdminPanel extends StatelessWidget {
+  const _LandlordContactAdminPanel({required this.landlordUid});
+
+  final String landlordUid;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return FutureBuilder<UserProfile?>(
+      future: AuthService().getUserProfile(landlordUid),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+        final p = snap.data;
+        if (p == null) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Could not load landlord profile.',
+              style: textTheme.bodySmall?.copyWith(color: Colors.red.shade700),
+            ),
+          );
+        }
+        final phoneStr =
+            (p.phone != null && p.phone!.trim().isNotEmpty)
+                ? p.phone!.trim()
+                : '—';
+
+        Widget row(String label, String value) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 88,
+                  child: Text(
+                    label,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF6B7280),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: SelectableText(
+                    value,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF1A2E35),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F5F7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE0E0E0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.admin_panel_settings_outlined,
+                      size: 20,
+                      color: Color(0xFF1A2E35),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Landlord (admin)',
+                      style: textTheme.titleSmall?.copyWith(
+                        color: const Color(0xFF1A2E35),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                row('Name', p.legalName),
+                row('Email', p.email.isEmpty ? '—' : p.email),
+                row('Phone', phoneStr),
+                row('User ID', p.id),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Loads a listing by id from Firestore and shows [ListingDetailScreen].
 /// Use for landlord "My Listings" and expat Estates when opening by id.
 /// When [showRequestEditOnly] is true, also streams the edit request and revision
@@ -1097,11 +1278,15 @@ class _ListingDetailBootstrap {
     required this.listing,
     this.agentAssignmentId,
     required this.agentShowsAcceptButton,
+    this.showLandlordContactForAdmin = false,
+    this.landlordContactUid,
   });
 
   final Listing listing;
   final String? agentAssignmentId;
   final bool agentShowsAcceptButton;
+  final bool showLandlordContactForAdmin;
+  final String? landlordContactUid;
 }
 
 class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
@@ -1126,10 +1311,17 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
       }
     }
 
+    final me = await AuthService().getCurrentUserProfile();
+    final landlordUid = listing.landlordId.trim();
+    final showLandlordAdmin =
+        me?.role == UserRole.superAdmin && landlordUid.isNotEmpty;
+
     return _ListingDetailBootstrap(
       listing: listing,
       agentAssignmentId: agentAid,
       agentShowsAcceptButton: agentShowAccept,
+      showLandlordContactForAdmin: showLandlordAdmin,
+      landlordContactUid: showLandlordAdmin ? landlordUid : null,
     );
   }
 
@@ -1193,6 +1385,8 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
                 editRequest: reqSnap.data,
                 agentAssignmentId: payload.agentAssignmentId,
                 agentShowsAcceptButton: payload.agentShowsAcceptButton,
+                showLandlordContactForAdmin: payload.showLandlordContactForAdmin,
+                landlordContactUid: payload.landlordContactUid,
               );
             },
           );
@@ -1204,6 +1398,8 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
           imagePaths,
           agentAssignmentId: payload.agentAssignmentId,
           agentShowsAcceptButton: payload.agentShowsAcceptButton,
+          showLandlordContactForAdmin: payload.showLandlordContactForAdmin,
+          landlordContactUid: payload.landlordContactUid,
         );
       },
     );
@@ -1216,6 +1412,8 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
     ListingEditRequest? editRequest,
     String? agentAssignmentId,
     bool agentShowsAcceptButton = false,
+    bool showLandlordContactForAdmin = false,
+    String? landlordContactUid,
   }) {
     return ListingDetailScreen(
       title: listing.title,
@@ -1226,7 +1424,9 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
       imagePaths: imagePaths,
       description: listing.description,
       upi: listing.upi,
-      isVerifiedByRdb: listing.verifiedBy != null,
+      isVerifiedByRdb:
+          listing.status == ListingStatus.published &&
+              listing.verifiedBy != null,
       representativeName: listing.representativeName,
       showRequestEditOnly: widget.showRequestEditOnly,
       showAgentActions: widget.showAgentActions,
@@ -1240,6 +1440,8 @@ class _ListingDetailScreenByIdState extends State<ListingDetailScreenById> {
       onListingDeclined: widget.onListingDeclined,
       editRequest: editRequest,
       onRequestEdit: () => _handleRequestEdit(context, listing),
+      showLandlordContactSection: showLandlordContactForAdmin,
+      landlordContactUid: landlordContactUid,
     );
   }
 

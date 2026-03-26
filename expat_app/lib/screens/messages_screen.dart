@@ -291,6 +291,14 @@ List<Object> _threadSlotsFromMessages(List<ChatMessage> messages) {
   return slots;
 }
 
+/// Insert after the first day divider when the thread uses conversation metadata
+/// for the property card (e.g. expat inquiry) rather than a listing message payload.
+class _LegacyListingCardMarker {
+  const _LegacyListingCardMarker();
+}
+
+const _legacyListingCardMarker = _LegacyListingCardMarker();
+
 // ---------------------------------------------------------------------------
 // ConversationScreen — real-time Firestore chat
 // ---------------------------------------------------------------------------
@@ -555,6 +563,31 @@ class _ConversationScreenState extends State<ConversationScreen> {
     });
   }
 
+  bool _needsLegacyListingCard(List<ChatMessage> messages) {
+    if (widget.listingId.trim().isEmpty) return false;
+    if (messages.isEmpty) return false;
+    return !messages.any((m) => m.isListingCardMessage);
+  }
+
+  List<Object> _conversationDisplaySlots(List<ChatMessage> messages) {
+    final slots = _threadSlotsFromMessages(messages);
+    if (!_needsLegacyListingCard(messages)) return slots;
+
+    final out = <Object>[];
+    var inserted = false;
+    for (var i = 0; i < slots.length; i++) {
+      out.add(slots[i]);
+      if (!inserted && slots[i] is DateTime) {
+        final next = i + 1 < slots.length ? slots[i + 1] : null;
+        if (next is ChatMessage) {
+          out.add(_legacyListingCardMarker);
+          inserted = true;
+        }
+      }
+    }
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -573,8 +606,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   _lastMessageCount = messages.length;
                   _scrollToBottom();
                 }
-                const headerCount = 3;
-                final slots = _threadSlotsFromMessages(messages);
+                const headerCount = 2;
+                final slots = _conversationDisplaySlots(messages);
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
@@ -583,16 +616,25 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     if (index == 0) {
                       return _buildEncryptionBanner(textTheme);
                     }
-                    if (index == 1) return const SizedBox(height: 24);
-                    if (index == 2) {
-                      return _buildListingCard(context, textTheme);
-                    }
+                    if (index == 1) return const SizedBox(height: 8);
 
                     final slot = slots[index - headerCount];
                     if (slot is DateTime) {
                       return _buildThreadDayDivider(textTheme, slot);
                     }
+                    if (slot is _LegacyListingCardMarker) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _buildLegacyStaticListingCard(context, textTheme),
+                      );
+                    }
                     final m = slot as ChatMessage;
+                    if (m.isListingCardMessage) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _buildListingCardFromMessage(context, textTheme, m),
+                      );
+                    }
                     final isMe = m.senderId == _myUid;
                     return Padding(
                       padding: const EdgeInsets.only(top: 12),
@@ -760,7 +802,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Widget _buildThreadDayDivider(TextTheme textTheme, DateTime day) {
     final now = DateTime.now();
     return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      padding: const EdgeInsets.only(top: 10, bottom: 8),
       child: Center(
         child: Text(
           threadDayDividerLabel(day, now),
@@ -773,15 +815,63 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  Widget _buildListingCard(BuildContext context, TextTheme textTheme) {
-    // Landlord (and expat) keep the card on the right; agent sees it as received (left).
-    final alignLeft = widget.listingDetailRole == kRoleAgent;
+  Widget _buildLegacyStaticListingCard(BuildContext context, TextTheme textTheme) {
+    final alignOutgoing = widget.listingDetailRole != kRoleAgent;
+    return _buildListingCardLayout(
+      context,
+      textTheme,
+      listingId: widget.listingId.trim(),
+      title: widget.listingTitle,
+      imagePath: widget.imagePath,
+      priceRaw: widget.price,
+      location: widget.location,
+      alignOutgoing: alignOutgoing,
+    );
+  }
+
+  Widget _buildListingCardFromMessage(
+    BuildContext context,
+    TextTheme textTheme,
+    ChatMessage m,
+  ) {
+    final isMe = m.senderId == _myUid;
+    final id = (m.payload[ChatMessage.kPayloadListingId] as String?)?.trim() ?? '';
+    final title = m.payload[ChatMessage.kPayloadListingTitle] as String? ?? '';
+    final imagePath =
+        m.payload[ChatMessage.kPayloadListingImage] as String? ?? '';
+    final priceRaw =
+        m.payload[ChatMessage.kPayloadListingPrice] as String? ?? '';
+    final location =
+        m.payload[ChatMessage.kPayloadListingLocation] as String? ?? '';
+    return _buildListingCardLayout(
+      context,
+      textTheme,
+      listingId: id,
+      title: title,
+      imagePath: imagePath,
+      priceRaw: priceRaw,
+      location: location,
+      alignOutgoing: isMe,
+    );
+  }
+
+  Widget _buildListingCardLayout(
+    BuildContext context,
+    TextTheme textTheme, {
+    required String listingId,
+    required String title,
+    required String imagePath,
+    required String priceRaw,
+    required String location,
+    required bool alignOutgoing,
+  }) {
+    void onTap() => _onListingCardTapWithId(context, listingId);
     return Align(
-      alignment: alignLeft ? Alignment.centerLeft : Alignment.centerRight,
+      alignment: alignOutgoing ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 240),
         child: InkWell(
-          onTap: () => _onListingCardTap(context),
+          onTap: onTap,
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -806,7 +896,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   ),
                   child: Center(
                     child: Text(
-                      widget.listingTitle,
+                      title,
                       style: textTheme.titleSmall?.copyWith(
                         color: const Color(0xFF1A2E35),
                         fontWeight: FontWeight.w600,
@@ -816,7 +906,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     ),
                   ),
                 ),
-                AspectRatio(aspectRatio: 4 / 3, child: _buildCardImage()),
+                AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: _buildListingCardImage(imagePath),
+                ),
                 Container(
                   color: const Color(0xFF1A2E35),
                   padding: const EdgeInsets.symmetric(
@@ -830,7 +923,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              formatConversationListingPrice(widget.price),
+                              formatConversationListingPrice(priceRaw),
                               style: textTheme.titleMedium?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -838,7 +931,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              widget.location,
+                              location,
                               style: textTheme.bodySmall?.copyWith(
                                 color: Colors.white.withValues(alpha: 0.9),
                               ),
@@ -848,7 +941,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       ),
                       const SizedBox(width: 8),
                       GestureDetector(
-                        onTap: () => _onListingCardTap(context),
+                        onTap: onTap,
                         child: Container(
                           width: 32,
                           height: 32,
@@ -874,8 +967,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  Widget _buildCardImage() {
-    final path = widget.imagePath;
+  Widget _buildListingCardImage(String path) {
     if (path.isEmpty) {
       return Container(color: Colors.grey.shade300);
     }
@@ -894,19 +986,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  void _onListingCardTap(BuildContext context) {
-    final id = widget.listingId.trim();
+  void _onListingCardTapWithId(BuildContext context, String listingId) {
+    final id = listingId.trim();
     if (id.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Listing details are unavailable for this thread.')),
+        const SnackBar(
+          content: Text('Listing details are unavailable for this thread.'),
+        ),
       );
       return;
     }
 
     final role = widget.listingDetailRole;
-    // Use a named route so this file does not import listing_detail_screen.dart
-    // (that screen imports messages_screen.dart for ConversationScreen — a cycle
-    // can cause runtime NoSuchMethodError on ConversationScreen's constructor).
     Navigator.of(context).pushNamed(
       AppRouteNames.listingDetailFromChat,
       arguments: <String, dynamic>{

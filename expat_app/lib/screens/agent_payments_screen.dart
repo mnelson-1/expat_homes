@@ -4,9 +4,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/commission_slip.dart';
+import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/models/listing_assignment.dart';
+import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/services/listings_service.dart';
 import 'package:expat_app/utils/calendar_thread_labels.dart';
 import 'package:expat_app/services/commission_slips_service.dart';
+import 'package:expat_app/utils/listing_price_display.dart';
 
 class AgentPaymentsScreen extends StatefulWidget {
   const AgentPaymentsScreen({super.key});
@@ -21,8 +26,11 @@ class _AgentPaymentsColors {
   static const Color helper = Color(0xFF9CA5A8);
 }
 
+enum _AgentCreateSlipStep { pickListing, form }
+
 class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
   int _selectedTab = 0;
+  _AgentCreateSlipStep _createStep = _AgentCreateSlipStep.pickListing;
 
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
@@ -46,7 +54,34 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
 
   String? _agentUid;
   Stream<List<CommissionSlip>>? _slipsStream;
+  Stream<List<Listing>>? _acceptedListingsStream;
   StreamSubscription<User?>? _authSub;
+
+  /// UPI/phone locks when pre-filled from listing / licensed agent.
+  bool _upiNeedsManualEntry = false;
+  bool _phoneReadOnly = false;
+  /// Firestore listing id for the slip being created (one slip per listing).
+  String? _formListingId;
+
+  /// Listings the agent has an **accepted** assignment for (for commission slip picker).
+  Stream<List<Listing>>? _makeAcceptedListingsStream(String? uid) {
+    if (uid == null || uid.isEmpty) return null;
+    // Client-filter to accepted only so Firestore needs only the agentUid index.
+    return AgentsService().agentAssignmentsStream(uid).asyncMap((assignments) async {
+      final accepted = assignments
+          .where((a) => a.status == AssignmentStatus.accepted)
+          .toList();
+      final withSlip =
+          await CommissionSlipsService().listingIdsWithSlipForAgent(uid);
+      final listings = <Listing>[];
+      for (final a in accepted) {
+        if (withSlip.contains(a.listingId)) continue;
+        final listing = await ListingsService().getListingById(a.listingId);
+        if (listing != null) listings.add(listing);
+      }
+      return listings;
+    });
+  }
 
   void _bindSlipsStream(String? uid) {
     _agentUid = uid;
@@ -54,6 +89,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
         uid != null && uid.isNotEmpty
             ? CommissionSlipsService().agentSlipsStream(uid)
             : null;
+    _acceptedListingsStream = _makeAcceptedListingsStream(uid);
   }
 
   @override
@@ -107,7 +143,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
         Expanded(
           child: _selectedTab == 0
               ? _buildTrackTab(textTheme)
-              : _buildCreateTab(textTheme),
+              : _buildCreateTabContent(textTheme),
         ),
       ],
     );
@@ -150,7 +186,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
               onTap: () {
                 setState(() {
                   _selectedTab = 1;
-                  _clearForm();
+                  _resetCreateSlipFlow();
                 });
               },
               child: Column(
@@ -414,11 +450,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                 child: SizedBox(
                   height: 44,
                   child: FilledButton(
-                    onPressed: () async {
-                      await CommissionSlipsService().reportSlip(slip.id);
-                      if (!context.mounted) return;
-                      _showReportDialog();
-                    },
+                    onPressed: () => _confirmDeleteSlip(context, textTheme, slip),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFC62828),
                       foregroundColor: Colors.white,
@@ -429,7 +461,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    child: const Text('Report'),
+                    child: const Text('Delete'),
                   ),
                 ),
               ),
@@ -464,18 +496,273 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     );
   }
 
-  Widget _buildCreateTab(TextTheme textTheme) {
+  Widget _buildCreateTabContent(TextTheme textTheme) {
+    if (_createStep == _AgentCreateSlipStep.pickListing) {
+      return _buildListingPicker(textTheme);
+    }
+    return _buildCreateForm(textTheme);
+  }
+
+  Widget _buildListingPicker(TextTheme textTheme) {
+    if (_acceptedListingsStream == null) {
+      return Center(
+        child: Text(
+          'Not signed in.',
+          style: textTheme.bodySmall?.copyWith(
+            color: _AgentPaymentsColors.helper,
+          ),
+        ),
+      );
+    }
+
+    return StreamBuilder<List<Listing>>(
+      stream: _acceptedListingsStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final listings = snapshot.data ?? [];
+        if (listings.isEmpty) {
+          return ListView(
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 32, 20, 32),
+            children: [
+              Text(
+                'No accepted listings yet.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: _AgentPaymentsColors.bodyText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Commission slips can only be created for properties where you '
+                'have accepted an assignment, and only one slip per listing. '
+                'If every accepted listing already has a slip, delete one on '
+                'the Track tab to create it again here.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodySmall?.copyWith(
+                  color: _AgentPaymentsColors.helper,
+                ),
+              ),
+            ],
+          );
+        }
+
+        return ListView.separated(
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          itemCount: listings.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final listing = listings[index];
+            return _buildListingPickCard(textTheme, listing);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildListingPickCard(TextTheme textTheme, Listing listing) {
+    final imagePath = listing.mediaUrls.isNotEmpty
+        ? listing.mediaUrls.first
+        : 'assets/images/placeholder.png';
+    final isNetwork =
+        imagePath.startsWith('http://') || imagePath.startsWith('https://');
+    final priceParts = splitListingPriceForDisplay(
+      listing.type,
+      listing.price,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: isNetwork
+                ? Image.network(
+                    imagePath,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  )
+                : Image.asset(
+                    imagePath,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(height: 180, color: Colors.grey.shade300),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      listing.title,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: _AgentPaymentsColors.bodyText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      listing.location,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _AgentPaymentsColors.bodyText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _AgentPaymentsColors.helper,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      listing.typeLabel,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _AgentPaymentsColors.bodyText,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: priceParts.amountWithSymbol,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: textTheme.titleSmall?.fontSize,
+                            color: _AgentPaymentsColors.bodyText,
+                          ),
+                        ),
+                        TextSpan(
+                          text: priceParts.slashSuffix,
+                          style: TextStyle(
+                            fontWeight: FontWeight.normal,
+                            fontSize: textTheme.bodySmall?.fontSize,
+                            color: _AgentPaymentsColors.bodyText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: FilledButton(
+              onPressed: () => _onPickListingForSlip(listing),
+              style: FilledButton.styleFrom(
+                backgroundColor: _AgentPaymentsColors.accentGreen,
+                foregroundColor: _AgentPaymentsColors.bodyText,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                textStyle: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              child: const Text('Create'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onPickListingForSlip(Listing listing) async {
+    final uid = _agentUid ?? AuthService().currentUser?.uid;
+    if (uid != null &&
+        uid.isNotEmpty &&
+        await CommissionSlipsService().agentHasSlipForListing(uid, listing.id)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You already have a commission slip for this listing. Delete it first to create a new one.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final landlord = await AuthService().getUserProfile(listing.landlordId);
+    final profile = await AuthService().getCurrentUserProfile();
+    var phone = '';
+    final aid = profile?.agentId;
+    if (aid != null && aid.isNotEmpty) {
+      final la = await AgentsService().getAgent(aid);
+      phone = la?.phone?.trim() ?? '';
+    }
+
+    if (!mounted) return;
+    final upi = listing.upi?.trim() ?? '';
+    setState(() {
+      _createStep = _AgentCreateSlipStep.form;
+      _formListingId = listing.id;
+      _upiNeedsManualEntry = upi.isEmpty;
+      _estateNameController.text = listing.title;
+      _commissionIdController.text = upi;
+      _landlordNameController.text = landlord?.legalName ?? '';
+      _homeOwnerIdController.text = listing.landlordId;
+      _amountController.clear();
+      _paymentMethodController.text = 'MTN Momo';
+      _phoneController.text = phone;
+      _phoneReadOnly = phone.isNotEmpty;
+    });
+  }
+
+  Widget _buildCreateForm(TextTheme textTheme) {
     return SingleChildScrollView(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () {
+                setState(_resetCreateSlipFlow);
+              },
+              icon: const Icon(Icons.arrow_back_ios_new, size: 16),
+              label: Text(
+                'Choose another listing',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: _AgentPaymentsColors.bodyText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           _buildLabel(textTheme, 'Property Title'),
           const SizedBox(height: 8),
           _buildTextField(
             controller: _estateNameController,
             hint: 'e.g 3–Bedroom Apartment etc.',
+            readOnly: true,
           ),
           const SizedBox(height: 16),
           _buildLabel(textTheme, 'House UPI (Unique Parcel Identifier)'),
@@ -483,6 +770,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
           _buildTextField(
             controller: _commissionIdController,
             hint: 'RHA given Land UPI',
+            readOnly: !_upiNeedsManualEntry,
           ),
           const SizedBox(height: 16),
           _buildLabel(textTheme, 'Home Owner'),
@@ -490,6 +778,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
           _buildTextField(
             controller: _landlordNameController,
             hint: 'Landlord name',
+            readOnly: true,
           ),
           const SizedBox(height: 16),
           _buildLabel(textTheme, 'Home Owner ID'),
@@ -497,6 +786,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
           _buildTextField(
             controller: _homeOwnerIdController,
             hint: 'ID of Landlord',
+            readOnly: true,
           ),
           const SizedBox(height: 16),
           _buildLabel(textTheme, 'Amount Due'),
@@ -513,6 +803,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
           _buildTextField(
             controller: _paymentMethodController,
             hint: 'MTN Momo',
+            readOnly: true,
           ),
           const SizedBox(height: 16),
           _buildLabel(textTheme, 'Phone Number of Recipient'),
@@ -521,6 +812,7 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
             controller: _phoneController,
             hint: 'e.g 0798654987',
             keyboardType: TextInputType.phone,
+            readOnly: _phoneReadOnly,
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -543,6 +835,65 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDeleteSlip(
+    BuildContext context,
+    TextTheme textTheme,
+    CommissionSlip slip,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: _AgentPaymentsColors.bodyText,
+          surfaceTintColor: Colors.transparent,
+          title: Text(
+            'Delete commission slip?',
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          content: Text(
+            'This removes slip ${slip.reference} permanently. You can create '
+            'a new slip for this listing afterwards.',
+            style: textTheme.bodyMedium?.copyWith(
+              color: Colors.white,
+              height: 1.35,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFC62828),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await CommissionSlipsService().deleteSlip(slip.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Commission slip deleted.')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete: $e')),
+      );
+    }
   }
 
   String _formatAmountRwf(String raw) {
@@ -608,8 +959,20 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
       return;
     }
 
+    final listingId = _formListingId?.trim() ?? '';
+    if (listingId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Choose a listing from the list before creating a slip.'),
+        ),
+      );
+      return;
+    }
+
     try {
       final created = await CommissionSlipsService().createSlip(
+        listingId: listingId,
         listingTitle: propertyTitle,
         contractCode: houseUpi,
         landlordId: ownerId,
@@ -628,8 +991,15 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
         landlordId: ownerId,
         slipReference: created.reference,
       );
-      _clearForm();
-      setState(() => _selectedTab = 0);
+      setState(() {
+        _resetCreateSlipFlow();
+        _selectedTab = 0;
+      });
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e, st) {
       debugPrint('createSlip failed: $e\n$st');
       if (!mounted) return;
@@ -643,7 +1013,11 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     }
   }
 
-  void _clearForm() {
+  void _resetCreateSlipFlow() {
+    _createStep = _AgentCreateSlipStep.pickListing;
+    _formListingId = null;
+    _upiNeedsManualEntry = false;
+    _phoneReadOnly = false;
     _estateNameController.clear();
     _commissionIdController.clear();
     _landlordNameController.clear();
@@ -744,9 +1118,11 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     required TextEditingController controller,
     required String hint,
     TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
   }) {
     return TextField(
       controller: controller,
+      readOnly: readOnly,
       keyboardType: keyboardType,
       style: const TextStyle(
         color: _AgentPaymentsColors.bodyText,
@@ -758,6 +1134,8 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
           color: _AgentPaymentsColors.helper,
           fontSize: 14,
         ),
+        filled: readOnly,
+        fillColor: readOnly ? const Color(0xFFF4F5F7) : null,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFF9E9E9E)),
@@ -846,78 +1224,4 @@ class _AgentPaymentsScreenState extends State<AgentPaymentsScreen> {
     );
   }
 
-  void _showReportDialog() {
-    final textTheme = Theme.of(context).textTheme;
-
-    showDialog<void>(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: true,
-      barrierColor: Colors.black.withValues(alpha: 0.4),
-      builder: (dialogContext) {
-        return Center(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 32),
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-            decoration: BoxDecoration(
-              color: _AgentPaymentsColors.accentGreen,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: _AgentPaymentsColors.bodyText,
-                      size: 22,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Report Successful',
-                  style: textTheme.titleLarge?.copyWith(
-                    color: _AgentPaymentsColors.bodyText,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'You have successfully reported this slip to the right '
-                  'authorities. The issue is being investigated, and updates '
-                  'will be sent soon.',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: _AgentPaymentsColors.bodyText,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: const BoxDecoration(
-                    color: _AgentPaymentsColors.bodyText,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }

@@ -8,6 +8,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isOwnPublishedListing(listingId) {
+      // Only allow edit requests once the super admin has published the listing.
+      // (Prevents landlords from creating edit requests for pending/archived listings.)
+      return get(/databases/$(database)/documents/listings/$(listingId)).data
+              .landlordId ==
+          request.auth.uid &&
+        get(/databases/$(database)/documents/listings/$(listingId)).data.status ==
+          'published';
+    }
+
     function isSuperAdmin() {
       return isSignedIn() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
@@ -22,10 +32,16 @@ service cloud.firestore {
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Listings: any signed-in user can read (agents need access to assigned listings,
-    // expats to published ones). Writes restricted to owner or admin.
+    // Listings visibility:
+    // - Landlord (owner) can read their own listings at any status (draft/pending/archived).
+    // - Super admin can read all listings (needed for moderation).
+    // - Everyone else can read only published listings.
     match /listings/{listingId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource.data.landlordId == request.auth.uid ||
+        resource.data.status == 'published' ||
+        isSuperAdmin()
+      );
       allow create: if isSignedIn() &&
         (request.resource.data.landlordId == request.auth.uid || isSuperAdmin());
       allow update, delete: if isSignedIn() &&
@@ -38,7 +54,9 @@ service cloud.firestore {
       allow read: if isSignedIn() &&
         (resource.data.landlordId == request.auth.uid || isSuperAdmin());
       allow create: if isSignedIn() &&
-        request.resource.data.landlordId == request.auth.uid;
+        request.resource.data.landlordId == request.auth.uid &&
+        request.resource.data.listingId != null &&
+        isOwnPublishedListing(request.resource.data.listingId);
       allow update: if isSignedIn() && (
         isSuperAdmin() ||
         (resource.data.landlordId == request.auth.uid &&
@@ -67,8 +85,23 @@ service cloud.firestore {
     // resolution). Landlord can create; landlord/agent/admin can update.
     match /listing_assignments/{assignmentId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.landlordId == request.auth.uid &&
+        request.resource.data.agentUid != null &&
+        request.resource.data.status == 'pending' &&
+        get(/databases/$(database)/documents/users/$(request.resource.data.agentUid)).data.role == 'agent';
+
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        (
+          resource.data.agentUid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        ) ||
+        (
+          resource.data.landlordId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        )
+      );
     }
 
     // Conversations: any signed-in user can read their own and create new ones.
@@ -84,11 +117,13 @@ service cloud.firestore {
       allow create: if isSignedIn();
     }
 
-    // Commission slips: agent creates; both agent and landlord can read/update.
+    // Commission slips: agent creates/deletes own; both agent and landlord can read/update.
     match /commission_slips/{slipId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
+      allow delete: if isSignedIn() &&
+        resource.data.agentUid == request.auth.uid;
     }
 
     // Community posts: any signed-in user can read; author can create/update/delete.

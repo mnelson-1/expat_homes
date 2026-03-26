@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:expat_app/models/chat_message.dart';
 import 'package:expat_app/models/listing.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
@@ -49,7 +50,7 @@ class _LandlordAssignPropertyScreenState
     super.initState();
     final uid = AuthService().currentUser?.uid;
     if (uid != null) {
-      _listingsStream = ListingsService().landlordListingsStream(uid);
+      _listingsStream = ListingsService().landlordAssignableListingsStream(uid);
     }
   }
 
@@ -101,9 +102,15 @@ class _LandlordAssignPropertyScreenState
 
         if (filtered.isEmpty) {
           return Center(
-            child: Text(
-              'No listings to assign.',
-              style: textTheme.bodySmall?.copyWith(color: _AssignColors.hint),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                allListings.isEmpty
+                    ? 'Nothing to assign right now. Listings with a pending or accepted agent are hidden until that agent declines.'
+                    : 'No listings match this category.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodySmall?.copyWith(color: _AssignColors.hint),
+              ),
             ),
           );
         }
@@ -313,6 +320,14 @@ class _LandlordAssignPropertyScreenState
     String? agentUidValue;
     try {
       agentUidValue = await AgentsService().getAgentUid(widget.agentId);
+      if (agentUidValue == null || agentUidValue.isEmpty) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Agent has not registered yet.')),
+        );
+        return;
+      }
+
       await AgentsService().createAssignment(
         listingId: listing.id,
         agentId: widget.agentId,
@@ -323,16 +338,14 @@ class _LandlordAssignPropertyScreenState
       );
     } catch (e) {
       if (!context.mounted) return;
+      final message = e is StateError &&
+              e.message.contains('active assignment')
+          ? 'This property already has an agent assignment. Try again after the current agent declines, or pick another listing.'
+          : e is StateError
+              ? e.message
+              : 'Could not create the assignment. Please try again.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
-      return;
-    }
-
-    if (agentUidValue == null) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Agent has not registered yet.')),
+        SnackBar(content: Text(message)),
       );
       return;
     }
@@ -348,6 +361,21 @@ class _LandlordAssignPropertyScreenState
       listingImage: imagePath,
       listingPrice: priceWithSuffix,
       listingLocation: listing.location,
+      sharedLandlordAgentThread: true,
+    );
+
+    await ConversationsService().sendMessage(
+      conversationId: convo.id,
+      senderId: uid,
+      content: '',
+      lastMessagePreview: listing.title,
+      payload: {
+        ChatMessage.kPayloadListingId: listing.id,
+        ChatMessage.kPayloadListingTitle: listing.title,
+        ChatMessage.kPayloadListingImage: imagePath,
+        ChatMessage.kPayloadListingPrice: priceWithSuffix,
+        ChatMessage.kPayloadListingLocation: listing.location,
+      },
     );
 
     await ConversationsService().sendMessage(

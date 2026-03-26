@@ -43,6 +43,8 @@ class UserProfile {
     this.profileImageUrl,
     /// Short bio / about (expat, landlord, optional for others).
     this.bio,
+    /// Optional contact phone; stored when collected (e.g. landlord for admin review).
+    this.phone,
   });
 
   final String id;
@@ -70,6 +72,9 @@ class UserProfile {
 
   /// Free-text bio shown on profile and peer view.
   final String? bio;
+
+  /// Optional phone number on the user document (not all roles collect it).
+  final String? phone;
 
   String get legalName {
     if (legalFirstName != null || legalLastName != null) {
@@ -100,6 +105,7 @@ class UserProfile {
       agentId: data['agentId'] as String?,
       profileImageUrl: data['profileImageUrl'] as String?,
       bio: data['bio'] as String?,
+      phone: data['phone'] as String?,
     );
   }
 
@@ -129,6 +135,7 @@ class UserProfile {
     if (agentId != null) map['agentId'] = agentId;
     if (profileImageUrl != null) map['profileImageUrl'] = profileImageUrl;
     if (bio != null) map['bio'] = bio;
+    if (phone != null) map['phone'] = phone;
     return map;
   }
 

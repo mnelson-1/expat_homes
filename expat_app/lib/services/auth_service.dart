@@ -116,13 +116,17 @@ class AuthService {
     await _firestore.collection(kUsersCollection).doc(user.uid).set(createData);
 
     // Link the agent's Firebase UID to their licensed_agents record.
+    // Doc IDs are uppercase (e.g. RM-204112); normalize so signup always hits the same doc.
     if (role == UserRole.agent && profile.agentId != null) {
-      try {
-        await _firestore
-            .collection('licensed_agents')
-            .doc(profile.agentId)
-            .update({'registeredUid': user.uid});
-      } catch (_) {}
+      final aid = profile.agentId!.trim().toUpperCase();
+      if (aid.isNotEmpty) {
+        try {
+          await _firestore
+              .collection('licensed_agents')
+              .doc(aid)
+              .update({'registeredUid': user.uid});
+        } catch (_) {}
+      }
     }
 
     if (role == UserRole.expat) {
@@ -228,6 +232,22 @@ class AuthService {
       'bio': bio.trim(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Optional contact phone on `users` (e.g. landlord; admins may use for listing review).
+  Future<void> updateUserPhone(String phone) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Not signed in');
+    final trimmed = phone.trim();
+    final updates = <String, dynamic>{
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (trimmed.isEmpty) {
+      updates['phone'] = FieldValue.delete();
+    } else {
+      updates['phone'] = trimmed;
+    }
+    await _firestore.collection(kUsersCollection).doc(user.uid).update(updates);
   }
 
   /// Updates email in Firestore and attempts Firebase Auth email update.

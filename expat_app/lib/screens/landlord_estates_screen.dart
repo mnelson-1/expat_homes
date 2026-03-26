@@ -343,6 +343,34 @@ class _LandlordEstatesScreenState extends State<LandlordEstatesScreen> {
     Listing estate,
     ListingEditRequest? req,
   ) {
+    // Only let landlords request edits once the super admin has published the listing.
+    if (estate.status != ListingStatus.published || estate.verifiedBy == null) {
+      const String label = 'Verification Pending';
+      const Color bgColor = Color(0xFFFFD54F);
+      const Color fgColor = _LandlordEstatesColors.bodyText;
+
+      return SizedBox(
+        width: double.infinity,
+        height: 44,
+        child: FilledButton(
+          onPressed: null,
+          style: FilledButton.styleFrom(
+            backgroundColor: bgColor,
+            foregroundColor: fgColor,
+            disabledBackgroundColor: bgColor,
+            disabledForegroundColor: fgColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(7),
+            ),
+            textStyle: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          child: Text(label),
+        ),
+      );
+    }
+
     final status = req?.status;
 
     final String label;

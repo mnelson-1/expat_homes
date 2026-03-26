@@ -1,14 +1,39 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEditRequests } from '../context/EditRequestsContext'
+import {
+  fetchLandlordVerification,
+  type LandlordVerification,
+} from '../lib/landlordProfile'
 
 export function EditRequestPendingDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { pending, approveRequest, rejectRequest } = useEditRequests()
   const [saving, setSaving] = useState(false)
+  const [landlordVerification, setLandlordVerification] =
+    useState<LandlordVerification | null>(null)
 
   const request = pending.find((r) => r.id === id)
+
+  useEffect(() => {
+    if (!request?.landlordId) {
+      setLandlordVerification(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const v = await fetchLandlordVerification(request.landlordId)
+        if (!cancelled) setLandlordVerification(v)
+      } catch {
+        if (!cancelled) setLandlordVerification(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [request?.id, request?.landlordId])
 
   if (!request) {
     return (
@@ -68,6 +93,40 @@ export function EditRequestPendingDetailPage() {
       <p style={{ color: '#666', marginBottom: 24 }}>
         Landlord: <strong>{listing.landlord || '—'}</strong> &middot; Requested: {request.requestedAt}
       </p>
+
+      {landlordVerification && (
+        <section
+          style={{
+            marginBottom: 24,
+            padding: 16,
+            background: '#f4f5f7',
+            borderRadius: 12,
+            border: '1px solid #e0e0e0',
+          }}
+        >
+          <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>Landlord account (admin)</h3>
+          <dl style={{ margin: 0, display: 'grid', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 8 }}>
+              <dt style={{ margin: 0, color: '#6b7280', fontWeight: 600 }}>Legal name</dt>
+              <dd style={{ margin: 0 }}>{landlordVerification.displayName}</dd>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 8 }}>
+              <dt style={{ margin: 0, color: '#6b7280', fontWeight: 600 }}>Email</dt>
+              <dd style={{ margin: 0 }}>{landlordVerification.email || '—'}</dd>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 8 }}>
+              <dt style={{ margin: 0, color: '#6b7280', fontWeight: 600 }}>Phone</dt>
+              <dd style={{ margin: 0 }}>{landlordVerification.phone ?? '—'}</dd>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 8 }}>
+              <dt style={{ margin: 0, color: '#6b7280', fontWeight: 600 }}>User ID</dt>
+              <dd style={{ margin: 0, wordBreak: 'break-all' }}>
+                <code>{landlordVerification.uid}</code>
+              </dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       {listing.images?.length > 0 && (
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 24 }}>

@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/licensed_agent.dart';
 import '../models/listing_assignment.dart';
 
 const String kLicensedAgentsCollection = 'licensed_agents';
+const String _kUsersCollection = 'users';
+
+String _licensedAgentDocId(String agentId) => agentId.trim().toUpperCase();
 const String kAssignmentsCollection = 'listing_assignments';
 
 /// Seed data for the licensed_agents collection. Called once to populate
@@ -112,38 +117,108 @@ class AgentsService {
   /// Validate an agent ID against the licensed_agents collection.
   /// Returns the [LicensedAgent] if found, null otherwise.
   Future<LicensedAgent?> validateAgentId(String agentId) async {
-    final doc = await _agentsRef.doc(agentId.toUpperCase()).get();
+    final doc = await _agentsRef.doc(_licensedAgentDocId(agentId)).get();
     if (!doc.exists) return null;
     return LicensedAgent.fromFirestore(doc);
+  }
+
+  /// True when [registeredUid] points at a real agent profile that matches [agentId].
+  Future<bool> _isRegisteredAgentLinkOk(
+    String agentId,
+    String registeredUid,
+  ) async {
+    final userDoc =
+        await _firestore.collection(_kUsersCollection).doc(registeredUid).get();
+    if (!userDoc.exists) return false;
+    final data = userDoc.data();
+    if (data == null) return false;
+    if ((data['role'] as String?) != 'agent') return false;
+    final userAgentId = data['agentId'] as String?;
+    if (userAgentId == null ||
+        userAgentId.trim().toUpperCase() != _licensedAgentDocId(agentId)) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<List<LicensedAgent>> _filterToVerifiedRegisteredAgents(
+    List<LicensedAgent> agents,
+  ) async {
+    final withUid = agents
+        .where((a) => a.registeredUid != null && a.registeredUid!.isNotEmpty)
+        .toList();
+    if (withUid.isEmpty) return [];
+
+    final uids = withUid.map((a) => a.registeredUid!).toSet().toList();
+    final userSnaps = await Future.wait(
+      uids.map((uid) => _firestore.collection(_kUsersCollection).doc(uid).get()),
+    );
+    final uidToData = <String, Map<String, dynamic>>{};
+    for (var i = 0; i < uids.length; i++) {
+      final doc = userSnaps[i];
+      final data = doc.data();
+      if (doc.exists && data != null) {
+        uidToData[uids[i]] = data;
+      }
+    }
+
+    return withUid.where((a) {
+      final uid = a.registeredUid!;
+      final data = uidToData[uid];
+      if (data == null) return false;
+      if ((data['role'] as String?) != 'agent') return false;
+      final userAgentId = data['agentId'] as String?;
+      return userAgentId != null &&
+          userAgentId.trim().toUpperCase() == _licensedAgentDocId(a.agentId);
+    }).toList();
   }
 
   // ---------------------------------------------------------------------------
   // List agents (landlord "Find Agent")
   // ---------------------------------------------------------------------------
 
-  /// Stream all licensed agents, optionally filtered by region.
-  Stream<List<LicensedAgent>> agentsStream({String? region}) {
+  /// Stream licensed agents for the Landlord "Find Agent" flow.
+  ///
+  /// Defaults to `registeredOnly: true` so landlords can only assign/search
+  /// agents who have actually completed app registration (i.e. have
+  /// `registeredUid` set).
+  Stream<List<LicensedAgent>> agentsStream({
+    String? region,
+    bool registeredOnly = true,
+  }) {
     Query<Map<String, dynamic>> q = _agentsRef;
     if (region != null && region.isNotEmpty) {
       q = q.where('region', isEqualTo: region);
     }
-    return q.snapshots().map((snap) =>
-        snap.docs.map((d) => LicensedAgent.fromFirestore(d)).toList());
+    return q.snapshots().asyncMap((snap) async {
+      var list = snap.docs.map((d) => LicensedAgent.fromFirestore(d)).toList();
+      if (registeredOnly) {
+        list = await _filterToVerifiedRegisteredAgents(list);
+      }
+      return list;
+    });
   }
 
   /// One-time fetch of all licensed agents.
-  Future<List<LicensedAgent>> getAgents({String? region}) async {
+  Future<List<LicensedAgent>> getAgents({
+    String? region,
+    bool registeredOnly = true,
+  }) async {
     Query<Map<String, dynamic>> q = _agentsRef;
     if (region != null && region.isNotEmpty) {
       q = q.where('region', isEqualTo: region);
     }
     final snap = await q.get();
-    return snap.docs.map((d) => LicensedAgent.fromFirestore(d)).toList();
+    var list = snap.docs.map((d) => LicensedAgent.fromFirestore(d)).toList();
+    if (registeredOnly) {
+      list = await _filterToVerifiedRegisteredAgents(list);
+    }
+    return list;
   }
 
   /// Get a single licensed agent by ID.
   Future<LicensedAgent?> getAgent(String agentId) async {
-    final doc = await _agentsRef.doc(agentId).get();
+    final doc = await _agentsRef.doc(_licensedAgentDocId(agentId)).get();
     if (!doc.exists) return null;
     return LicensedAgent.fromFirestore(doc);
   }
@@ -163,7 +238,7 @@ class AgentsService {
     if (lastName != null) updates['lastName'] = lastName;
     if (bio != null) updates['bio'] = bio;
     if (phone != null) updates['phone'] = phone;
-    await _agentsRef.doc(agentId).update(updates);
+    await _agentsRef.doc(_licensedAgentDocId(agentId)).update(updates);
   }
 
   // ---------------------------------------------------------------------------
@@ -171,10 +246,14 @@ class AgentsService {
   // ---------------------------------------------------------------------------
 
   /// Look up the Firebase UID of a registered agent by their institution ID.
-  /// Returns null if the agent hasn't signed up yet.
+  /// Returns null if the agent hasn't signed up or [users] profile doesn't match.
   Future<String?> getAgentUid(String agentId) async {
     final agent = await getAgent(agentId);
-    return agent?.registeredUid;
+    if (agent == null) return null;
+    final uid = agent.registeredUid;
+    if (uid == null || uid.isEmpty) return null;
+    final ok = await _isRegisteredAgentLinkOk(agent.agentId, uid);
+    return ok ? uid : null;
   }
 
   // ---------------------------------------------------------------------------
@@ -191,6 +270,10 @@ class AgentsService {
     String? agentName,
     String? listingTitle,
   }) async {
+    if (agentUid == null || agentUid.isEmpty) {
+      throw StateError('Agent has not registered yet.');
+    }
+
     // Check for existing active assignment on this listing.
     final existing = await _assignmentsRef
         .where('listingId', isEqualTo: listingId)
@@ -235,6 +318,27 @@ class AgentsService {
         return bAt.compareTo(aAt);
       });
       return list;
+    });
+  }
+
+  /// Listing IDs for this landlord that already have a **pending** or **accepted**
+  /// assignment (negotiation or active representation — no new assignment until declined).
+  Stream<Set<String>> landlordBusyAssignmentListingIdsStream(
+    String landlordId,
+  ) {
+    return _assignmentsRef
+        .where('landlordId', isEqualTo: landlordId)
+        .snapshots()
+        .map((snap) {
+      final ids = <String>{};
+      for (final doc in snap.docs) {
+        final a = ListingAssignment.fromFirestore(doc);
+        if (a.status == AssignmentStatus.pending ||
+            a.status == AssignmentStatus.accepted) {
+          ids.add(a.listingId);
+        }
+      }
+      return ids;
     });
   }
 

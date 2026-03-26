@@ -12,8 +12,8 @@ import 'agent_edit_field_screen.dart';
 /// Full-screen account profile: photo, sectional fields, role-specific ID, logout.
 /// All roles: preferred language (same options as registration). Expats only:
 /// country of citizenship (from registration, editable). Expat/Landlord may edit
-/// name, email, bio; IDs read-only. Agent name/email read-only; bio & phone sync
-/// with licensed_agents (bio-view).
+/// name, email, bio; landlord also edits phone on `users`. IDs read-only.
+/// Agent name/email read-only; bio & phone sync with licensed_agents (bio-view).
 class AccountProfileScreen extends StatefulWidget {
   const AccountProfileScreen({super.key, required this.role})
     : assert(
@@ -175,6 +175,33 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not update email: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _editPhoneLandlord(String current) async {
+    if (widget.role != UserRole.landlord) return;
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => AgentEditFieldScreen(
+          title: 'Edit phone number',
+          label: 'Phone Number',
+          hintText: 'e.g. +250 788 123 456',
+          helperText:
+              'Optional. May be shown to admins when they review your listings.',
+          initialValue: current.isEmpty || current == '—' ? '' : current,
+          keyboardType: TextInputType.phone,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    try {
+      await AuthService().updateUserPhone(result.trim());
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update phone: $e')),
         );
       }
     }
@@ -657,6 +684,11 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
               : '—';
           final langLine = _languageDisplay(profile);
           final countryLine = _countryDisplay(profile);
+          final phoneLandlord = profile?.phone?.trim();
+          final phoneLandlordDisp =
+              (phoneLandlord != null && phoneLandlord.isNotEmpty)
+                  ? phoneLandlord
+                  : '—';
 
           if (widget.role == UserRole.agent) {
             final agentId = profile?.agentId;
@@ -760,6 +792,14 @@ class _AccountProfileScreenState extends State<AccountProfileScreen> {
                 value: email,
                 onTap: () => _editEmail(email),
               ),
+              if (widget.role == UserRole.landlord) ...[
+                const SizedBox(height: 20),
+                _sectionLabel('Phone number'),
+                _tappableRow(
+                  value: phoneLandlordDisp,
+                  onTap: () => _editPhoneLandlord(phoneLandlordDisp),
+                ),
+              ],
               const SizedBox(height: 20),
               _sectionLabel('Preferred language'),
               _tappableRow(

@@ -27,8 +27,22 @@ class ConversationsService {
   CollectionReference<Map<String, dynamic>> get _messagesRef =>
       _firestore.collection('messages');
 
+  /// Stable doc id for one thread per landlord↔agent pair (assignments + Chat Landlord).
+  static String pairThreadDocumentId(List<String> participantIds) {
+    final sorted = List<String>.from(participantIds)..sort();
+    if (sorted.length != 2) {
+      throw ArgumentError('pairThreadDocumentId expects exactly 2 participants');
+    }
+    return 'pair_${sorted[0]}_${sorted[1]}';
+  }
+
   /// Returns an existing conversation between [participantIds] for [listingId],
   /// or creates a new one with the supplied listing metadata and participant names.
+  ///
+  /// When [sharedLandlordAgentThread] is true, the same document is reused for the
+  /// two participants regardless of [listingId] (multiple listing assignments share
+  /// one chat). Conversation listing fields are refreshed to the latest context.
+  /// Use for landlord↔agent only; expat inquiries should leave this false (default).
   Future<Conversation> getOrCreateConversation({
     required String listingId,
     required List<String> participantIds,
@@ -37,8 +51,45 @@ class ConversationsService {
     String listingImage = '',
     String listingPrice = '',
     String listingLocation = '',
+    bool sharedLandlordAgentThread = false,
   }) async {
     final sorted = List<String>.from(participantIds)..sort();
+
+    if (sharedLandlordAgentThread) {
+      if (sorted.length != 2) {
+        throw ArgumentError(
+          'sharedLandlordAgentThread requires exactly 2 participants',
+        );
+      }
+      final docId = pairThreadDocumentId(sorted);
+      final ref = _conversationsRef.doc(docId);
+      final existing = await ref.get();
+      if (existing.exists) {
+        await ref.update({
+          'listingId': listingId,
+          'listingTitle': listingTitle,
+          'listingImage': listingImage,
+          'listingPrice': listingPrice,
+          'listingLocation': listingLocation,
+          'participantNames': participantNames,
+        });
+        final updated = await ref.get();
+        return Conversation.fromFirestore(updated);
+      }
+      final convo = Conversation(
+        id: docId,
+        listingId: listingId,
+        participantIds: sorted,
+        participantNames: participantNames,
+        listingTitle: listingTitle,
+        listingImage: listingImage,
+        listingPrice: listingPrice,
+        listingLocation: listingLocation,
+      );
+      await ref.set(convo.toFirestoreCreate());
+      final created = await ref.get();
+      return Conversation.fromFirestore(created);
+    }
 
     // Look for an existing conversation with the same participants and listing.
     final snap = await _conversationsRef
