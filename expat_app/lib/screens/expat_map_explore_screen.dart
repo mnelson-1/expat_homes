@@ -18,9 +18,20 @@ enum ExpatMapTabMode { rides, explore }
 /// `ValueKey('expat_map_explore')`) so Flutter does not reuse one [State] when switching
 /// tabs — otherwise Rides listeners/GPS init are skipped if Explore opened first.
 class ExpatMapExploreScreen extends StatefulWidget {
-  const ExpatMapExploreScreen({super.key, required this.mode});
+  const ExpatMapExploreScreen({
+    super.key,
+    required this.mode,
+    this.ridesDestinationSeed,
+    this.onRidesDestinationSeedConsumed,
+  });
 
   final ExpatMapTabMode mode;
+
+  /// Listing / estate address to pre-fill **To** and route (Estates "Get a Ride").
+  final String? ridesDestinationSeed;
+
+  /// Called after the seed is read so the parent can clear it (avoids re-applying on rebuild).
+  final VoidCallback? onRidesDestinationSeedConsumed;
 
   @override
   State<ExpatMapExploreScreen> createState() => _ExpatMapExploreScreenState();
@@ -72,6 +83,16 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
   LatLng? _ridesDestination;
   bool _ridesRouteLoading = false;
 
+  /// True while forward-geocoding [ridesDestinationSeed] so we don't stack duplicate work.
+  bool _consumingDestinationSeed = false;
+
+  /// Rides: inline fare panel after a successful route (replaces SnackBar).
+  String? _ridesFareDistanceLine;
+  String? _ridesFarePriceLine;
+
+  /// Rides: inline error (no driving route, etc.).
+  String? _ridesRouteError;
+
   bool get _isRides => widget.mode == ExpatMapTabMode.rides;
 
   @override
@@ -111,7 +132,100 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
     });
     if (_isRides && key.isNotEmpty) {
       await _initRidesFromLocation();
+      await _maybeConsumeDestinationSeed();
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant ExpatMapExploreScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_isRides) return;
+    final n = widget.ridesDestinationSeed?.trim();
+    final o = oldWidget.ridesDestinationSeed?.trim();
+    if (n != null &&
+        n.isNotEmpty &&
+        n != o &&
+        _apiKey.isNotEmpty &&
+        !_loadingKey) {
+      _maybeConsumeDestinationSeed();
+    }
+  }
+
+  Future<void> _maybeConsumeDestinationSeed() async {
+    final seed = widget.ridesDestinationSeed?.trim();
+    if (!_isRides ||
+        seed == null ||
+        seed.isEmpty ||
+        _consumingDestinationSeed ||
+        _geocoding == null) {
+      return;
+    }
+    _consumingDestinationSeed = true;
+    widget.onRidesDestinationSeedConsumed?.call();
+    try {
+      final hit = await _geocoding!.forwardGeocode(seed);
+      if (!mounted) return;
+      if (hit == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not find that property location on the map. Try typing the address in To.',
+            ),
+          ),
+        );
+        return;
+      }
+      final title =
+          hit.formattedAddress.split(',').first.trim().isNotEmpty
+              ? hit.formattedAddress.split(',').first.trim()
+              : seed;
+      _ridesToController.text = hit.formattedAddress;
+      await _applyRidesDestination(
+        hit.latLng,
+        title: title,
+        snippet: hit.formattedAddress,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _consumingDestinationSeed = false);
+      } else {
+        _consumingDestinationSeed = false;
+      }
+    }
+  }
+
+  void _dismissRidesResultPanels() {
+    if (!_isRides) return;
+    setState(() {
+      _ridesFareDistanceLine = null;
+      _ridesFarePriceLine = null;
+      _ridesRouteError = null;
+    });
+  }
+
+  void _applyRideRouteSuccess(DirectionsRoute route) {
+    final meters = route.distanceMeters;
+    final sec = route.durationSeconds;
+    final km =
+        meters != null && meters > 0
+            ? formatRideDistanceKm(meters)
+            : (route.distanceText ?? '—');
+    final timeLine =
+        sec != null && sec > 0
+            ? formatRideDurationHms(sec)
+            : (route.durationText ?? '—');
+    final distPart =
+        meters != null && meters > 0 ? '$km km' : (route.distanceText ?? '—');
+    final est =
+        meters != null && meters > 0
+            ? estimateRwandaRideFareRwf(distanceMeters: meters)
+            : null;
+    setState(() {
+      _ridesRouteError = null;
+      _ridesFareDistanceLine = '$distPart • $timeLine';
+      _ridesFarePriceLine =
+          est != null ? '${formatRwfAmount(est)} RWF' : '— RWF';
+    });
   }
 
   Future<void> _initRidesFromLocation() async {
@@ -465,7 +579,14 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
     final geocoding = _geocoding;
     if (dest == null || directions == null || !_isRides) return;
 
-    setState(() => _ridesRouteLoading = true);
+    if (mounted) {
+      setState(() {
+        _ridesRouteLoading = true;
+        _ridesRouteError = null;
+        _ridesFareDistanceLine = null;
+        _ridesFarePriceLine = null;
+      });
+    }
 
     try {
       LatLng? origin;
@@ -599,15 +720,18 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
       if (!mounted) return;
 
       if (route == null || route.points.isEmpty) {
-        setState(() => _ridesRouteLoading = false);
-        if (showErrors) {
-          final detail = outcome.errorDetail ?? 'Unknown error';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_directionsFailureUserMessage(detail)),
-              duration: const Duration(seconds: 6),
-            ),
-          );
+        if (mounted) {
+          setState(() {
+            _ridesRouteLoading = false;
+            if (showErrors) {
+              final detail = outcome.errorDetail ?? 'Unknown error';
+              _ridesRouteError = _directionsFailureUserMessage(
+                detail,
+                origin: origin,
+                destination: dest,
+              );
+            }
+          });
         }
         return;
       }
@@ -642,35 +766,17 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
 
       await _fitBounds(route.points, origin, dest);
 
-      if (mounted &&
-          (route.durationText != null ||
-              route.distanceText != null ||
-              (route.distanceMeters != null && route.distanceMeters! > 0))) {
-        final parts = <String>[
-          if (route.distanceText != null) route.distanceText!,
-          if (route.durationText != null) route.durationText!,
-        ];
-        final meters = route.distanceMeters;
-        if (meters != null && meters > 0) {
-          final est = estimateRwandaRideFareRwf(distanceMeters: meters);
-          parts.add('~${formatRwfAmount(est)} RWF (est.)');
-        }
-        final summary = parts.join(' · ');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(summary),
-            duration: const Duration(seconds: 5),
-          ),
-        );
+      if (mounted) {
+        _applyRideRouteSuccess(route);
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _ridesRouteLoading = false);
-        if (showErrors) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not get directions: $e')),
-          );
-        }
+        setState(() {
+          _ridesRouteLoading = false;
+          if (showErrors) {
+            _ridesRouteError = 'Could not get directions: $e';
+          }
+        });
       }
     }
   }
@@ -707,16 +813,43 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
         Future.value();
   }
 
+  static const double _kEmulatorDefaultLat = 37.42;
+  static const double _kEmulatorDefaultLng = -122.08;
+
+  /// True when start is near the common emulator default (Mountain View) and end is in central Africa / Indian Ocean region.
+  bool _looksLikeEmulatorOverseasRoute(LatLng? origin, LatLng? destination) {
+    if (origin == null || destination == null) return false;
+    final nearEmu =
+        (origin.latitude - _kEmulatorDefaultLat).abs() < 0.35 &&
+        (origin.longitude - _kEmulatorDefaultLng).abs() < 0.35;
+    final destLon = destination.longitude.abs();
+    final destAfricanish =
+        destination.latitude > -15 &&
+        destination.latitude < 15 &&
+        destLon < 55;
+    return nearEmu && destAfricanish;
+  }
+
   /// Maps Directions API errors to actionable copy (e.g. emulator GPS in US vs destination in Rwanda).
-  String _directionsFailureUserMessage(String detail) {
+  String _directionsFailureUserMessage(
+    String detail, {
+    LatLng? origin,
+    LatLng? destination,
+  }) {
     final u = detail.toUpperCase();
     if (u.contains('ZERO_RESULTS') ||
         u.contains('NOT_FOUND') ||
-        u.contains('MAX_ROUTE_LENGTH_EXCEEDED')) {
-      return 'No driving route between start and destination. '
-          'The Android emulator often reports GPS in California (~37.42, -122.08). '
-          'Use Extended controls → Location to set a point near your destination, '
-          'or type a start address in From (e.g. Kigali).';
+        u.contains('MAX_ROUTE_LENGTH_EXCEEDED') ||
+        u.contains('NO ROUTES')) {
+      final farApart = _looksLikeEmulatorOverseasRoute(origin, destination);
+      if (farApart) {
+        return "No driving route: From looks like the emulator's default GPS in California, "
+            'while To is far away (e.g. Rwanda). Use Extended controls → Location to set a '
+            'point near your destination, or type a From address in the same city as To '
+            '(e.g. Kigali).';
+      }
+      return 'No driving route between these points. Try From and To in the same region, '
+          'or use full street addresses.';
     }
     if (u.contains('REQUEST_DENIED')) {
       return 'Directions were denied ($detail). '
@@ -787,6 +920,9 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                           (m) => m.markerId == const MarkerId('origin'),
                         );
                         _polylines.clear();
+                        _ridesRouteError = null;
+                        _ridesFareDistanceLine = null;
+                        _ridesFarePriceLine = null;
                       });
                     },
                   )
@@ -922,6 +1058,9 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                                       _ridesToController.clear();
                                       setState(() {
                                         _predictions = [];
+                                        _ridesRouteError = null;
+                                        _ridesFareDistanceLine = null;
+                                        _ridesFarePriceLine = null;
                                         _ridesDestination = null;
                                         _polylines.clear();
                                         _markers.removeWhere(
@@ -986,6 +1125,21 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                     ),
                   ),
                 ),
+              if (_ridesFareDistanceLine != null &&
+                  _ridesFarePriceLine != null)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 40,
+                  child: _buildRidesFareResultCard(textTheme),
+                )
+              else if (_ridesRouteError != null)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 40,
+                  child: _buildRidesRouteErrorCard(textTheme),
+                ),
               Positioned(
                 left: 0,
                 right: 0,
@@ -1003,6 +1157,108 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Light panel: distance + duration, then large RWF price (Estates / Rides success).
+  Widget _buildRidesFareResultCard(TextTheme textTheme) {
+    return Material(
+      elevation: 6,
+      borderRadius: BorderRadius.circular(12),
+      color: const Color(0xFFF2F3F5),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 36),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Distance (km) · Time',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: _ExpatMapColors.hint,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _ridesFareDistanceLine!,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: _ExpatMapColors.primaryDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Price (RWF)',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: _ExpatMapColors.hint,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _ridesFarePriceLine!,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: _ExpatMapColors.primaryDark,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: -10,
+              right: -6,
+              child: IconButton(
+                icon: const Icon(Icons.close, size: 22),
+                color: _ExpatMapColors.primaryDark,
+                onPressed: _dismissRidesResultPanels,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRidesRouteErrorCard(TextTheme textTheme) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(12),
+      color: const Color(0xFFF2F3F5),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 36),
+              child: Text(
+                _ridesRouteError!,
+                style: textTheme.bodySmall?.copyWith(
+                  color: _ExpatMapColors.primaryDark,
+                  height: 1.35,
+                ),
+              ),
+            ),
+            Positioned(
+              top: -10,
+              right: -6,
+              child: IconButton(
+                icon: const Icon(Icons.close, size: 22),
+                color: _ExpatMapColors.primaryDark,
+                onPressed: _dismissRidesResultPanels,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

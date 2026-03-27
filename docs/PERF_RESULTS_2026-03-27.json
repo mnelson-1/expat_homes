@@ -1,0 +1,28 @@
+{
+  "run_timestamp_utc": "2026-03-27T10:05:29.901Z",
+  "environment": {
+    "target": "Android emulator (emulator-5554, API 35)",
+    "entrypoint": "lib/dev/perf_probe_main.dart",
+    "runs_requested": 5
+  },
+  "result": {
+    "response_time_avg_ms": 766,
+    "response_time_max_ms": 2288,
+    "workflow_success_rate": 0,
+    "message_latency_ms": 0,
+    "notes":
+        "Measured on real emulator runtime. workflow_success_rate=0 is due to the benchmark's success criteria: it fetches published listings using a text `searchQuery` equal to the new `listing.id`, but the search filter matches title/location/description rather than listing ids—so the 'found' check fails. message_latency_ms=0 indicates the send->stream latency measurement did not produce a recorded latency value in this run."
+  },
+  "raw_probe_output": {
+    "PERF_PROBE_USER": "4hVP9zdIEeYsg9w5epEO3ThiUa53",
+    "PERF_PROBE_RESULT": {
+      "response_time_avg_ms": 766,
+      "response_time_max_ms": 2288,
+      "workflow_success_rate": 0,
+      "message_latency_ms": 0,
+      "notes":
+          "response_time_* aggregates measured Firestore operations. workflow_success_rate is benchmark workflow pass percentage. message_latency_ms measures send->stream-observed latency."
+    }
+  }
+}
+

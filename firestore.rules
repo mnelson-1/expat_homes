@@ -23,6 +23,11 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
     }
 
+    function isConversationParticipant(conversationId) {
+      let p = /databases/$(database)/documents/conversations/$(conversationId);
+      return exists(p) && request.auth.uid in get(p).data.participantIds;
+    }
+
     // Users: any signed-in user can read profiles (needed for message thread
     // avatars, etc.). Writes are limited to the document owner.
     // Note: we deliberately DO NOT call isSuperAdmin() on this match to avoid
@@ -30,6 +35,21 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // One doc per normalized email (`uid` only) so Get Started can check existence
+    // while signed out. Clients may not list the collection.
+    match /registered_emails/{emailKey} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn() &&
+        request.resource.data.keys().hasAll(['uid']) &&
+        request.resource.data.uid == request.auth.uid &&
+        !exists(/databases/$(database)/documents/registered_emails/$(emailKey));
+      allow update: if isSignedIn() &&
+        resource.data.uid == request.auth.uid &&
+        request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     // Listings visibility:
@@ -44,7 +64,20 @@ service cloud.firestore {
       );
       allow create: if isSignedIn() &&
         (request.resource.data.landlordId == request.auth.uid || isSuperAdmin());
-      allow update, delete: if isSignedIn() &&
+      // Only super admin can transition listings into "published"/"archived".
+      // Landlords may update non-moderation fields while keeping moderation state unchanged.
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        (
+          resource.data.landlordId == request.auth.uid &&
+          // Prevent landlord from publishing/archiving by changing moderation markers.
+          request.resource.data.status == resource.data.status &&
+          request.resource.data.verifiedBy == resource.data.verifiedBy &&
+          request.resource.data.publishedAt == resource.data.publishedAt
+        )
+      );
+
+      allow delete: if isSignedIn() &&
         (resource.data.landlordId == request.auth.uid || isSuperAdmin());
     }
 
@@ -109,6 +142,14 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
+    }
+
+    match /conversations/{conversationId}/typing/{userId} {
+      allow read: if isSignedIn() && isConversationParticipant(conversationId);
+      allow create, update: if isSignedIn() && request.auth.uid == userId &&
+        isConversationParticipant(conversationId);
+      allow delete: if isSignedIn() && request.auth.uid == userId &&
+        isConversationParticipant(conversationId);
     }
 
     // Messages: any signed-in user can read and write messages.

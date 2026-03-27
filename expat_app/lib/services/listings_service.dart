@@ -7,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../models/listing.dart';
 import '../models/listing_assignment.dart';
 import 'agents_service.dart';
+import 'perf_metrics_service.dart';
 
 const String kListingsCollection = 'listings';
 const String kStorageListingsPath = 'listings';
@@ -41,6 +42,7 @@ class ListingsService {
     String? upi,
     List<Uint8List> imageBytes = const [],
   }) async {
+    final sw = Stopwatch()..start();
     final ref = _listingsRef.doc();
     final listingId = ref.id;
 
@@ -115,6 +117,8 @@ class ListingsService {
     );
 
     await ref.set(listing.toFirestoreCreate());
+    sw.stop();
+    PerfMetricsService().addSample('create_listing', sw.elapsedMilliseconds);
     return listing;
   }
 
@@ -315,6 +319,7 @@ class ListingsService {
     ListingType? type,
     String searchQuery = '',
   }) async {
+    final sw = Stopwatch()..start();
     var query = _listingsRef.where(
       'status',
       isEqualTo: ListingStatus.published.value,
@@ -338,6 +343,8 @@ class ListingsService {
                 l.description.toLowerCase().contains(q);
           }).toList();
     }
+    sw.stop();
+    PerfMetricsService().addSample('fetch_listings', sw.elapsedMilliseconds);
     return list;
   }
 

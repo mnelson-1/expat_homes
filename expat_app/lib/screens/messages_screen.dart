@@ -9,10 +9,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:expat_app/models/conversation.dart';
 import 'package:expat_app/models/chat_message.dart';
-import 'package:expat_app/models/user_profile.dart';
+import 'package:expat_app/models/user_profile.dart' show UserProfile, UserRole;
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/conversations_service.dart'
     show ConversationsService, kChatAttachmentMaxBytes;
+import 'package:expat_app/services/message_translation_service.dart';
 import 'package:expat_app/utils/calendar_thread_labels.dart';
 import 'package:expat_app/utils/read_platform_file_bytes.dart';
 import 'package:expat_app/utils/listing_price_display.dart';
@@ -119,23 +120,39 @@ class _MessagesScreenState extends State<MessagesScreen> {
           child:
               _uid == null || _conversationsStream == null
                   ? _buildEmptyState(textTheme)
-                  : StreamBuilder<List<Conversation>>(
-                    stream: _conversationsStream,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final convos = snapshot.data ?? [];
-                      if (convos.isEmpty) {
-                        return _buildEmptyState(textTheme);
-                      }
-                      return ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.only(bottom: 56),
-                        itemCount: convos.length,
-                        itemBuilder: (context, index) {
-                          final convo = convos[index];
-                          return _buildThreadRow(context, textTheme, convo);
+                  : StreamBuilder<UserProfile?>(
+                    stream: AuthService().currentUserProfileStream,
+                    builder: (context, profileSnap) {
+                      final pref = profileSnap.data?.preferredLanguage.trim();
+                      final lang =
+                          (pref != null && pref.isNotEmpty) ? pref : 'English';
+                      return StreamBuilder<List<Conversation>>(
+                        stream: _conversationsStream,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          final convos = snapshot.data ?? [];
+                          if (convos.isEmpty) {
+                            return _buildEmptyState(textTheme);
+                          }
+                          return ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.only(bottom: 56),
+                            itemCount: convos.length,
+                            itemBuilder: (context, index) {
+                              final convo = convos[index];
+                              return _buildThreadRow(
+                                context,
+                                textTheme,
+                                convo,
+                                lang,
+                              );
+                            },
+                          );
                         },
                       );
                     },
@@ -169,11 +186,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
     BuildContext context,
     TextTheme textTheme,
     Conversation convo,
+    String preferredLanguage,
   ) {
     final myUid = _uid!;
     final contactName = convo.contactName(myUid);
     final contactUid = convo.otherUid(myUid);
-    final lastMessage = convo.lastMessage ?? '';
+    final lastMessage =
+        convo.lastMessageLineForPreferredLanguage(preferredLanguage);
     final lastTime = convo.lastMessageAt ?? convo.createdAt;
 
     final now = DateTime.now();
@@ -343,10 +362,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final ScrollController _scrollController = ScrollController();
 
   String? _myUid;
+  /// Receiver’s profile language (drives on-device / cloud target for incoming bubbles).
+  String _preferredLanguage = 'English';
+  StreamSubscription<User?>? _authSub;
+  StreamSubscription<UserProfile?>? _meProfileSub;
   Stream<List<ChatMessage>>? _messagesStream;
   int _lastMessageCount = 0;
   bool _uploadingAttachment = false;
-  StreamSubscription<User?>? _authSub;
+  Timer? _typingDebounce;
+  Timer? _typingIdleTimer;
 
   @override
   void initState() {
@@ -358,20 +382,104 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _authSub = AuthService().authStateChanges.listen((user) {
       if (!mounted) return;
       setState(() => _myUid = user?.uid);
+      _attachMeProfileStream(user?.uid);
+    });
+    _attachMeProfileStream(_myUid);
+    AuthService().getCurrentUserProfile().then((p) {
+      if (!mounted) return;
+      setState(() {
+        _preferredLanguage = p?.preferredLanguage.trim().isNotEmpty == true
+            ? p!.preferredLanguage.trim()
+            : 'English';
+      });
+    });
+  }
+
+  void _attachMeProfileStream(String? uid) {
+    _meProfileSub?.cancel();
+    _meProfileSub = null;
+    if (uid == null || uid.isEmpty) return;
+    _meProfileSub = AuthService().userProfileStream(uid).listen((p) {
+      if (!mounted) return;
+      final lang = p?.preferredLanguage.trim();
+      setState(() {
+        _preferredLanguage =
+            (lang != null && lang.isNotEmpty) ? lang : 'English';
+      });
     });
   }
 
   @override
   void dispose() {
+    _typingDebounce?.cancel();
+    _typingIdleTimer?.cancel();
+    final uid = _myUid;
+    if (uid != null) {
+      unawaited(
+        ConversationsService().setTypingState(
+          conversationId: widget.conversationId,
+          userId: uid,
+          isTyping: false,
+        ),
+      );
+    }
+    _meProfileSub?.cancel();
     _authSub?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
+  void _onComposerTextChanged() {
+    final uid = _myUid;
+    if (uid == null) return;
+    final cid = widget.conversationId;
+    _typingDebounce?.cancel();
+    final text = _messageController.text;
+    if (text.isEmpty) {
+      _typingIdleTimer?.cancel();
+      unawaited(
+        ConversationsService().setTypingState(
+          conversationId: cid,
+          userId: uid,
+          isTyping: false,
+        ),
+      );
+      return;
+    }
+    _typingDebounce = Timer(const Duration(milliseconds: 450), () {
+      unawaited(
+        ConversationsService().setTypingState(
+          conversationId: cid,
+          userId: uid,
+          isTyping: true,
+        ),
+      );
+      _typingIdleTimer?.cancel();
+      _typingIdleTimer = Timer(const Duration(seconds: 3), () {
+        unawaited(
+          ConversationsService().setTypingState(
+            conversationId: cid,
+            userId: uid,
+            isTyping: false,
+          ),
+        );
+      });
+    });
+  }
+
   void _onSend() {
     final text = _messageController.text.trim();
     if (text.isEmpty || _myUid == null) return;
+    _typingDebounce?.cancel();
+    _typingIdleTimer?.cancel();
+    unawaited(
+      ConversationsService().setTypingState(
+        conversationId: widget.conversationId,
+        userId: _myUid!,
+        isTyping: false,
+      ),
+    );
     _messageController.clear();
     ConversationsService().sendMessage(
       conversationId: widget.conversationId,
@@ -534,7 +642,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
         fileName: f.name,
         caption: caption,
       );
-      if (mounted) _messageController.clear();
+      if (mounted) {
+        _typingDebounce?.cancel();
+        _typingIdleTimer?.cancel();
+        unawaited(
+          ConversationsService().setTypingState(
+            conversationId: widget.conversationId,
+            userId: _myUid!,
+            isTyping: false,
+          ),
+        );
+        _messageController.clear();
+      }
     } catch (e, st) {
       debugPrint('Chat attachment upload failed: $e\n$st');
       if (mounted) {
@@ -641,12 +760,29 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       child:
                           isMe
                               ? _buildOutgoingBubble(textTheme, m)
-                              : _buildIncomingBubble(textTheme, m),
+                              : _buildIncomingBubble(
+                                textTheme,
+                                m,
+                                preferredLanguage: _preferredLanguage,
+                                translateEnabled: _liveTranslateEnabled,
+                              ),
                     );
                   },
                 );
               },
             ),
+          ),
+          StreamBuilder<bool>(
+            stream: _myUid == null
+                ? Stream<bool>.value(false)
+                : ConversationsService().peerTypingStream(
+                    widget.conversationId,
+                    _myUid!,
+                  ),
+            builder: (context, snap) {
+              if (snap.data != true) return const SizedBox.shrink();
+              return _buildPeerTypingIndicator(textTheme);
+            },
           ),
           _buildComposer(context, textTheme),
         ],
@@ -745,32 +881,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
     return row;
   }
 
-  /// Landlord → agent: show agent's institution ID. Agent → landlord: listing title.
-  /// Expat flow: "Agent of [property]".
+  /// Peer role + viewer role drive subtitle: e.g. "Expat", "Landlord of …", agent ID.
   Widget _buildHeaderSubtitleLine(TextTheme textTheme) {
     final style = textTheme.bodySmall?.copyWith(
       color: Colors.white.withValues(alpha: 0.8),
     );
-    final role = widget.listingDetailRole;
-
-    if (role == kRoleAgent) {
-      return Text(
-        widget.listingTitle,
-        style: style,
-        overflow: TextOverflow.ellipsis,
-      );
-    }
-
-    if (role == kRoleExpat) {
-      return Text(
-        'Agent of ${widget.listingTitle}',
-        style: style,
-        overflow: TextOverflow.ellipsis,
-      );
-    }
-
-    // Landlord messaging assigned agent: subtitle is agent ID from profile.
+    final viewer = widget.listingDetailRole;
     final uid = widget.contactUid;
+
     if (uid == null) {
       return Text('—', style: style, overflow: TextOverflow.ellipsis);
     }
@@ -781,11 +899,95 @@ class _ConversationScreenState extends State<ConversationScreen> {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return Text('…', style: style, overflow: TextOverflow.ellipsis);
         }
-        final agentId = snap.data?.agentId;
-        final line =
-            (agentId != null && agentId.isNotEmpty) ? agentId : '—';
-        return Text(line, style: style, overflow: TextOverflow.ellipsis);
+        final peer = snap.data;
+        final peerRole = peer?.role ?? UserRole.expat;
+        final title =
+            widget.listingTitle.trim().isEmpty ? 'this listing' : widget.listingTitle;
+
+        if (viewer == kRoleExpat) {
+          if (peerRole == UserRole.landlord) {
+            return Text(
+              'Landlord of $title',
+              style: style,
+              overflow: TextOverflow.ellipsis,
+            );
+          }
+          if (peerRole == UserRole.agent) {
+            return Text(
+              'Agent of $title',
+              style: style,
+              overflow: TextOverflow.ellipsis,
+            );
+          }
+          return Text(
+            'Landlord of $title',
+            style: style,
+            overflow: TextOverflow.ellipsis,
+          );
+        }
+
+        if (peerRole == UserRole.expat) {
+          return Text('Expat', style: style, overflow: TextOverflow.ellipsis);
+        }
+
+        if (viewer == kRoleAgent && peerRole == UserRole.landlord) {
+          return Text(
+            widget.listingTitle.trim().isEmpty ? '—' : widget.listingTitle,
+            style: style,
+            overflow: TextOverflow.ellipsis,
+          );
+        }
+
+        if (viewer == kRoleLandlord && peerRole == UserRole.agent) {
+          final agentId = peer?.agentId;
+          final line =
+              (agentId != null && agentId.isNotEmpty) ? agentId : '—';
+          return Text(line, style: style, overflow: TextOverflow.ellipsis);
+        }
+
+        return Text(
+          widget.listingTitle.trim().isEmpty ? '—' : widget.listingTitle,
+          style: style,
+          overflow: TextOverflow.ellipsis,
+        );
       },
+    );
+  }
+
+  Widget _buildPeerTypingIndicator(TextTheme textTheme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF8ED966).withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Typing',
+                style: textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF1A2E35),
+                  fontWeight: FontWeight.w500,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '…',
+                style: textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF1A2E35),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -816,7 +1018,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildLegacyStaticListingCard(BuildContext context, TextTheme textTheme) {
-    final alignOutgoing = widget.listingDetailRole != kRoleAgent;
+    // Expat inquiry: expat sees the card on the right (sent); landlord/agent on the left (received).
+    final alignOutgoing = widget.listingDetailRole == kRoleExpat;
     return _buildListingCardLayout(
       context,
       textTheme,
@@ -1009,17 +1212,35 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildOutgoingBubble(TextTheme textTheme, ChatMessage m) {
-    return _buildMessageBubble(textTheme, m, isOutgoing: true);
+    return _buildMessageBubble(
+      textTheme,
+      m,
+      isOutgoing: true,
+      translateIncoming: false,
+    );
   }
 
-  Widget _buildIncomingBubble(TextTheme textTheme, ChatMessage m) {
-    return _buildMessageBubble(textTheme, m, isOutgoing: false);
+  Widget _buildIncomingBubble(
+    TextTheme textTheme,
+    ChatMessage m, {
+    required String preferredLanguage,
+    required bool translateEnabled,
+  }) {
+    return _buildMessageBubble(
+      textTheme,
+      m,
+      isOutgoing: false,
+      preferredLanguage: preferredLanguage,
+      translateIncoming: translateEnabled,
+    );
   }
 
   Widget _buildMessageBubble(
     TextTheme textTheme,
     ChatMessage m, {
     required bool isOutgoing,
+    String preferredLanguage = 'English',
+    bool translateIncoming = false,
   }) {
     final url = m.payload[ChatMessage.kPayloadAttachmentUrl] as String?;
     final attachmentName =
@@ -1067,10 +1288,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   16,
                   10,
                 ),
-                child: Text(
-                  text,
-                  style: textTheme.bodyMedium?.copyWith(color: fg),
-                ),
+                child:
+                    !isOutgoing && translateIncoming
+                        ? _IncomingMessageTranslatedBody(
+                          message: m,
+                          textTheme: textTheme,
+                          foreground: fg,
+                          preferredLanguage: preferredLanguage,
+                          translationEnabled: true,
+                        )
+                        : Text(
+                          text,
+                          style: textTheme.bodyMedium?.copyWith(color: fg),
+                        ),
               ),
           ],
         ),
@@ -1219,6 +1449,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   const SizedBox(height: 8),
                   GestureDetector(
                     onTap: () {
+                      MessageTranslationService.instance.clearCache();
                       setState(() {
                         _liveTranslateEnabled = !_liveTranslateEnabled;
                       });
@@ -1327,6 +1558,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                             contentPadding: EdgeInsets.zero,
                             isDense: true,
                           ),
+                          onChanged: (_) => _onComposerTextChanged(),
                           onSubmitted: (_) => _onSend(),
                         ),
                       ),
@@ -1347,6 +1579,92 @@ class _ConversationScreenState extends State<ConversationScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Resolves incoming text via on-device [MessageTranslationService] (ML Kit).
+class _IncomingMessageTranslatedBody extends StatefulWidget {
+  const _IncomingMessageTranslatedBody({
+    required this.message,
+    required this.textTheme,
+    required this.foreground,
+    required this.preferredLanguage,
+    required this.translationEnabled,
+  });
+
+  final ChatMessage message;
+  final TextTheme textTheme;
+  final Color foreground;
+  final String preferredLanguage;
+  final bool translationEnabled;
+
+  @override
+  State<_IncomingMessageTranslatedBody> createState() =>
+      _IncomingMessageTranslatedBodyState();
+}
+
+class _IncomingMessageTranslatedBodyState
+    extends State<_IncomingMessageTranslatedBody> {
+  String _line = '';
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _IncomingMessageTranslatedBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.id != widget.message.id ||
+        oldWidget.message.content != widget.message.content ||
+        oldWidget.preferredLanguage != widget.preferredLanguage ||
+        oldWidget.translationEnabled != widget.translationEnabled) {
+      _resolve();
+    }
+  }
+
+  Future<void> _resolve() async {
+    final raw = widget.message.content;
+    if (!widget.translationEnabled) {
+      if (mounted) {
+        setState(() {
+          _line = raw;
+          _loading = false;
+        });
+      }
+      return;
+    }
+    if (mounted) {
+      setState(() => _loading = true);
+    }
+    final out = await MessageTranslationService.instance.translateIncoming(
+      text: raw,
+      messageId: widget.message.id,
+      preferredLanguageLabel: widget.preferredLanguage,
+      translationEnabled: widget.translationEnabled,
+    );
+    if (!mounted) return;
+    setState(() {
+      _line = out;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return Text(
+        '…',
+        style: widget.textTheme.bodyMedium?.copyWith(color: widget.foreground),
+      );
+    }
+    final s = _line.trim().isEmpty ? widget.message.content.trim() : _line;
+    return Text(
+      s,
+      style: widget.textTheme.bodyMedium?.copyWith(color: widget.foreground),
     );
   }
 }

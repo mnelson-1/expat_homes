@@ -67,7 +67,6 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       child: SafeArea(
         bottom: false,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               'expat',
@@ -77,18 +76,11 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
                 fontSize: 22,
               ),
             ),
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.notifications_none,
-                    color: Colors.white,
-                  ),
-                  onPressed: () {},
-                ),
-                _buildProfileMenu(),
-              ],
-            ),
+            const SizedBox(width: 8),
+            Expanded(child: SizedBox.shrink()),
+            const Icon(Icons.notifications_none, color: Colors.white),
+            const SizedBox(width: 4),
+            _buildProfileMenu(),
           ],
         ),
       ),

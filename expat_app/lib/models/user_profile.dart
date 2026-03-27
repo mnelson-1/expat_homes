@@ -45,6 +45,9 @@ class UserProfile {
     this.bio,
     /// Optional contact phone; stored when collected (e.g. landlord for admin review).
     this.phone,
+    /// Set at registration when the user accepts Terms + Privacy (required to register).
+    this.termsAndPrivacyConsentAt,
+    this.acceptedLegalVersion,
   });
 
   final String id;
@@ -76,6 +79,12 @@ class UserProfile {
   /// Optional phone number on the user document (not all roles collect it).
   final String? phone;
 
+  /// When the user accepted EULA + Privacy + related policies at sign-up.
+  final DateTime? termsAndPrivacyConsentAt;
+
+  /// Matches [kLegalDocumentsVersion] in `lib/legal/legal_version.dart` at acceptance time.
+  final String? acceptedLegalVersion;
+
   String get legalName {
     if (legalFirstName != null || legalLastName != null) {
       return [legalFirstName, legalLastName].whereType<String>().join(' ').trim();
@@ -106,6 +115,9 @@ class UserProfile {
       profileImageUrl: data['profileImageUrl'] as String?,
       bio: data['bio'] as String?,
       phone: data['phone'] as String?,
+      termsAndPrivacyConsentAt:
+          (data['termsAndPrivacyConsentAt'] as Timestamp?)?.toDate(),
+      acceptedLegalVersion: data['acceptedLegalVersion'] as String?,
     );
   }
 
@@ -136,6 +148,13 @@ class UserProfile {
     if (profileImageUrl != null) map['profileImageUrl'] = profileImageUrl;
     if (bio != null) map['bio'] = bio;
     if (phone != null) map['phone'] = phone;
+    if (termsAndPrivacyConsentAt != null) {
+      map['termsAndPrivacyConsentAt'] =
+          Timestamp.fromDate(termsAndPrivacyConsentAt!);
+    }
+    if (acceptedLegalVersion != null) {
+      map['acceptedLegalVersion'] = acceptedLegalVersion;
+    }
     return map;
   }
 

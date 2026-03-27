@@ -60,6 +60,9 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   String _userRole = 'Expat';
   String? _userProfileImageUrl;
 
+  /// Forward-geocoded on Rides as **To** when user taps Get a Ride on an estate card or listing detail.
+  String? _ridesDestinationSeed;
+
   static const List<BoxShadow> _tabBarShadow = [
     BoxShadow(
       color: Color(0x33000000),
@@ -175,9 +178,16 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                       ],
                     )
                     : _selectedBottomIndex == 1
-                    ? const ExpatMapExploreScreen(
-                        key: ValueKey<String>('expat_map_rides'),
+                    ? ExpatMapExploreScreen(
+                        key: const ValueKey<String>('expat_map_rides'),
                         mode: ExpatMapTabMode.rides,
+                        ridesDestinationSeed: _ridesDestinationSeed,
+                        onRidesDestinationSeedConsumed: () {
+                          if (!mounted) return;
+                          if (_ridesDestinationSeed != null) {
+                            setState(() => _ridesDestinationSeed = null);
+                          }
+                        },
                       )
                     : _selectedBottomIndex == 2
                     ? _buildEstatesContentWithStream(textTheme)
@@ -204,8 +214,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   }
 
   Widget _buildHeader(TextTheme textTheme) {
-    final mapMode =
-        _selectedBottomIndex == 1 || _selectedBottomIndex == 4;
     return Container(
       color: _ExpatHomeColors.primaryDark,
       padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
@@ -221,18 +229,9 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                 fontSize: 22,
               ),
             ),
-            SizedBox(width: mapMode ? 12 : 8),
-            if (mapMode)
-              Expanded(child: _buildSearchBar(textTheme))
-            else
-              ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minWidth: 140,
-                  maxWidth: 220,
-                ),
-                child: _buildSearchBar(textTheme),
-              ),
             const SizedBox(width: 8),
+            // Estates search lives on the Estates tab only; header stays clear.
+            Expanded(child: SizedBox.shrink()),
             const Icon(Icons.notifications_none, color: Colors.white),
             const SizedBox(width: 4),
             _buildProfileMenu(textTheme),
@@ -281,32 +280,6 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
         .then((_) {
           if (mounted) _loadUserProfile();
         });
-  }
-
-  Widget _buildSearchBar(TextTheme textTheme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white, width: 1),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.search, color: _ExpatHomeColors.hint, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Search Apartments...',
-              style: textTheme.bodyMedium?.copyWith(
-                color: _ExpatHomeColors.hint,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildTabBar(TextTheme textTheme) {
@@ -858,129 +831,156 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     );
   }
 
+  void _openListingDetailForEstate(String listingId) {
+    Navigator.of(context)
+        .push<String?>(
+          MaterialPageRoute<String?>(
+            builder: (_) => ListingDetailScreenById(listingId: listingId),
+          ),
+        )
+        .then((locationForRides) {
+          if (!mounted) return;
+          final loc = locationForRides?.trim();
+          if (loc == null || loc.isEmpty) return;
+          setState(() {
+            _ridesDestinationSeed = loc;
+            _selectedBottomIndex = 1;
+          });
+        });
+  }
+
+  void _openRidesWithListingLocation(String location) {
+    final loc = location.trim();
+    if (loc.isEmpty) return;
+    setState(() {
+      _ridesDestinationSeed = loc;
+      _selectedBottomIndex = 1;
+    });
+  }
+
   Widget _buildEstateCardFromListing(
     BuildContext context,
     TextTheme textTheme,
     Listing estate,
   ) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ListingDetailScreenById(listingId: estate.id),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _buildListingImage(estate, height: 180),
-            ),
-            const SizedBox(height: 12),
-            Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => _openListingDetailForEstate(estate.id),
+            borderRadius: BorderRadius.circular(12),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        estate.title,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: _ExpatHomeColors.bodyText,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        estate.location,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: _ExpatHomeColors.bodyText,
-                        ),
-                      ),
-                    ],
-                  ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: _buildListingImage(estate, height: 180),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _ExpatHomeColors.helper,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        estate.typeLabel,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: _ExpatHomeColors.bodyText,
-                        ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            estate.title,
+                            style: textTheme.titleMedium?.copyWith(
+                              color: _ExpatHomeColors.bodyText,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            estate.location,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: _ExpatHomeColors.bodyText,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    _buildListingPriceRichText(
-                      textTheme,
-                      estate.type,
-                      estate.price,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _ExpatHomeColors.helper,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            estate.typeLabel,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: _ExpatHomeColors.bodyText,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        _buildListingPriceRichText(
+                          textTheme,
+                          estate.type,
+                          estate.price,
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {},
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _ExpatHomeColors.accentGreen,
-                      foregroundColor: _ExpatHomeColors.bodyText,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(7),
-                      ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => _openRidesWithListingLocation(estate.location),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _ExpatHomeColors.accentGreen,
+                    foregroundColor: _ExpatHomeColors.bodyText,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(7),
                     ),
-                    child: Text(
-                      'Get a Ride',
-                      style: textTheme.titleMedium?.copyWith(
-                        color: _ExpatHomeColors.bodyText,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ),
+                  child: Text(
+                    'Get a Ride',
+                    style: textTheme.titleMedium?.copyWith(
+                      color: _ExpatHomeColors.bodyText,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {},
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _ExpatHomeColors.exploreYellow,
-                      foregroundColor: _ExpatHomeColors.bodyText,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(7),
-                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {},
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _ExpatHomeColors.exploreYellow,
+                    foregroundColor: _ExpatHomeColors.bodyText,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(7),
                     ),
-                    child: Text(
-                      'Explore Area',
-                      style: textTheme.titleMedium?.copyWith(
-                        color: _ExpatHomeColors.bodyText,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ),
+                  child: Text(
+                    'Explore Area',
+                    style: textTheme.titleMedium?.copyWith(
+                      color: _ExpatHomeColors.bodyText,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

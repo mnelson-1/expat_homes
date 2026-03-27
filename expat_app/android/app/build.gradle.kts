@@ -15,8 +15,10 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
+// Prefer android/local.properties; fall back to env for CI / shells that export the key.
 val googleMapsApiKey: String =
     (localProperties.getProperty("GOOGLE_MAPS_API_KEY") ?: "").trim()
+        .ifEmpty { (System.getenv("GOOGLE_MAPS_API_KEY") ?: "").trim() }
 
 android {
     namespace = "com.example.expat_app"

@@ -5,10 +5,15 @@ import { PendingListingsPage } from './pages/PendingListingsPage'
 import { PendingListingDetailPage } from './pages/PendingListingDetailPage'
 import { EditRequestsPage } from './pages/EditRequestsPage'
 import { EditRequestPendingDetailPage } from './pages/EditRequestPendingDetailPage'
+import { LegalPage } from './pages/LegalPage'
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/privacy-policy" element={<LegalPage variant="privacy" />} />
+      <Route path="/terms" element={<LegalPage variant="eula" />} />
+      <Route path="/payments-terms" element={<LegalPage variant="payments" />} />
+      <Route path="/nondiscrimination" element={<LegalPage variant="nondiscrimination" />} />
       <Route path="/admin/login" element={<LoginPage />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="/admin/listings/pending" replace />} />

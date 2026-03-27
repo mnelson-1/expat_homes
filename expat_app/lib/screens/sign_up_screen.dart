@@ -1,8 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:expat_app/constants/user_profile_options.dart';
+import 'package:expat_app/legal/legal_version.dart';
 import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/widgets/legal_consent_rich_text.dart';
 
 /// Shared palette for onboarding screens (matches Get Started).
 class _SignUpColors {
@@ -44,6 +46,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _legalConsentChecked = false;
 
   void _onPasswordFieldChanged() => setState(() {});
 
@@ -156,8 +159,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       'This will be used to automatically assign you to bowls.'),
                   const SizedBox(height: 24),
                   _buildErrorBanner(textTheme),
-                  _buildTermsText(textTheme),
-                  const SizedBox(height: 28),
+                  LegalConsentRichText(
+                    baseStyle: textTheme.bodySmall?.copyWith(
+                      color: _SignUpColors.bodyText,
+                      fontSize: _SignUpColors.helperFontSize,
+                    ),
+                    linkColor: _SignUpColors.link,
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    value: _legalConsentChecked,
+                    onChanged: (v) =>
+                        setState(() => _legalConsentChecked = v ?? false),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(
+                      'I have read and agree to the policies linked above.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _SignUpColors.bodyText,
+                        fontSize: _SignUpColors.helperFontSize,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   _buildAgreeButton(textTheme),
                   const SizedBox(height: 32),
                 ],
@@ -381,58 +405,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  Widget _buildTermsText(TextTheme textTheme) {
-    return RichText(
-      text: TextSpan(
-        style: textTheme.bodySmall?.copyWith(
-          color: _SignUpColors.bodyText,
-          fontSize: _SignUpColors.helperFontSize,
-        ),
-        children: [
-          const TextSpan(
-              text:
-                  'By selecting Agree & continue, I agree to ExpatHomes\' '),
-          TextSpan(
-            text: 'Terms of Service',
-            style: TextStyle(
-              color: _SignUpColors.link,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-          const TextSpan(text: ', '),
-          TextSpan(
-            text: 'Payments Terms of Service',
-            style: TextStyle(
-              color: _SignUpColors.link,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-          const TextSpan(text: ' and '),
-          TextSpan(
-            text: 'Nondiscrimination Policy',
-            style: TextStyle(
-              color: _SignUpColors.link,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-          const TextSpan(text: ' and acknowledge the '),
-          TextSpan(
-            text: 'Privacy Policy',
-            style: TextStyle(
-              color: _SignUpColors.link,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-          const TextSpan(text: '.'),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleAgreeAndContinue() async {
     final email = widget.initialEmail?.trim() ?? '';
     if (email.isEmpty) {
@@ -446,6 +418,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
     if (password.length < 8 || !RegExp(r'[a-zA-Z]').hasMatch(password) || !RegExp(r'[0-9]').hasMatch(password)) {
       setState(() => _errorMessage = 'Use 8+ characters with letters and numbers');
+      return;
+    }
+    if (!_legalConsentChecked) {
+      setState(
+        () => _errorMessage =
+            'Please read and accept the Terms of Service and Privacy Policy.',
+      );
       return;
     }
     setState(() {
@@ -464,10 +443,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
           legalLastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
           dateOfBirth: _dateOfBirth,
           countryOfCitizenship: _country,
+          termsAndPrivacyConsentAt: DateTime.now(),
+          acceptedLegalVersion: kLegalDocumentsVersion,
         ),
       );
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
+    } on StateError catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.message;
+      });
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() {
@@ -479,7 +466,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Widget _buildAgreeButton(TextTheme textTheme) {
     return FilledButton(
-      onPressed: _isLoading ? null : _handleAgreeAndContinue,
+      onPressed: (_isLoading || !_legalConsentChecked)
+          ? null
+          : _handleAgreeAndContinue,
       style: FilledButton.styleFrom(
         backgroundColor: _SignUpColors.accentGreen,
         foregroundColor: _SignUpColors.primaryDark,

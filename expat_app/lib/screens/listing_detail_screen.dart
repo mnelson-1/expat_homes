@@ -849,7 +849,9 @@ class ListingDetailScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: FilledButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.of(context).pop<String>(location);
+                      },
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF1A2E35),
                         foregroundColor: Colors.white,

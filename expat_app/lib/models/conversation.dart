@@ -10,6 +10,7 @@ class Conversation {
     this.participantNames = const {},
     this.lastMessage,
     this.lastMessageAt,
+    this.lastMessageTranslations,
     this.listingTitle = '',
     this.listingImage = '',
     this.listingPrice = '',
@@ -29,6 +30,9 @@ class Conversation {
   final String? lastMessage;
   final DateTime? lastMessageAt;
 
+  /// Keys: English / French / Swahili — list preview per language (see [sendMessage] updates).
+  final Map<String, String>? lastMessageTranslations;
+
   /// Denormalized listing metadata for the thread list and conversation card.
   final String listingTitle;
   final String listingImage;
@@ -43,6 +47,24 @@ class Conversation {
       if (entry.key != myUid) return entry.value;
     }
     return 'Unknown';
+  }
+
+  /// Thread list line for [preferredLanguage] (English / French / Swahili labels).
+  String lastMessageLineForPreferredLanguage(String preferredLanguage) {
+    final fallback = lastMessage ?? '';
+    final map = lastMessageTranslations;
+    if (map == null || map.isEmpty) return fallback;
+    final key = preferredLanguage.trim();
+    if (key.isEmpty) return fallback;
+    final direct = map[key];
+    if (direct != null && direct.isNotEmpty) return direct;
+    final lower = key.toLowerCase();
+    for (final e in map.entries) {
+      if (e.key.toLowerCase() == lower && e.value.isNotEmpty) {
+        return e.value;
+      }
+    }
+    return fallback;
   }
 
   /// Returns the other participant's UID.
@@ -67,6 +89,13 @@ class Conversation {
     final names = (data['participantNames'] as Map?)
             ?.map((k, v) => MapEntry(k.toString(), v.toString())) ??
         {};
+    Map<String, String>? translations;
+    final rawTr = data['lastMessageTranslations'];
+    if (rawTr is Map) {
+      translations = rawTr.map(
+        (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+      );
+    }
 
     return Conversation(
       id: doc.id,
@@ -75,6 +104,7 @@ class Conversation {
       participantNames: names,
       lastMessage: data['lastMessage'] as String?,
       lastMessageAt: (data['lastMessageAt'] as Timestamp?)?.toDate(),
+      lastMessageTranslations: translations,
       listingTitle: data['listingTitle'] as String? ?? '',
       listingImage: data['listingImage'] as String? ?? '',
       listingPrice: data['listingPrice'] as String? ?? '',

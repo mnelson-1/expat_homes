@@ -11,6 +11,47 @@ import 'bowls_service.dart';
 /// Firestore collection name for user profiles (BACKEND_CHECKLIST §1.1).
 const String kUsersCollection = 'users';
 
+/// Maps normalized email → Firebase UID for pre-sign-in “email taken” checks.
+const String kRegisteredEmailsCollection = 'registered_emails';
+
+/// Result of [AuthService.lookupEmailForRegistration] (Get Started / sign-up gating).
+enum EmailLookupKind {
+  empty,
+  invalidFormat,
+  /// Not taken in Firebase Auth or in [kRegisteredEmailsCollection].
+  available,
+  /// Email already used (Auth and/or Firestore registry).
+  alreadyRegistered,
+  error,
+}
+
+class EmailRegistrationLookupResult {
+  const EmailRegistrationLookupResult({required this.kind, this.detail});
+
+  final EmailLookupKind kind;
+  final String? detail;
+
+  bool get allowsNewRegistration => kind == EmailLookupKind.available;
+
+  /// Short line under the email field (null when [kind] is [EmailLookupKind.empty]).
+  String? get statusMessage {
+    switch (kind) {
+      case EmailLookupKind.empty:
+        return null;
+      case EmailLookupKind.invalidFormat:
+        return 'Enter a valid email address.';
+      case EmailLookupKind.available:
+        return 'This email is available.';
+      case EmailLookupKind.alreadyRegistered:
+        return 'An account with this email already exists. Use Login below.';
+      case EmailLookupKind.error:
+        return detail?.trim().isNotEmpty == true
+            ? detail!.trim()
+            : 'Could not verify email. Try again.';
+    }
+  }
+}
+
 /// Handles Firebase Auth and Firestore user profiles.
 /// Use for register, login, logout, auth state, and current user profile.
 class AuthService {
@@ -21,6 +62,120 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  static final RegExp _emailFormat = RegExp(
+    r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+  );
+
+  /// Basic shape check for sign-up flows (Get Started, etc.).
+  static bool emailLooksValid(String email) =>
+      _emailFormat.hasMatch(email.trim());
+
+  /// Same key as [kRegisteredEmailsCollection] document ids (trim + lowercase).
+  static String normalizeRegistrationEmail(String email) =>
+      email.trim().toLowerCase();
+
+  Future<void> _claimRegisteredEmail(String normalizedEmail, String uid) async {
+    final ref =
+        _firestore.collection(kRegisteredEmailsCollection).doc(normalizedEmail);
+    await ref.set({
+      'uid': uid,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> _swapRegisteredEmailClaim({
+    required String? oldNormalized,
+    required String newNormalized,
+    required String uid,
+  }) async {
+    if (oldNormalized == newNormalized) return;
+    await _firestore.runTransaction((txn) async {
+      if (oldNormalized != null && oldNormalized.isNotEmpty) {
+        final oldRef =
+            _firestore.collection(kRegisteredEmailsCollection).doc(oldNormalized);
+        final oldSnap = await txn.get(oldRef);
+        if (oldSnap.exists && oldSnap.data()?['uid'] == uid) {
+          txn.delete(oldRef);
+        }
+      }
+      final newRef =
+          _firestore.collection(kRegisteredEmailsCollection).doc(newNormalized);
+      final newSnap = await txn.get(newRef);
+      if (newSnap.exists) {
+        final existing = newSnap.data()?['uid'] as String?;
+        if (existing != null && existing != uid) {
+          throw StateError('email_already_registered');
+        }
+      }
+      txn.set(newRef, {
+        'uid': uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  /// Returns [EmailLookupKind.alreadyRegistered] if Firebase Auth **or**
+  /// [kRegisteredEmailsCollection] has this email.
+  ///
+  /// Signed-out users cannot query `users`, so we mirror claimed emails at registration
+  /// and check that doc here. Legacy accounts may only exist in Auth until they sign in
+  /// again (registry backfill is optional).
+  ///
+  /// Uses Auth sign-in-methods lookup plus Firestore. If **email enumeration
+  /// protection** is enabled, Auth behaviour may differ—treat failures as
+  /// [EmailLookupKind.error] and retry.
+  Future<EmailRegistrationLookupResult> lookupEmailForRegistration(
+    String rawEmail,
+  ) async {
+    final t = rawEmail.trim();
+    if (t.isEmpty) {
+      return const EmailRegistrationLookupResult(kind: EmailLookupKind.empty);
+    }
+    if (!emailLooksValid(t)) {
+      return const EmailRegistrationLookupResult(
+        kind: EmailLookupKind.invalidFormat,
+      );
+    }
+    final normalized = normalizeRegistrationEmail(t);
+    try {
+      // Deprecated API; server Callable is the long-term hardening path.
+      // ignore: deprecated_member_use
+      final methods = await _auth.fetchSignInMethodsForEmail(t);
+      if (methods.isNotEmpty) {
+        return const EmailRegistrationLookupResult(
+          kind: EmailLookupKind.alreadyRegistered,
+        );
+      }
+      final regSnap = await _firestore
+          .collection(kRegisteredEmailsCollection)
+          .doc(normalized)
+          .get();
+      if (regSnap.exists) {
+        return const EmailRegistrationLookupResult(
+          kind: EmailLookupKind.alreadyRegistered,
+        );
+      }
+      return const EmailRegistrationLookupResult(
+        kind: EmailLookupKind.available,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'invalid-email') {
+        return const EmailRegistrationLookupResult(
+          kind: EmailLookupKind.invalidFormat,
+        );
+      }
+      return EmailRegistrationLookupResult(
+        kind: EmailLookupKind.error,
+        detail: e.message ?? e.code,
+      );
+    } catch (e) {
+      return EmailRegistrationLookupResult(
+        kind: EmailLookupKind.error,
+        detail: e.toString(),
+      );
+    }
+  }
 
   /// Current Firebase user (null if not signed in).
   User? get currentUser => _auth.currentUser;
@@ -83,6 +238,13 @@ class AuthService {
     required UserProfile profile,
     bool sendEmailVerification = true,
   }) async {
+    if (profile.termsAndPrivacyConsentAt == null ||
+        profile.acceptedLegalVersion == null ||
+        profile.acceptedLegalVersion!.trim().isEmpty) {
+      throw StateError(
+        'You must accept the Terms of Service and Privacy Policy to create an account.',
+      );
+    }
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
@@ -111,9 +273,20 @@ class AuthService {
           demographic: profile.demographic,
           agentId: profile.agentId,
           bio: profile.bio,
+          termsAndPrivacyConsentAt: profile.termsAndPrivacyConsentAt,
+          acceptedLegalVersion: profile.acceptedLegalVersion,
         ).toFirestoreCreate();
 
     await _firestore.collection(kUsersCollection).doc(user.uid).set(createData);
+
+    try {
+      await _claimRegisteredEmail(
+        normalizeRegistrationEmail(user.email ?? email),
+        user.uid,
+      );
+    } catch (_) {
+      // Rare race or rules mismatch; Auth + users doc still own the account.
+    }
 
     // Link the agent's Firebase UID to their licensed_agents record.
     // Doc IDs are uppercase (e.g. RM-204112); normalize so signup always hits the same doc.
@@ -256,10 +429,23 @@ class AuthService {
     if (user == null) throw StateError('Not signed in');
     final trimmed = email.trim();
     if (trimmed.isEmpty) throw ArgumentError.value(email, 'email', 'empty');
+    final oldNorm = user.email != null && user.email!.trim().isNotEmpty
+        ? normalizeRegistrationEmail(user.email!)
+        : null;
+    final newNorm = normalizeRegistrationEmail(trimmed);
     await _firestore.collection(kUsersCollection).doc(user.uid).update({
       'email': trimmed,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    try {
+      await _swapRegisteredEmailClaim(
+        oldNormalized: oldNorm,
+        newNormalized: newNorm,
+        uid: user.uid,
+      );
+    } catch (_) {
+      // Registry out of sync with profile; Get Started may still see stale state.
+    }
     try {
       await user.verifyBeforeUpdateEmail(trimmed);
     } on FirebaseAuthException {

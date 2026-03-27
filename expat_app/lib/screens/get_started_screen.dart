@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:expat_app/constants/user_profile_options.dart';
 import 'package:expat_app/screens/agent_sign_up_screen.dart';
 import 'package:expat_app/screens/landlord_sign_up_screen.dart';
 import 'package:expat_app/screens/sign_in_screen.dart';
 import 'package:expat_app/screens/sign_up_screen.dart';
+import 'package:expat_app/services/auth_service.dart';
 
 /// Palette and typography for Get Started / onboarding screens.
 class _GetStartedColors {
@@ -41,13 +44,106 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
   String _selectedLanguage = 'English';
   final _emailController = TextEditingController();
   final _emailFocus = FocusNode();
-  bool _verificationMessageSent = false;
+  final _authService = AuthService();
+  Timer? _emailLookupDebounce;
+  EmailRegistrationLookupResult? _emailLookup;
+  bool _emailLookupInFlight = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_onEmailChanged);
+    _emailFocus.addListener(_onEmailFocusChanged);
+  }
 
   @override
   void dispose() {
+    _emailLookupDebounce?.cancel();
+    _emailController.removeListener(_onEmailChanged);
+    _emailFocus.removeListener(_onEmailFocusChanged);
     _emailController.dispose();
     _emailFocus.dispose();
     super.dispose();
+  }
+
+  void _onEmailFocusChanged() {
+    if (!_emailFocus.hasFocus) {
+      _emailLookupDebounce?.cancel();
+      unawaited(_runEmailLookup());
+    }
+  }
+
+  void _onEmailChanged() {
+    _emailLookupDebounce?.cancel();
+    final text = _emailController.text.trim();
+    if (text.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _emailLookup = null;
+          _emailLookupInFlight = false;
+        });
+      }
+      return;
+    }
+    if (!AuthService.emailLooksValid(text)) {
+      if (mounted) {
+        setState(() {
+          _emailLookup = const EmailRegistrationLookupResult(
+            kind: EmailLookupKind.invalidFormat,
+          );
+          _emailLookupInFlight = false;
+        });
+      }
+      return;
+    }
+    _emailLookupDebounce = Timer(const Duration(milliseconds: 450), () {
+      unawaited(_runEmailLookup());
+    });
+  }
+
+  Future<void> _runEmailLookup() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _emailLookup = null;
+          _emailLookupInFlight = false;
+        });
+      }
+      return;
+    }
+    if (!AuthService.emailLooksValid(email)) {
+      if (mounted) {
+        setState(() {
+          _emailLookup = const EmailRegistrationLookupResult(
+            kind: EmailLookupKind.invalidFormat,
+          );
+          _emailLookupInFlight = false;
+        });
+      }
+      return;
+    }
+    if (mounted) setState(() => _emailLookupInFlight = true);
+    final result = await _authService.lookupEmailForRegistration(email);
+    if (!mounted) return;
+    if (_emailController.text.trim() != email) return;
+    setState(() {
+      _emailLookup = result;
+      _emailLookupInFlight = false;
+    });
+  }
+
+  Color _emailStatusColor() {
+    switch (_emailLookup?.kind) {
+      case EmailLookupKind.available:
+        return _GetStartedColors.accentGreen;
+      case EmailLookupKind.invalidFormat:
+      case EmailLookupKind.alreadyRegistered:
+      case EmailLookupKind.error:
+        return Colors.red.shade700;
+      default:
+        return _GetStartedColors.helper;
+    }
   }
 
   @override
@@ -120,21 +216,7 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
                     "We'll use this to personalise your experience and translate messages.",
                   ),
                   const SizedBox(height: 20),
-                  _buildTextField(
-                    controller: _emailController,
-                    focusNode: _emailFocus,
-                    hint: 'Email',
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                  ),
-                  if (_verificationMessageSent) ...[
-                    const SizedBox(height: 4),
-                    _buildHelper(
-                      textTheme,
-                      'A verification link will be sent to you shortly. '
-                      'Click the link to continue creating your account.',
-                    ),
-                  ],
+                  _buildEmailField(textTheme),
                   const SizedBox(height: 28),
                   _buildContinueButton(textTheme),
                   const SizedBox(height: 16),
@@ -239,56 +321,99 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required FocusNode focusNode,
-    required String hint,
-    TextInputType? keyboardType,
-    List<String>? autofillHints,
-    bool readOnly = false,
-  }) {
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      keyboardType: keyboardType,
-      autofillHints: autofillHints,
-      readOnly: readOnly,
-      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-        fontSize: _GetStartedColors.fieldFontSize,
-        color: _GetStartedColors.bodyText,
-      ),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(
-          color: _GetStartedColors.hint,
-          fontSize: _GetStartedColors.fieldFontSize,
+  Widget _buildEmailField(TextTheme textTheme) {
+    final msg = _emailLookup?.statusMessage;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _emailController,
+          focusNode: _emailFocus,
+          keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email],
+          style: textTheme.bodyLarge?.copyWith(
+            fontSize: _GetStartedColors.fieldFontSize,
+            color: _GetStartedColors.bodyText,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Email',
+            hintStyle: TextStyle(
+              color: _GetStartedColors.hint,
+              fontSize: _GetStartedColors.fieldFontSize,
+            ),
+            fillColor: Colors.white,
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: _GetStartedColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: _GetStartedColors.border),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            suffixIcon: _emailLookupInFlight
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : null,
+          ),
         ),
-        fillColor: Colors.white,
-        filled: true,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _GetStartedColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _GetStartedColors.border),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      ),
+        if (msg != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            msg,
+            style: textTheme.bodySmall?.copyWith(
+              color: _emailStatusColor(),
+              fontSize: _GetStartedColors.helperFontSize,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
   Widget _buildContinueButton(TextTheme textTheme) {
     return FilledButton(
-      onPressed: () {
+      onPressed: () async {
+        if (_selectedRole == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select what best describes you.'),
+            ),
+          );
+          return;
+        }
+        final email = _emailController.text.trim();
+        if (email.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please enter your email.')),
+          );
+          return;
+        }
+        if (mounted) setState(() => _emailLookupInFlight = true);
+        final lookup = await _authService.lookupEmailForRegistration(email);
+        if (!mounted) return;
+        setState(() {
+          _emailLookup = lookup;
+          _emailLookupInFlight = false;
+        });
+        if (!lookup.allowsNewRegistration) {
+          return;
+        }
         if (_selectedRole == _UserRole.expat) {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => SignUpScreen(
-                initialEmail: _emailController.text.trim(),
+                initialEmail: email,
                 preferredLanguage: _selectedLanguage,
               ),
             ),
@@ -299,7 +424,7 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => LandlordSignUpScreen(
-                initialEmail: _emailController.text.trim(),
+                initialEmail: email,
                 preferredLanguage: _selectedLanguage,
               ),
             ),
@@ -310,16 +435,11 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => AgentSignUpScreen(
-                initialEmail: _emailController.text.trim(),
+                initialEmail: email,
                 preferredLanguage: _selectedLanguage,
               ),
             ),
           );
-          return;
-        }
-        final email = _emailController.text.trim();
-        if (email.isNotEmpty) {
-          setState(() => _verificationMessageSent = true);
         }
       },
       style: FilledButton.styleFrom(

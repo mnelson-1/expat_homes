@@ -1,9 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:expat_app/constants/user_profile_options.dart';
+import 'package:expat_app/legal/legal_version.dart';
 import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/services/agents_service.dart';
 import 'package:expat_app/services/auth_service.dart';
+import 'package:expat_app/widgets/legal_consent_rich_text.dart';
 
 /// Palette for Agent signup (mirrors Expat / Landlord signup).
 class _AgentSignUpColors {
@@ -47,6 +49,7 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _legalConsentChecked = false;
 
   @override
   void initState() {
@@ -182,8 +185,29 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
                   _buildPasswordFeedback(textTheme),
                   const SizedBox(height: 24),
                   _buildErrorBanner(textTheme),
-                  _buildTermsText(textTheme),
-                  const SizedBox(height: 28),
+                  LegalConsentRichText(
+                    baseStyle: textTheme.bodySmall?.copyWith(
+                      color: _AgentSignUpColors.bodyText,
+                      fontSize: _AgentSignUpColors.helperFontSize,
+                    ),
+                    linkColor: _AgentSignUpColors.link,
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    value: _legalConsentChecked,
+                    onChanged: (v) =>
+                        setState(() => _legalConsentChecked = v ?? false),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(
+                      'I have read and agree to the policies linked above.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _AgentSignUpColors.bodyText,
+                        fontSize: _AgentSignUpColors.helperFontSize,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   _buildSignUpButton(textTheme),
                   const SizedBox(height: 32),
                 ],
@@ -437,59 +461,6 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
     );
   }
 
-  Widget _buildTermsText(TextTheme textTheme) {
-    return RichText(
-      text: TextSpan(
-        style: textTheme.bodySmall?.copyWith(
-          color: _AgentSignUpColors.bodyText,
-          fontSize: _AgentSignUpColors.helperFontSize,
-        ),
-        children: [
-          const TextSpan(
-            text:
-                'By selecting Agree & continue, I agree to ExpatHomes\' ',
-          ),
-          TextSpan(
-            text: 'Terms of Service',
-            style: TextStyle(
-              color: _AgentSignUpColors.link,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-          const TextSpan(text: ', '),
-          TextSpan(
-            text: 'Payments Terms of Service',
-            style: TextStyle(
-              color: _AgentSignUpColors.link,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-          const TextSpan(text: ' and '),
-          TextSpan(
-            text: 'Nondiscrimination Policy',
-            style: TextStyle(
-              color: _AgentSignUpColors.link,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-          const TextSpan(text: ' and acknowledge the '),
-          TextSpan(
-            text: 'Privacy Policy',
-            style: TextStyle(
-              color: _AgentSignUpColors.link,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-          const TextSpan(text: '.'),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleSignUp() async {
     final email = widget.initialEmail?.trim() ?? '';
     if (email.isEmpty) {
@@ -509,6 +480,13 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
       setState(() => _errorMessage = 'Use 8+ characters with letters and numbers');
       return;
     }
+    if (!_legalConsentChecked) {
+      setState(
+        () => _errorMessage =
+            'Please read and accept the Terms of Service and Privacy Policy.',
+      );
+      return;
+    }
     setState(() {
       _errorMessage = null;
       _isLoading = true;
@@ -526,10 +504,18 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
           legalFirstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
           legalLastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
           agentId: _agentIdController.text.trim(),
+          termsAndPrivacyConsentAt: DateTime.now(),
+          acceptedLegalVersion: kLegalDocumentsVersion,
         ),
       );
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
+    } on StateError catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.message;
+      });
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() {
@@ -540,7 +526,8 @@ class _AgentSignUpScreenState extends State<AgentSignUpScreen> {
   }
 
   Widget _buildSignUpButton(TextTheme textTheme) {
-    final canSignUp = _idValidationStatus == 'valid' &&
+    final canSignUp = _legalConsentChecked &&
+        _idValidationStatus == 'valid' &&
         _passwordController.text.isNotEmpty &&
         _passwordController.text == _confirmPasswordController.text;
     return FilledButton(

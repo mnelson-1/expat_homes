@@ -11,6 +11,28 @@ int estimateRwandaRideFareRwf({required int distanceMeters}) {
   return (dKm * kRwandaRideEstimateRwfPerKm).round();
 }
 
+/// Formats total seconds as `Hh Mm Ss` / `Mm Ss` / `Ss` for the rides panel.
+String formatRideDurationHms(int totalSeconds) {
+  if (totalSeconds < 0) totalSeconds = 0;
+  final h = totalSeconds ~/ 3600;
+  final m = (totalSeconds % 3600) ~/ 60;
+  final s = totalSeconds % 60;
+  if (h > 0) {
+    return '${h}h ${m}m ${s}s';
+  }
+  if (m > 0) {
+    return '${m}m ${s}s';
+  }
+  return '${s}s';
+}
+
+/// Kilometres with one decimal (e.g. 12.4 km).
+String formatRideDistanceKm(int distanceMeters) {
+  if (distanceMeters <= 0) return '0.0';
+  final km = distanceMeters / 1000.0;
+  return km.toStringAsFixed(1);
+}
+
 /// Formats [value] with thousands separators (e.g. 2500 → "2,500").
 String formatRwfAmount(int value) {
   final s = value.toString();

@@ -49,7 +49,7 @@ class AgentProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final defaultBio =
-        'Fluent in Kinyarwanda, English, and French. Commission Rate starts at 5% of sale price. Varies and Negotiable.';
+        'Fluent in English and French. Commission Rate starts at 5% of sale price. Varies and Negotiable.';
 
     return Scaffold(
       backgroundColor: Colors.white,

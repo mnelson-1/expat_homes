@@ -94,7 +94,6 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
       child: SafeArea(
         bottom: false,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               'expat',
@@ -104,13 +103,11 @@ class _LandlordHomeScreenState extends State<LandlordHomeScreen> {
                 fontSize: 22,
               ),
             ),
-            Row(
-              children: [
-                const Icon(Icons.notifications_none, color: Colors.white),
-                const SizedBox(width: 8),
-                _buildProfileMenu(textTheme),
-              ],
-            ),
+            const SizedBox(width: 8),
+            Expanded(child: SizedBox.shrink()),
+            const Icon(Icons.notifications_none, color: Colors.white),
+            const SizedBox(width: 4),
+            _buildProfileMenu(textTheme),
           ],
         ),
       ),

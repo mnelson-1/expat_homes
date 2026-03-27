@@ -1,7 +1,6 @@
 /// Options shown at registration and on the account profile (keep in sync).
 const List<String> kPreferredLanguages = [
   'English',
-  'Kinyarwanda',
   'French',
   'Swahili',
 ];

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,6 +6,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import '../models/conversation.dart';
 import '../models/chat_message.dart';
+import 'message_translation_service.dart';
+import 'perf_metrics_service.dart';
 
 /// Storage path: `chat_attachments/{senderId}/{conversationId}/{objectName}`.
 const String kChatAttachmentsStoragePrefix = 'chat_attachments';
@@ -135,6 +138,43 @@ class ConversationsService {
     });
   }
 
+  /// Typing heartbeat freshness for [peerTypingStream].
+  static const Duration typingFreshness = Duration(seconds: 6);
+
+  CollectionReference<Map<String, dynamic>> _typingCol(String conversationId) =>
+      _conversationsRef.doc(conversationId).collection('typing');
+
+  /// Emits true while another participant has a recent typing heartbeat.
+  Stream<bool> peerTypingStream(String conversationId, String myUid) {
+    return _typingCol(conversationId).snapshots().map((snap) {
+      final now = DateTime.now();
+      for (final doc in snap.docs) {
+        if (doc.id == myUid) continue;
+        final raw = doc.data()['at'];
+        DateTime? at;
+        if (raw is Timestamp) at = raw.toDate();
+        if (at != null && now.difference(at) <= typingFreshness) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  /// Writes or clears the current user's typing indicator for [conversationId].
+  Future<void> setTypingState({
+    required String conversationId,
+    required String userId,
+    required bool isTyping,
+  }) async {
+    final ref = _typingCol(conversationId).doc(userId);
+    if (!isTyping) {
+      await ref.delete();
+    } else {
+      await ref.set({'at': FieldValue.serverTimestamp()});
+    }
+  }
+
   /// Real-time stream of messages for a conversation, oldest first.
   /// Client-side sort avoids the need for a Firestore composite index.
   Stream<List<ChatMessage>> messagesStream(String conversationId) {
@@ -164,6 +204,7 @@ class ConversationsService {
     Map<String, dynamic> payload = const {},
     String? lastMessagePreview,
   }) async {
+    final sw = Stopwatch()..start();
     final msg = ChatMessage(
       id: '',
       conversationId: conversationId,
@@ -179,13 +220,66 @@ class ConversationsService {
             ? lastMessagePreview
             : content;
 
-    await _conversationsRef.doc(conversationId).update({
+    final updates = <String, dynamic>{
       'lastMessage': preview,
       'lastMessageAt': FieldValue.serverTimestamp(),
-    });
+    };
+    if (preview.trim().isNotEmpty) {
+      final tr =
+          await MessageTranslationService.buildLastMessageTranslationsForFirestore(
+        preview: preview,
+        conversationId: conversationId,
+      );
+      if (tr.isNotEmpty) {
+        updates['lastMessageTranslations'] = tr;
+      }
+    } else {
+      updates['lastMessageTranslations'] = FieldValue.delete();
+    }
+
+    await _conversationsRef.doc(conversationId).update(updates);
 
     final created = await docRef.get();
+    sw.stop();
+    PerfMetricsService().addSample('send_message', sw.elapsedMilliseconds);
     return ChatMessage.fromFirestore(created);
+  }
+
+  /// Measures latency from send call to message visibility in [messagesStream].
+  /// Uses the same stream path consumed by the UI.
+  Future<int> measureSendToReceiveLatency({
+    required String conversationId,
+    required String senderId,
+    required String content,
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final sw = Stopwatch()..start();
+    final completer = Completer<int>();
+    late final StreamSubscription<List<ChatMessage>> sub;
+    String? targetId;
+
+    sub = messagesStream(conversationId).listen((messages) {
+      if (targetId == null) return;
+      final seen = messages.any((m) => m.id == targetId);
+      if (seen && !completer.isCompleted) {
+        sw.stop();
+        completer.complete(sw.elapsedMilliseconds);
+      }
+    });
+
+    try {
+      final created = await sendMessage(
+        conversationId: conversationId,
+        senderId: senderId,
+        content: content,
+      );
+      targetId = created.id;
+      final ms = await completer.future.timeout(timeout);
+      PerfMetricsService().setMessageLatencyMs(ms);
+      return ms;
+    } finally {
+      await sub.cancel();
+    }
   }
 
   /// Uploads [fileBytes] to Storage, then sends a message with attachment metadata in [payload].
