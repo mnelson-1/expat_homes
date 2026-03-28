@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/models/listing_location_payload.dart';
 import 'package:expat_app/models/listing_edit_request.dart';
 import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/services/agents_service.dart';
@@ -850,7 +851,12 @@ class ListingDetailScreen extends StatelessWidget {
                   Expanded(
                     child: FilledButton(
                       onPressed: () {
-                        Navigator.of(context).pop<String>(location);
+                        Navigator.of(context).pop<ListingLocationPayload?>(
+                          ListingLocationPayload(
+                            openExploreTab: false,
+                            location: location,
+                          ),
+                        );
                       },
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF1A2E35),
@@ -872,7 +878,14 @@ class ListingDetailScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.of(context).pop<ListingLocationPayload?>(
+                          ListingLocationPayload(
+                            openExploreTab: true,
+                            location: location,
+                          ),
+                        );
+                      },
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFFFFD54F),
                         foregroundColor: const Color(0xFF1A2E35),

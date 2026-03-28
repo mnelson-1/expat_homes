@@ -4,7 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'package:expat_app/services/explore_session_storage.dart';
 import 'package:expat_app/services/google_directions_service.dart';
 import 'package:expat_app/services/google_geocoding_service.dart';
 import 'package:expat_app/services/google_places_service.dart';
@@ -23,6 +25,9 @@ class ExpatMapExploreScreen extends StatefulWidget {
     required this.mode,
     this.ridesDestinationSeed,
     this.onRidesDestinationSeedConsumed,
+    this.exploreLocationSeed,
+    this.onExploreLocationSeedConsumed,
+    this.onExploreFullscreenModeChanged,
   });
 
   final ExpatMapTabMode mode;
@@ -32,6 +37,15 @@ class ExpatMapExploreScreen extends StatefulWidget {
 
   /// Called after the seed is read so the parent can clear it (avoids re-applying on rebuild).
   final VoidCallback? onRidesDestinationSeedConsumed;
+
+  /// Listing / estate address to pre-fill Explore search and load nearby places.
+  final String? exploreLocationSeed;
+
+  /// Called after [exploreLocationSeed] is applied (parent should clear it).
+  final VoidCallback? onExploreLocationSeedConsumed;
+
+  /// When [true], Explore is showing the full-screen place list (parent may hide app chrome).
+  final ValueChanged<bool>? onExploreFullscreenModeChanged;
 
   @override
   State<ExpatMapExploreScreen> createState() => _ExpatMapExploreScreenState();
@@ -44,7 +58,17 @@ class _ExpatMapColors {
   static const fieldBorder = Color(0xFF9CA5A8);
   /// Explore top band (off-white), per design — pills stay white inside.
   static const explorePanelBackground = Color(0xFFF2F3F5);
+  /// Place-type pill on Explore cards (matches estate “Explore Area” accent).
+  static const categoryBadgeYellow = Color(0xFFFFD54F);
 }
+
+/// Tab label + Nearby Search [type] values (one type per request, merged per tab).
+const List<(String, List<String>)> _kExploreCategoryConfig = [
+  ('Food', ['restaurant', 'cafe', 'meal_takeaway']),
+  ('Health', ['hospital', 'pharmacy', 'doctor']),
+  ('Fitness', ['gym']),
+  ('Shopping', ['supermarket', 'shopping_mall']),
+];
 
 class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
   GoogleMapController? _mapController;
@@ -93,6 +117,17 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
   /// Rides: inline error (no driving route, etc.).
   String? _ridesRouteError;
 
+  // --- Explore: nearby places list + session ---
+  GoogleGeocodingService? _exploreGeocoding;
+  bool _consumingExploreSeed = false;
+  bool _exploreResultsMode = false;
+  String _exploreAnchorLabel = '';
+  LatLng? _exploreAnchor;
+  int _exploreCategoryIndex = 0;
+  final Map<int, List<ExplorePlaceDetails>> _explorePlacesByCategory = {};
+  bool _explorePlacesLoading = false;
+  String? _exploreFetchError;
+
   bool get _isRides => widget.mode == ExpatMapTabMode.rides;
 
   @override
@@ -120,12 +155,14 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
       _loadingKey = false;
       if (key.isEmpty) {
         _keyError =
-            'Add GOOGLE_MAPS_API_KEY to android/local.properties (see docs/GOOGLE_MAPS_SETUP.md).';
+            'Add GOOGLE_MAPS_API_KEY to env/google_maps.properties (copy env/google_maps.example.properties).';
       } else {
         _places = GooglePlacesService(apiKey: key);
         if (_isRides) {
           _directions = GoogleDirectionsService(apiKey: key);
           _geocoding = GoogleGeocodingService(apiKey: key);
+        } else {
+          _exploreGeocoding = GoogleGeocodingService(apiKey: key);
         }
         _keyError = null;
       }
@@ -133,21 +170,34 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
     if (_isRides && key.isNotEmpty) {
       await _initRidesFromLocation();
       await _maybeConsumeDestinationSeed();
+    } else if (!_isRides && key.isNotEmpty) {
+      await _bootstrapExploreFromDiskOrSeed();
     }
   }
 
   @override
   void didUpdateWidget(covariant ExpatMapExploreScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_isRides) return;
-    final n = widget.ridesDestinationSeed?.trim();
-    final o = oldWidget.ridesDestinationSeed?.trim();
-    if (n != null &&
-        n.isNotEmpty &&
-        n != o &&
-        _apiKey.isNotEmpty &&
-        !_loadingKey) {
-      _maybeConsumeDestinationSeed();
+    if (_isRides) {
+      final n = widget.ridesDestinationSeed?.trim();
+      final o = oldWidget.ridesDestinationSeed?.trim();
+      if (n != null &&
+          n.isNotEmpty &&
+          n != o &&
+          _apiKey.isNotEmpty &&
+          !_loadingKey) {
+        _maybeConsumeDestinationSeed();
+      }
+    } else {
+      final ex = widget.exploreLocationSeed?.trim();
+      final exOld = oldWidget.exploreLocationSeed?.trim();
+      if (ex != null &&
+          ex.isNotEmpty &&
+          ex != exOld &&
+          _apiKey.isNotEmpty &&
+          !_loadingKey) {
+        unawaited(_maybeConsumeExploreLocationSeed());
+      }
     }
   }
 
@@ -192,6 +242,352 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
         _consumingDestinationSeed = false;
       }
     }
+  }
+
+  Future<void> _bootstrapExploreFromDiskOrSeed() async {
+    final seed = widget.exploreLocationSeed?.trim();
+    if (seed != null && seed.isNotEmpty) {
+      await _maybeConsumeExploreLocationSeed();
+      return;
+    }
+    final fromDisk = await ExploreSessionStorage.instance.loadIfValid();
+    if (!mounted || fromDisk == null) return;
+
+    setState(() {
+      _exploreSearchController.text = fromDisk.searchFieldText;
+      _exploreAnchor = LatLng(fromDisk.anchorLat, fromDisk.anchorLng);
+      _exploreAnchorLabel = fromDisk.anchorLabel;
+      _exploreCategoryIndex = fromDisk.categoryIndex.clamp(
+        0,
+        _kExploreCategoryConfig.length - 1,
+      );
+      _explorePlacesByCategory.clear();
+      for (final e in fromDisk.placesByCategoryIndex.entries) {
+        _explorePlacesByCategory[e.key] = List<ExplorePlaceDetails>.from(
+          e.value,
+        );
+      }
+      _cameraTarget = _exploreAnchor!;
+      _exploreResultsMode = true;
+      _markers
+        ..clear()
+        ..add(
+          Marker(
+            markerId: const MarkerId('selected'),
+            position: _exploreAnchor!,
+            infoWindow: InfoWindow(
+              title: 'Search area',
+              snippet: fromDisk.searchFieldText,
+            ),
+          ),
+        );
+    });
+    widget.onExploreFullscreenModeChanged?.call(true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _exploreAnchor == null) return;
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(_exploreAnchor!, 14),
+      );
+    });
+  }
+
+  Future<void> _maybeConsumeExploreLocationSeed() async {
+    final seed = widget.exploreLocationSeed?.trim();
+    if (_isRides ||
+        seed == null ||
+        seed.isEmpty ||
+        _consumingExploreSeed ||
+        _exploreGeocoding == null) {
+      return;
+    }
+    _consumingExploreSeed = true;
+    widget.onExploreLocationSeedConsumed?.call();
+    try {
+      final hit = await _exploreGeocoding!.forwardGeocode(seed);
+      if (!mounted) return;
+      if (hit == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not find that location for Explore. Try typing it in the search field.',
+            ),
+          ),
+        );
+        return;
+      }
+      _exploreSearchController.text =
+          hit.formattedAddress.isNotEmpty ? hit.formattedAddress : seed;
+      final label = _shortAnchorLabel(hit.formattedAddress);
+      await _applyExploreAnchor(hit.latLng, label: label, openResults: true);
+    } finally {
+      if (mounted) {
+        setState(() => _consumingExploreSeed = false);
+      } else {
+        _consumingExploreSeed = false;
+      }
+    }
+  }
+
+  String _shortAnchorLabel(String formatted) {
+    const nearPrefix = 'Near ';
+    final parts =
+        formatted
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+    if (parts.length >= 2) {
+      return '$nearPrefix${parts.take(3).join(', ')}';
+    }
+    if (parts.isNotEmpty) return '$nearPrefix${parts.first}';
+    return '${nearPrefix}searched area';
+  }
+
+  double _distanceMeters(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const earthM = 6371000.0;
+    final p1 = lat1 * math.pi / 180;
+    final p2 = lat2 * math.pi / 180;
+    final dLat = (lat2 - lat1) * math.pi / 180;
+    final dLon = (lon2 - lon1) * math.pi / 180;
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(p1) * math.cos(p2) * math.sin(dLon / 2) * math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthM * c;
+  }
+
+  Future<void> _applyExploreAnchor(
+    LatLng ll, {
+    required String label,
+    required bool openResults,
+  }) async {
+    if (!mounted) return;
+    setState(() {
+      _exploreAnchor = ll;
+      _exploreAnchorLabel = label;
+      _cameraTarget = ll;
+      _exploreFetchError = null;
+      if (openResults) {
+        _exploreResultsMode = true;
+        _exploreCategoryIndex = 0;
+        _explorePlacesByCategory.clear();
+      }
+      _markers
+        ..clear()
+        ..add(
+          Marker(
+            markerId: const MarkerId('selected'),
+            position: ll,
+            infoWindow: InfoWindow(
+              title: 'Search area',
+              snippet: _exploreSearchController.text,
+            ),
+          ),
+        );
+    });
+    if (openResults) {
+      widget.onExploreFullscreenModeChanged?.call(true);
+    }
+    await _mapController?.animateCamera(CameraUpdate.newLatLngZoom(ll, 14));
+    if (openResults && _places != null) {
+      await _loadExploreCategory(0);
+    }
+  }
+
+  Future<List<ExplorePlaceDetails>> _fetchExploreDetailsInChunks(
+    GooglePlacesService places,
+    List<String> placeIds,
+  ) async {
+    const chunk = 5;
+    final out = <ExplorePlaceDetails>[];
+    for (var i = 0; i < placeIds.length; i += chunk) {
+      final end = math.min(i + chunk, placeIds.length);
+      final slice = placeIds.sublist(i, end);
+      final partial = await Future.wait(
+        slice.map(places.explorePlaceDetails),
+      );
+      for (final d in partial) {
+        if (d != null) out.add(d);
+      }
+    }
+    return out;
+  }
+
+  Future<void> _loadExploreCategory(int index) async {
+    final places = _places;
+    final anchor = _exploreAnchor;
+    if (places == null || anchor == null || !_exploreResultsMode) return;
+
+    final safeIndex = index.clamp(0, _kExploreCategoryConfig.length - 1);
+    final cached = _explorePlacesByCategory[safeIndex];
+    if (cached != null && cached.isNotEmpty) {
+      setState(() {
+        _exploreCategoryIndex = safeIndex;
+        _exploreFetchError = null;
+      });
+      await _persistExploreSession();
+      return;
+    }
+
+    setState(() {
+      _exploreCategoryIndex = safeIndex;
+      _explorePlacesLoading = true;
+      _exploreFetchError = null;
+    });
+
+    try {
+      final typeList = _kExploreCategoryConfig[safeIndex].$2;
+      final merged = <String, NearbyPlaceSummary>{};
+      for (final t in typeList) {
+        final batch = await places.nearbySearch(
+          lat: anchor.latitude,
+          lng: anchor.longitude,
+          radiusMeters: 2500,
+          type: t,
+        );
+        for (final p in batch) {
+          merged[p.placeId] = p;
+        }
+      }
+      final sorted =
+          merged.values.toList()
+            ..sort((a, b) {
+              final da = _distanceMeters(
+                anchor.latitude,
+                anchor.longitude,
+                a.lat,
+                a.lng,
+              );
+              final db = _distanceMeters(
+                anchor.latitude,
+                anchor.longitude,
+                b.lat,
+                b.lng,
+              );
+              return da.compareTo(db);
+            });
+      final top = sorted.take(15).toList();
+      final details = await _fetchExploreDetailsInChunks(
+        places,
+        top.map((e) => e.placeId).toList(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _explorePlacesByCategory[safeIndex] = details;
+        _explorePlacesLoading = false;
+      });
+      await _persistExploreSession();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _explorePlacesLoading = false;
+        _exploreFetchError =
+            'Could not load places. Check connection and Places API settings.';
+      });
+    }
+  }
+
+  Future<void> _persistExploreSession() async {
+    final anchor = _exploreAnchor;
+    if (!_exploreResultsMode || anchor == null) return;
+    await ExploreSessionStorage.instance.save(
+      ExploreSessionSnapshot(
+        savedAt: DateTime.now(),
+        anchorLat: anchor.latitude,
+        anchorLng: anchor.longitude,
+        anchorLabel: _exploreAnchorLabel,
+        searchFieldText: _exploreSearchController.text,
+        categoryIndex: _exploreCategoryIndex,
+        placesByCategoryIndex: Map<int, List<ExplorePlaceDetails>>.from(
+          _explorePlacesByCategory,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPlaceInGoogle(ExplorePlaceDetails p) async {
+    final raw = p.googleMapsUri?.trim();
+    final uri =
+        raw != null && raw.isNotEmpty
+            ? Uri.parse(raw)
+            : Uri.parse(
+              'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(p.name)}&query_place_id=${Uri.encodeComponent(p.placeId)}',
+            );
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps')),
+        );
+      }
+    }
+  }
+
+  /// Back from place list → map/search; keeps search text, anchor, marker, session.
+  void _popExploreResultsToMapView() {
+    if (!_exploreResultsMode) return;
+    setState(() {
+      _exploreResultsMode = false;
+    });
+    widget.onExploreFullscreenModeChanged?.call(false);
+    final anchor = _exploreAnchor;
+    if (anchor != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngZoom(anchor, 14),
+        );
+      });
+    }
+  }
+
+  String _exploreTypeBadgeLabel(List<String> types) {
+    if (types.isEmpty) return 'Place';
+    const map = <String, String>{
+      'restaurant': 'Restaurant',
+      'cafe': 'Cafe',
+      'meal_takeaway': 'Takeaway',
+      'hospital': 'Hospital',
+      'pharmacy': 'Pharmacy',
+      'doctor': 'Clinic',
+      'gym': 'Gym',
+      'supermarket': 'Supermarket',
+      'shopping_mall': 'Mall',
+      'store': 'Store',
+      'bakery': 'Bakery',
+      'bar': 'Bar',
+    };
+    for (final t in types) {
+      final m = map[t];
+      if (m != null) return m;
+    }
+    return types.first.replaceAll('_', ' ');
+  }
+
+  String _exploreHoursLine(ExplorePlaceDetails p) {
+    if (p.weekdayText.isNotEmpty) {
+      return p.weekdayText.first;
+    }
+    if (p.openNow == true) return 'Open now';
+    if (p.openNow == false) return 'Closed now';
+    return 'Hours not listed';
+  }
+
+  String _exploreRatingLine(ExplorePlaceDetails p) {
+    final r = p.rating;
+    if (r == null) return 'No ratings yet';
+    return '${r.toStringAsFixed(1)} Star rated';
   }
 
   void _dismissRidesResultPanels() {
@@ -474,6 +870,9 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
 
   @override
   void dispose() {
+    if (!_isRides && _exploreResultsMode) {
+      widget.onExploreFullscreenModeChanged?.call(false);
+    }
     _debounce?.cancel();
     if (widget.mode == ExpatMapTabMode.rides) {
       _ridesFromController.removeListener(_onRidesFromOrToChanged);
@@ -506,25 +905,12 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
         ? details.formattedAddress
         : details.name;
 
-    setState(() {
-      _cameraTarget = latLng;
-      _markers
-        ..clear()
-        ..add(
-          Marker(
-            markerId: const MarkerId('selected'),
-            position: latLng,
-            infoWindow: InfoWindow(
-              title: details.name.isNotEmpty ? details.name : 'Selected place',
-              snippet: details.formattedAddress,
-            ),
-          ),
-        );
-    });
-
-    await _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(latLng, 15),
+    final label = _shortAnchorLabel(
+      details.formattedAddress.isNotEmpty
+          ? details.formattedAddress
+          : details.name,
     );
+    await _applyExploreAnchor(latLng, label: label, openResults: true);
   }
 
   Future<void> _onRidesSelectFromPrediction(PlacePrediction p) async {
@@ -856,7 +1242,7 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
           'Check API key restrictions, enable Directions API, and billing (see docs).';
     }
     return 'Could not load route: $detail. '
-        'Confirm Directions API + Geocoding API on the key, billing, and rebuild after changing local.properties (see docs).';
+        'Confirm Directions + Geocoding + Places on the key, billing, and rebuild after changing env/google_maps.properties.';
   }
 
   /// Pill field used on Rides (From/To) and Explore (location search).
@@ -1160,12 +1546,13 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
     );
   }
 
-  /// Light panel: distance + duration, then large RWF price (Estates / Rides success).
+  /// Rides fare panel: green card, dark blue copy (distance, time, price).
   Widget _buildRidesFareResultCard(TextTheme textTheme) {
+    const ink = _ExpatMapColors.primaryDark;
     return Material(
       elevation: 6,
       borderRadius: BorderRadius.circular(12),
-      color: const Color(0xFFF2F3F5),
+      color: _ExpatMapColors.accentGreen,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
         child: Stack(
@@ -1180,7 +1567,7 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                   Text(
                     'Distance (km) · Time',
                     style: textTheme.labelSmall?.copyWith(
-                      color: _ExpatMapColors.hint,
+                      color: ink,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1188,7 +1575,7 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                   Text(
                     _ridesFareDistanceLine!,
                     style: textTheme.bodySmall?.copyWith(
-                      color: _ExpatMapColors.primaryDark,
+                      color: ink,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1196,7 +1583,7 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                   Text(
                     'Price (RWF)',
                     style: textTheme.labelSmall?.copyWith(
-                      color: _ExpatMapColors.hint,
+                      color: ink,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1204,7 +1591,7 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                   Text(
                     _ridesFarePriceLine!,
                     style: textTheme.titleLarge?.copyWith(
-                      color: _ExpatMapColors.primaryDark,
+                      color: ink,
                       fontWeight: FontWeight.bold,
                       fontSize: 22,
                     ),
@@ -1217,7 +1604,7 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
               right: -6,
               child: IconButton(
                 icon: const Icon(Icons.close, size: 22),
-                color: _ExpatMapColors.primaryDark,
+                color: ink,
                 onPressed: _dismissRidesResultPanels,
               ),
             ),
@@ -1317,6 +1704,15 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
   }
 
   Widget _buildExploreLayout(BuildContext context, TextTheme textTheme) {
+    if (_exploreResultsMode) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) _popExploreResultsToMapView();
+        },
+        child: _buildExploreResultsLayout(context, textTheme),
+      );
+    }
     final panelMaxH = MediaQuery.sizeOf(context).height * 0.48;
     return Column(
       key: const ValueKey(ExpatMapTabMode.explore),
@@ -1354,6 +1750,9 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                                         _predictions = [];
                                         _markers.clear();
                                       });
+                                      unawaited(
+                                        ExploreSessionStorage.instance.clear(),
+                                      );
                                     },
                                   )
                                   : null,
@@ -1402,6 +1801,282 @@ class _ExpatMapExploreScreenState extends State<ExpatMapExploreScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExploreResultsLayout(BuildContext context, TextTheme textTheme) {
+    final places =
+        _explorePlacesByCategory[_exploreCategoryIndex] ?? const [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          color: _ExpatMapColors.primaryDark,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8, right: 16, bottom: 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    onPressed: _popExploreResultsToMapView,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _exploreAnchorLabel.isNotEmpty
+                          ? _exploreAnchorLabel
+                          : 'Nearby places',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+          child: Row(
+            children: List.generate(_kExploreCategoryConfig.length, (i) {
+              final label = _kExploreCategoryConfig[i].$1;
+              final sel = i == _exploreCategoryIndex;
+              return Expanded(
+                child: InkWell(
+                  onTap:
+                      _explorePlacesLoading
+                          ? null
+                          : () => unawaited(_loadExploreCategory(i)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelLarge?.copyWith(
+                            color:
+                                sel
+                                    ? _ExpatMapColors.primaryDark
+                                    : _ExpatMapColors.hint,
+                            fontWeight:
+                                sel ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        height: 3,
+                        color:
+                            sel
+                                ? _ExpatMapColors.primaryDark
+                                : Colors.transparent,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const Divider(height: 1, thickness: 1, color: Color(0xFFE0E0E0)),
+        Expanded(
+          child:
+              _explorePlacesLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _exploreFetchError != null
+                  ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        _exploreFetchError!,
+                        textAlign: TextAlign.center,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: _ExpatMapColors.hint,
+                        ),
+                      ),
+                    ),
+                  )
+                  : places.isEmpty
+                  ? Center(
+                    child: Text(
+                      'No places found in this category nearby.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: _ExpatMapColors.hint,
+                      ),
+                    ),
+                  )
+                  : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    itemCount: places.length,
+                    separatorBuilder:
+                        (_, __) => const Divider(
+                          height: 24,
+                          thickness: 1,
+                          color: Color(0xFFE0E0E0),
+                        ),
+                    itemBuilder: (context, index) {
+                      return _buildExplorePlaceCard(
+                        context,
+                        textTheme,
+                        places[index],
+                      );
+                    },
+                  ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExplorePlaceCard(
+    BuildContext context,
+    TextTheme textTheme,
+    ExplorePlaceDetails place,
+  ) {
+    final placesSvc = _places;
+    final photoUrls =
+        placesSvc == null
+            ? const <String>[]
+            : place.photoReferences
+                .map((r) => placesSvc.placePhotoUrl(r, maxWidth: 640))
+                .where((u) => u.isNotEmpty)
+                .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (photoUrls.isNotEmpty)
+          SizedBox(
+            height: 108,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: photoUrls.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    photoUrls[i],
+                    width: 140,
+                    height: 108,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (_, __, ___) => Container(
+                          width: 140,
+                          height: 108,
+                          color: const Color(0xFFE8E8E8),
+                          child: const Icon(Icons.image_not_supported),
+                        ),
+                  ),
+                );
+              },
+            ),
+          )
+        else
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              height: 100,
+              color: const Color(0xFFE8E8E8),
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.store_mall_directory_outlined,
+                size: 40,
+                color: _ExpatMapColors.hint,
+              ),
+            ),
+          ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                place.name,
+                style: textTheme.titleMedium?.copyWith(
+                  color: _ExpatMapColors.primaryDark,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _ExpatMapColors.categoryBadgeYellow,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _exploreTypeBadgeLabel(place.types),
+                style: textTheme.labelSmall?.copyWith(
+                  color: _ExpatMapColors.primaryDark,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          place.formattedAddress.isNotEmpty
+              ? place.formattedAddress
+              : '${place.lat}, ${place.lng}',
+          style: textTheme.bodySmall?.copyWith(
+            color: _ExpatMapColors.primaryDark,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _exploreRatingLine(place),
+          style: textTheme.bodySmall?.copyWith(
+            color: _ExpatMapColors.primaryDark,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          _exploreHoursLine(place),
+          style: textTheme.bodySmall?.copyWith(
+            color: _ExpatMapColors.primaryDark,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: () => unawaited(_openPlaceInGoogle(place)),
+            style: FilledButton.styleFrom(
+              backgroundColor: _ExpatMapColors.accentGreen,
+              foregroundColor: _ExpatMapColors.primaryDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(7),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: Text(
+              'Continue in Google',
+              style: textTheme.titleMedium?.copyWith(
+                color: _ExpatMapColors.primaryDark,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
       ],

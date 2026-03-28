@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Maps / Places API key (copy from env/google_maps.example.properties)
+env/google_maps.properties

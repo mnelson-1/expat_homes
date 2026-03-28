@@ -15,9 +15,20 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
-// Prefer android/local.properties; fall back to env for CI / shells that export the key.
+
+// Flutter app root is one level above the android/ folder.
+val envMapsProperties = Properties()
+val envMapsFile = rootProject.file("../env/google_maps.properties")
+if (envMapsFile.exists()) {
+    envMapsFile.inputStream().use { envMapsProperties.load(it) }
+}
+
+// 1) expat_app/env/google_maps.properties (preferred)
+// 2) android/local.properties (legacy)
+// 3) GOOGLE_MAPS_API_KEY environment variable
 val googleMapsApiKey: String =
-    (localProperties.getProperty("GOOGLE_MAPS_API_KEY") ?: "").trim()
+    (envMapsProperties.getProperty("GOOGLE_MAPS_API_KEY") ?: "").trim()
+        .ifEmpty { (localProperties.getProperty("GOOGLE_MAPS_API_KEY") ?: "").trim() }
         .ifEmpty { (System.getenv("GOOGLE_MAPS_API_KEY") ?: "").trim() }
 
 android {

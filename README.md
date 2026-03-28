@@ -1,207 +1,203 @@
-# ExpatHomes – Expat Support & Settlement Platform (Rwanda)
------
+# ExpatHomes
 
-ExpatHomes is a mobile-first expat support platform designed to improve the experience of expats, international students, and foreign professionals relocating to Rwanda. The platform focuses on trust, communication, and verified services, addressing common challenges such as housing exploitation, language barriers, arrival logistics, and access to essential local services.
-
-Rather than replacing existing service providers, ExpatHomes acts as a **connection hub**, integrating verified housing listings, real-time multilingual communication, location-based discovery, and trusted transport cost transparency into a single cohesive experience.
+**ExpatHomes** is a mobile-first platform that helps expatriates, students, and professionals settle in Rwanda—starting with **trusted housing discovery**, **community**, **in-app messaging**, and **location-aware tools** (rides and neighbourhood exploration). The product is built around **Firebase** for auth and data, **Google Maps Platform** for maps and places, and a separate **admin web** app for operational access.
 
 ---
 
-## Project Description
+## What’s implemented today
 
-Relocating to a new country can be overwhelming, particularly for first-time arrivals. In Kigali’s evolving real estate market, expatriates often encounter:
+### Mobile app (`expat_app/`)
 
-- Unverified housing listings and informal brokerage practices
-- Opaque agent commission structures and inconsistent pricing
-- Limited visibility into agent credentials
-- Communication barriers between landlords, agents, and international tenants
-- Fragmented arrival and neighbourhood discovery experiences
-- Lack of structured accountability in property negotiations
+- **Authentication & profiles** — Email/password and Google sign-in paths, Firestore-backed user profiles with roles (**Expat**, **Landlord**, **Agent**, **Super Admin**).
+- **Onboarding** — Get Started, sign-in/up flows, language preference, profile setup.
+- **Splash** — Branded intro animation; native launch screens aligned with app colours (`#1A2E35` / `#8ED966`).
+- **Expat home**
+  - **Community** — Feed and **Bowls** (groups), post composer with media, likes/comments, threads.
+  - **Rides** — Google Map with **From / To** (Places autocomplete, geocoding), **Directions** polylines, estimated **distance/duration**, **RWF fare estimate** (configurable per-km helper), listing **“Get a Ride”** pre-fills destination from estate or listing detail.
+  - **Estates** — Published listings from Firestore (filter by type, search), cards with **Get a Ride** and **Explore Area** (hands listing location into Explore).
+  - **Messages** — Conversations tied to listings; **ML Kit** on-device language ID and translation in the composer; attachment-friendly flows where wired.
+  - **Explore** — Search anchor via Places; **Nearby Search** by category (**Food**, **Health**, **Fitness**, **Shopping**); place cards (photos, address, rating, hours); **Continue in Google** (opens place in Google Maps); **session restore** (~24h) via `shared_preferences`; full-screen results UI with shell chrome hidden; back returns to map **with search text preserved**.
+- **Listing detail** — Deep link from feed/estates; landlord chat; ride/explore actions return structured navigation payloads.
+- **Landlord & Agent** — Dedicated Flutter entry screens for listing management, payments UI, assignments, and messaging (workflows continue to evolve—see *Future work*).
+- **Super Admin (mobile)** — Currently routes to the expat shell as a placeholder; operational admin is intended for **`admin-web`**.
 
-ExpatHomes addresses these issues by prioritising:
+### Backend & config
 
-- Verified property listings (admin-reviewed ownership validation before publication)
-- Licensed agent verification workflow (credential-based access control before platform entry)
-- Exclusive agent delegation model (one verified agent per property)
-- Structured commission tracking system using internal reference IDs
-- Landlord-uploaded rental contracts for transparency and documentation
-- Role-based access control (Expat, Landlord, Agent, Admin)
-- Secure in-app messaging with multilingual support and live translation
-- Neighbourhood intelligence (“Explore”) powered by location services
-- Arrival mobility support (“Rides”) integration concept
-- Community-driven peer knowledge sharing and feedback features
+- **Firebase** — `firebase_core`, `firebase_auth`, `cloud_firestore`, `firebase_storage`.
+- **Security rules** — `firestore.rules` in repo (adjust per environment).
+- **Google Maps / Places / Directions / Geocoding** — Used from the Flutter app (HTTP + Android Maps SDK). API key configuration is documented under `docs/GOOGLE_MAPS_SETUP.md`.
+- **Local secrets** — Prefer `expat_app/env/google_maps.properties` (gitignored); see `expat_app/env/google_maps.example.properties`. Gradle still accepts `android/local.properties` or `GOOGLE_MAPS_API_KEY` env var.
 
-This Link will lead you to the Final Version of the Product Solution - (https://drive.google.com/drive/u/0/folders/1_AMhxyJX8jGhNmvqjKVwZOvtTcxecxAB)
+### Admin web (`admin-web/`)
 
----
-
-## Final version of the product/solution
-
-Video has been uploaded to the directory
-
-Installation Process...
-to run this project you must have flutter sdk and react on your pc
-
-1. Download Zip file
-2. Change Directory to expat_app [cd expat_homes\expat_app]
-
-- Run the command [flutter pub get] - to install and fetch all dependencies
-- Run the command [flutter run] - to get the app running.
-
-3. Go back to the root directory, and then go into the admin-web directory of the root
-
-- cd expat_homes\admin-web
-- Run the command [npm install] - to install dependencies
-- Run the command [npm run dev] - to get the web app running.
-
-4. While the webapp for the superadmin is running please use this credentials to log in:
-   email: admin@expathomes.rw
-   pssd: admin123
-5. Now you can test the full functioning solution...
+- React-based **superadmin** panel (npm). Use it alongside the mobile app for admin workflows described in your internal runbooks.
 
 ---
 
-## Designs
+## Repository layout
 
-### Figma Mockups
+| Path | Purpose |
+|------|--------|
+| `expat_app/` | Flutter application (primary product) |
+| `admin-web/` | Web console for administrators |
+| `docs/` | Setup notes (e.g. Google Maps) |
+| `firestore.rules` | Firestore security rules |
+| `png_directory/` | Design and diagram assets referenced below |
 
-Design Link: *https://www.figma.com/design/ZzcXrh5VLp93Em9U8tpXK4/Expat?node-id=455-3067&t=Q0yACGkum3N2qMm0-1*
+---
 
-The interactive design prototype demonstrates the full system behaviour and user flows, including:
+## Prerequisites
 
-- Community feed and topic-based groups (Bowls)
-- Verified estate listings with inquiry-driven interaction
-- Secure messaging with live translation
-- Arrival support through transport cost estimation
-- Location-based discovery via Google Maps
-- Role-based interfaces for expats, agents, and landlords
-- Mock Payment workflows
-- Commission and payment status tracker
-- Agent Rating and Allocation
-- Landlord Assignment
+- **Flutter** SDK (Dart ^3.7 per `pubspec.yaml`)
+- **Node.js** & npm (for `admin-web`)
+- **Firebase** project with Android (and optionally iOS) apps registered
+- **Google Cloud** project with billing and APIs enabled for Maps, Places, Directions, and Geocoding (see `docs/GOOGLE_MAPS_SETUP.md`)
 
-The designs are mobile-first and intentionally minimalist, prioritising clarity, trust, and communication over transactional complexity.
+---
+
+## Run the Flutter app
+
+```bash
+cd expat_app
+flutter pub get
+```
+
+1. Copy `env/google_maps.example.properties` → `env/google_maps.properties` and set `GOOGLE_MAPS_API_KEY`.
+2. Ensure Firebase config files are in place (`google-services.json` for Android, etc.).
+3. Run:
+
+```bash
+flutter run
+```
+
+After changing the Maps key or Gradle env sources, use `flutter clean` before the next release build.
+
+---
+
+## Run the admin web app
+
+```bash
+cd admin-web
+npm install
+npm run dev
+```
+
+Use credentials and URLs from your team’s internal documentation (do not commit production passwords to the repository).
+
+---
+
+## Design & architecture references
+
+### Figma mockups
+
+**Design link:** [ExpatHomes on Figma](https://www.figma.com/design/ZzcXrh5VLp93Em9U8tpXK4/Expat?node-id=455-3067&t=Q0yACGkum3N2qMm0-1)
+
+The interactive prototype illustrates community and bowls, verified estates, messaging (with translation), rides and explore, and role-specific landlord/agent flows. The visuals below are exported references stored in `png_directory/figma_mockups/`.
 
 <div align="center">
-  <img src="png_directory/figma_mockups/Welcome Screen.png">
-  <img src="png_directory/figma_mockups/Community Page 1_Feed.png">
-  <img src="png_directory/figma_mockups/Estate Page 3.png">
-  <img src="png_directory/figma_mockups/Messages Epat Interface 2.png">
-  <img src="png_directory/figma_mockups/Landlord Interface 2.png">
-  <img src="png_directory/figma_mockups/Rides Interface 2.png">
-  <img src="png_directory/figma_mockups/Rides Interface 3.png">
+
+<img src="png_directory/figma_mockups/Welcome Screen.png" alt="Welcome screen mockup">
+
+<img src="png_directory/figma_mockups/Community Page 1_Feed.png" alt="Community feed mockup">
+
+<img src="png_directory/figma_mockups/Estate Page 3.png" alt="Estates mockup">
+
+<img src="png_directory/figma_mockups/Messages Epat Interface 2.png" alt="Messages (expat) mockup">
+
+<img src="png_directory/figma_mockups/Landlord Interface 2.png" alt="Landlord interface mockup">
+
+<img src="png_directory/figma_mockups/Rides Interface 2.png" alt="Rides interface mockup">
+
+<img src="png_directory/figma_mockups/Rides Interface 3.png" alt="Rides interface mockup (variant)">
+
 </div>
----
 
-## System Diagrams
+### System diagrams
 
-The following diagrams guide the design and implementation of the system:
+High-level modelling assets live under `png_directory/sys_dir/` and complement the implementation described above.
 
-### 1. System Architecture Diagram
-
-The system architecture illustrates how ExpatHomes is structured as a mobile-first platform backed by Firebase services and external APIs. The mobile application serves as the primary interface for all users (Expats, Agents/Landlords, and Service Providers), while Firebase handles backend responsibilities such as authentication, data storage, and real-time communication. External services such as Google Maps and partner transport providers (e.g., Move) are integrated to support location discovery and ride cost estimation without replicating existing third-party solutions.
+#### 1. System architecture
 
 <div align="center">
-  <img src="png_directory/sys_dir/SYS ARCH.png" alt="SYS Diagram">
+
+<img src="png_directory/sys_dir/SYS ARCH.png" alt="System architecture diagram">
+
 </div>
 
-### 2. Entity Relationship Diagram (ERD)
-
-The ERD provides a database-level view of how data is structured and related within Firestore. It focuses on persistence concerns such as ownership, foreign-key–like references, and cardinality between users, listings, inquiries, chats, and messages. The ERD ensures data consistency, scalability, and clarity in how information flows through the system.
+#### 2. Entity relationship diagram (ERD)
 
 <div align="center">
-  <img src="png_directory/sys_dir/ERD.png" alt="SYS Diagram">
+
+<img src="png_directory/sys_dir/ERD.png" alt="Entity relationship diagram">
+
 </div>
 
-### 3. UML Use Case
-
-The use case diagram captures how different actors interact with the system and clarifies role-based access across the platform. Expats are the primary users, engaging with listings, community features, messaging, exploration tools, and arrival support. Agents and landlords focus on managing listings and communicating with expats, while administrators oversee verification and moderation. This diagram ensures functional boundaries are clearly defined and aligned with trust and transparency goals.
+#### 3. UML use case
 
 <div align="center">
-  <img src="png_directory/sys_dir/Use Case.png" alt="SYS Diagram">
+
+<img src="png_directory/sys_dir/Use Case.png" alt="UML use case diagram">
+
 </div>
 
-### 4. UML Class Diagram
-
-The class diagram represents the core domain entities of ExpatHomes and their relationships. Central to the model is the `User` entity, which is extended through roles such as Expat, Agent, and Landlord. Supporting entities include Property Listings, Inquiries, Chat Sessions, Messages, and Community Posts. This diagram informed both the Firestore data structure and the UI component logic within the mobile application.
+#### 4. UML class diagram
 
 <div align="center">
-  <img src="png_directory/sys_dir/Class.png" alt="SYS Diagram">
+
+<img src="png_directory/sys_dir/Class.png" alt="UML class diagram">
+
 </div>
 
 ---
 
-## Deployment Plan
+## Product collateral
 
-At this stage, ExpatHomes focuses on design, prototyping, and system modelling rather than full production deployment.
-
-### Planned Architecture
-
-- **Frontend:** Flutter (Android / iOS)
-- **Backend:** Firebase
-  - Firebase Authentication (role-based access)
-  - Cloud Firestore (real-time data storage)
-  - Firebase Storage (media uploads)
-- **External Services:**
-  - Google Maps & Places API (Explore feature)
-  - Transport partner API (ride cost estimation)
-
-Production deployment and advanced backend logic are planned as future work beyond the capstone timeline.
+- **Solution folder (Google Drive):** [Product solution materials](https://drive.google.com/drive/u/0/folders/1_AMhxyJX8jGhNmvqjKVwZOvtTcxecxAB)
+- **Video demo:** [Demo folder](https://drive.google.com/drive/folders/1YhtUzBrgGVvE0uT6gy-Anae2fN02YtvV?usp=sharing)
 
 ---
 
-## Video Demo
+## Future implementations
 
-🎥 **Video Demo:** *https://drive.google.com/drive/folders/1YhtUzBrgGVvE0uT6gy-Anae2fN02YtvV?usp=sharing*
+These items extend the current foundation into a full production-grade marketplace and operations stack.
 
-The demo showcases:
-
-- Project motivation and problem context
-- Community feature and Bowl-based interaction
-- Verified estate listings and inquiry flow
-- Secure messaging with live translation
-- Explore feature using location-based discovery
-- Rides feature for arrival cost transparency
-- Role-based access behaviour
-
----
-
-## Current Project Phase
-
-- ✅ Problem analysis and system requirements
-- ✅ UX/UI design and interactive prototyping
-- ✅ UML and system architecture modelling
-- 🔄 Firebase-backed implementation (planned / in progress)
-- 🔄 External API integrations
+1. **Landlord, admin, and agent workflows** — End-to-end flows: listing lifecycle (draft → review → publish), edit requests, commission and payout reconciliation, bulk tools, and admin moderation dashboards beyond the current web/mobile split.
+2. **AI-assisted listing assignment** — Models that suggest or auto-route new listings to suitable licensed agents (constraints: geography, capacity, language, specialization), with human override and audit logs.
+3. **Security hardening** — Stricter Firestore rules per subcollection, rate limiting, anomaly detection, secrets rotation runbooks, optional **separate REST-only Maps key** vs Android-restricted SDK key, penetration testing, and dependency/CVE monitoring.
+4. **Agent vetting, ratings, and reviews** — Document verification pipeline, expiry reminders, public agent profiles with aggregated ratings, listing-specific reviews, and dispute handling.
+5. **Notifications & engagement** — Push (FCM), email for critical events, and digest preferences.
+6. **Payments** — Integration with regulated payment providers; escrow or milestone flows where legally viable; receipts and landlord/agent statements.
+7. **iOS parity & release** — Maps SDK for iOS, TestFlight/App Store pipeline, entitlements and privacy manifests.
+8. **Quality & operations** — Automated tests (unit/widget/integration), CI/CD, crash reporting, and performance budgets for maps and chat.
+9. **Accessibility & i18n** — WCAG-minded UI, screen-reader labels, and broader locale coverage beyond current translation helpers.
+10. **Analytics & trust metrics** — Funnel analytics, conversion on inquiries, and transparency reports for stakeholders.
 
 ---
 
-## Key Technologies
+## Key technologies
 
-### Design & Prototyping
+| Layer | Stack |
+|--------|--------|
+| Mobile | Flutter, `google_maps_flutter`, `geolocator`, `url_launcher`, `shared_preferences`, `http` |
+| Auth & data | Firebase Auth, Cloud Firestore, Firebase Storage |
+| ML (on-device) | Google ML Kit (translation, language ID) |
+| Maps | Maps SDK for Android, Places API, Directions API, Geocoding API, Place Photos |
+| Admin UI | React (`admin-web`) |
 
-- Figma
+---
 
-### Frontend
+## Current project phase
 
-- Flutter (mobile-first development)
-
-### Backend & Infrastructure
-
-- Firebase Authentication
-- Cloud Firestore
-- Firebase Storage
-
-### External APIs
-
-- Google Maps & Places API
-- Transport partner API (fare estimation only)
+- Problem analysis, UX/UI design, and system modelling — **complete**
+- Firebase-backed mobile implementation (core Expat flows, maps, messaging, explore) — **in active use**
+- Landlord / agent / superadmin depth — **partial**; aligned with *Future implementations*
+- Production hardening, AI assignment, and full vetting/ratings — **planned**
 
 ---
 
 ## Author
 
 **Somtochukwu Nelson**  
-**Email:** m.nelson@alustudent.com
-**Supervisor:** Pelin Mutanguha
-Project: ExpatHomes
+**Email:** m.nelson@alustudent.com  
+**Supervisor:** Pelin Mutanguha  
+**Project:** ExpatHomes

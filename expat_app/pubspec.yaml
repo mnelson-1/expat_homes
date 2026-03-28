@@ -38,6 +38,7 @@ dependencies:
   image_picker: ^1.0.7
   file_picker: ^10.3.10
   url_launcher: ^6.3.1
+  shared_preferences: ^2.3.5
 
   # Firebase backend (auth + Firestore + Storage)
   firebase_core: ^3.8.1
@@ -64,8 +65,11 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: true
-  ios: false
+  ios: true
+  remove_alpha_ios: true
   image_path: assets/images/App_Icon.png
+  adaptive_icon_background: "#1A2E35"
+  adaptive_icon_foreground: assets/images/App_Icon.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

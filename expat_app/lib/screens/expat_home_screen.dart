@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:expat_app/models/listing.dart';
+import 'package:expat_app/models/listing_location_payload.dart';
 import 'package:expat_app/models/user_profile.dart';
 import 'package:expat_app/models/post.dart';
 import 'package:expat_app/models/bowl.dart';
@@ -62,6 +63,12 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
 
   /// Forward-geocoded on Rides as **To** when user taps Get a Ride on an estate card or listing detail.
   String? _ridesDestinationSeed;
+
+  /// Listing address to pre-fill Explore and load nearby places (Estates / listing detail).
+  String? _exploreLocationSeed;
+
+  /// True while Explore tab shows the full-screen nearby-places list (hide shell chrome).
+  bool _explorePlacesFullscreen = false;
 
   static const List<BoxShadow> _tabBarShadow = [
     BoxShadow(
@@ -147,12 +154,14 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final hideExpatShellChrome =
+        _selectedBottomIndex == 4 && _explorePlacesFullscreen;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          _buildHeader(textTheme),
+          if (!hideExpatShellChrome) _buildHeader(textTheme),
           Expanded(
             child:
                 _selectedBottomIndex == 0
@@ -194,9 +203,20 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                     : _selectedBottomIndex == 3
                     ? MessagesScreen(currentUserRole: kRoleExpat)
                     : _selectedBottomIndex == 4
-                    ? const ExpatMapExploreScreen(
-                        key: ValueKey<String>('expat_map_explore'),
+                    ? ExpatMapExploreScreen(
+                        key: const ValueKey<String>('expat_map_explore'),
                         mode: ExpatMapTabMode.explore,
+                        exploreLocationSeed: _exploreLocationSeed,
+                        onExploreLocationSeedConsumed: () {
+                          if (!mounted) return;
+                          if (_exploreLocationSeed != null) {
+                            setState(() => _exploreLocationSeed = null);
+                          }
+                        },
+                        onExploreFullscreenModeChanged: (fullscreen) {
+                          if (!mounted) return;
+                          setState(() => _explorePlacesFullscreen = fullscreen);
+                        },
                       )
                     : Center(
                       child: Text(
@@ -209,7 +229,8 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(textTheme),
+      bottomNavigationBar:
+          hideExpatShellChrome ? null : _buildBottomNav(textTheme),
     );
   }
 
@@ -833,18 +854,24 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
 
   void _openListingDetailForEstate(String listingId) {
     Navigator.of(context)
-        .push<String?>(
-          MaterialPageRoute<String?>(
+        .push<ListingLocationPayload?>(
+          MaterialPageRoute<ListingLocationPayload?>(
             builder: (_) => ListingDetailScreenById(listingId: listingId),
           ),
         )
-        .then((locationForRides) {
+        .then((result) {
           if (!mounted) return;
-          final loc = locationForRides?.trim();
-          if (loc == null || loc.isEmpty) return;
+          if (result is! ListingLocationPayload) return;
+          final loc = result.location.trim();
+          if (loc.isEmpty) return;
           setState(() {
-            _ridesDestinationSeed = loc;
-            _selectedBottomIndex = 1;
+            if (result.openExploreTab) {
+              _exploreLocationSeed = loc;
+              _selectedBottomIndex = 4;
+            } else {
+              _ridesDestinationSeed = loc;
+              _selectedBottomIndex = 1;
+            }
           });
         });
   }
@@ -855,6 +882,15 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     setState(() {
       _ridesDestinationSeed = loc;
       _selectedBottomIndex = 1;
+    });
+  }
+
+  void _openExploreWithListingLocation(String location) {
+    final loc = location.trim();
+    if (loc.isEmpty) return;
+    setState(() {
+      _exploreLocationSeed = loc;
+      _selectedBottomIndex = 4;
     });
   }
 
@@ -959,25 +995,26 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {},
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _ExpatHomeColors.exploreYellow,
-                    foregroundColor: _ExpatHomeColors.bodyText,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(7),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed:
+                          () => _openExploreWithListingLocation(estate.location),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _ExpatHomeColors.exploreYellow,
+                        foregroundColor: _ExpatHomeColors.bodyText,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                      ),
+                      child: Text(
+                        'Explore Area',
+                        style: textTheme.titleMedium?.copyWith(
+                          color: _ExpatHomeColors.bodyText,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                  child: Text(
-                    'Explore Area',
-                    style: textTheme.titleMedium?.copyWith(
-                      color: _ExpatHomeColors.bodyText,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ],
@@ -1234,7 +1271,10 @@ class _ExpatHomeScreenState extends State<ExpatHomeScreen> {
     final bool selected = _selectedBottomIndex == index;
     final Color color = selected ? _ExpatHomeColors.accentGreen : Colors.white;
     return InkWell(
-      onTap: () => setState(() => _selectedBottomIndex = index),
+      onTap: () => setState(() {
+        _selectedBottomIndex = index;
+        if (index != 4) _explorePlacesFullscreen = false;
+      }),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,

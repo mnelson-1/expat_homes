@@ -17,6 +17,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   static const String _word = 'expat';
+  static const Color _brandBlue = Color(0xFF1A2E35);
   static const double _sweepDuration = 1.2;
   static const double _holdDuration = 1.0;
   static const double _curtainDuration = 1.2;
@@ -87,24 +88,25 @@ class _SplashScreenState extends State<SplashScreen>
     return (4, 1.0);
   }
 
+  TextStyle? _wordStyle(BuildContext context) =>
+      Theme.of(context).textTheme.headlineMedium?.copyWith(
+            color: Colors.white,
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+          );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A2E35),
+      backgroundColor: _brandBlue,
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
             final (phase, progress) = _phaseProgress();
 
-            final baseStyle = Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2,
-            );
+            final baseStyle = _wordStyle(context);
 
             final baseText = Text(_word, style: baseStyle);
             final greenText = Text(

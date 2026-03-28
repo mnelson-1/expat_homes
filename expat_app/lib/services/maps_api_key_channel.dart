@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Android: same key as Maps SDK (from `local.properties` → Gradle → [BuildConfig]).
+/// Android: same key as Maps SDK (from `env/google_maps.properties` or `local.properties`
+/// → Gradle → [BuildConfig]).
 /// Other platforms: optional `--dart-define=GOOGLE_MAPS_API_KEY=...` for Places HTTP.
 class MapsApiKeyChannel {
   MapsApiKeyChannel._();
