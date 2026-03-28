@@ -86,6 +86,14 @@ Use credentials and URLs from your team’s internal documentation (do not commi
 
 ---
 
+## Testing & QA
+
+- **Automated tests:** From `expat_app/`, run `flutter test`. With coverage: `flutter test --coverage`.
+- **Chart-ready metrics:** From the repo root, run `.\scripts\collect-test-metrics.ps1` (PowerShell). This runs the full suite, writes JSON line events, and produces **`docs/qa/generated/test_metrics.json`** and **`test_metrics.csv`** (ignored by git) for pass/fail totals, per-suite counts, duration, and a coarse **line coverage %** from `lcov.info`. See **`docs/qa/README.md`** for schema details.
+- **Manual regression:** Use **`docs/QA_CHECKLIST.md`** for role-based smoke checks (Community, Estates, Rides, Explore, Messages, maps keys, Firebase).
+
+---
+
 ## Design & architecture references
 
 ### Figma mockups

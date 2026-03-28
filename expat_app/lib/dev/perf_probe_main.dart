@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -33,13 +35,18 @@ class _PerfProbeAppState extends State<_PerfProbeApp> {
       // ignore: avoid_print
       print('PERF_PROBE_USER=$userId');
 
-      final res = await PerfBenchmarkService().runBenchmarks(runs: 5);
+      final full = await PerfBenchmarkService().runBenchmarks(runs: 5);
+      final history = full.remove('workflow_history');
       // ignore: avoid_print
-      print('PERF_PROBE_RESULT=$res');
-      debugPrint('PERF_PROBE_RESULT=$res');
+      print('PERF_PROBE_RESULT=$full');
+      debugPrint('PERF_PROBE_RESULT=$full');
+      final histLine = jsonEncode(history);
+      // ignore: avoid_print
+      print('PERF_WORKFLOW_HISTORY_JSON=$histLine');
+      debugPrint('PERF_WORKFLOW_HISTORY_JSON=$histLine');
 
       if (!mounted) return;
-      setState(() => _status = res.toString());
+      setState(() => _status = full.toString());
     } catch (e) {
       debugPrint('PERF_PROBE_ERROR=$e');
       if (!mounted) return;

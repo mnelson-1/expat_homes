@@ -1,11 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../models/listing.dart';
+import '../utils/rwanda_ride_fare_estimate.dart';
 import 'agents_service.dart';
 import 'auth_service.dart';
 import 'conversations_service.dart';
+import 'google_directions_service.dart';
+import 'google_places_service.dart';
 import 'listings_service.dart';
+import 'maps_api_key_channel.dart';
+import 'message_translation_service.dart';
 import 'perf_metrics_service.dart';
+import 'perf_workflow_ids.dart';
+
+/// Kigali-ish endpoints for repeatable Directions / fare timing (not user-specific).
+const LatLng _kigaliRouteA = LatLng(-1.9403, 29.8739);
+const LatLng _kigaliRouteB = LatLng(-1.9565, 30.0615);
 
 class PerfBenchmarkService {
   PerfBenchmarkService._();
@@ -14,10 +25,12 @@ class PerfBenchmarkService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Runs real runtime measurements against current Firebase project.
+  /// Runs real runtime measurements against current Firebase project + Maps APIs.
   ///
   /// Requires a signed-in user. For assignment workflow this works best when
   /// the signed-in user is a landlord and at least one registered agent exists.
+  ///
+  /// Returns [summaryJson] fields plus `workflow_history` for JSONL time-series.
   Future<Map<String, dynamic>> runBenchmarks({
     int runs = 5,
     String? assignmentAgentId,
@@ -28,13 +41,19 @@ class PerfBenchmarkService {
     if (uid == null) throw StateError('You must be signed in to run benchmarks.');
 
     final metrics = PerfMetricsService()..reset();
+    final apiKey = await MapsApiKeyChannel.resolvePlacesApiKey();
+    final directions =
+        apiKey.isNotEmpty ? GoogleDirectionsService(apiKey: apiKey) : null;
+    final places =
+        apiKey.isNotEmpty ? GooglePlacesService(apiKey: apiKey) : null;
 
     for (var i = 0; i < runs; i++) {
+      metrics.setIteration(i);
       var workflowOk = true;
       String? listingId;
       String? assignmentId;
       try {
-        // 1) Listing create
+        // 1) Landlord listing upload (Storage + Firestore) — timed in ListingsService.
         final listing = await ListingsService().createListing(
           landlordId: uid,
           type: ListingType.apartment,
@@ -47,8 +66,6 @@ class PerfBenchmarkService {
         listingId = listing.id;
 
         // 2) Listing verification simulation (super admin action)
-        // NOTE: this uses direct update from current signed-in user and may fail
-        // if rules disallow this actor from publishing.
         final verifySw = Stopwatch()..start();
         await _firestore.collection('listings').doc(listing.id).update({
           'status': ListingStatus.published.value,
@@ -59,14 +76,14 @@ class PerfBenchmarkService {
         verifySw.stop();
         metrics.addSample('verify_listing_update', verifySw.elapsedMilliseconds);
 
-        // 3) Retrieval (published listings fetch)
+        // 3) Retrieval — search matches title/location/description (not id).
         final published = await ListingsService().getPublishedListings(
-          searchQuery: listing.id,
+          searchQuery: 'Benchmark Listing',
         );
         final found = published.any((l) => l.id == listing.id);
         if (!found) workflowOk = false;
 
-        // 4) Agent assignment create -> acceptance simulation
+        // 4) Listing assignment create -> acceptance
         final a = await _resolveAssignmentAgent(
           overrideAgentId: assignmentAgentId,
           overrideAgentUid: assignmentAgentUid,
@@ -92,11 +109,15 @@ class PerfBenchmarkService {
           await AgentsService().acceptAssignment(assn.id);
           acceptSw.stop();
           metrics.addSample('accept_assignment', acceptSw.elapsedMilliseconds);
+          metrics.addSample(
+            'listing_assignment',
+            createAssnSw.elapsedMilliseconds + acceptSw.elapsedMilliseconds,
+          );
         } else {
           workflowOk = false;
         }
 
-        // 5) Message latency: send -> stream observed
+        // 5) Chat send -> stream (message_latency summary field)
         final convo = await ConversationsService().getOrCreateConversation(
           listingId: listing.id,
           participantIds: [uid, 'benchmark_peer'],
@@ -112,6 +133,67 @@ class PerfBenchmarkService {
           senderId: uid,
           content: 'benchmark_ping_$i',
         );
+
+        // 6) Message translate (ML Kit on-device when not web)
+        final trSw = Stopwatch()..start();
+        await MessageTranslationService.instance.translateIncoming(
+          text: 'Bonjour, je voudrais visiter cet appartement.',
+          messageId: 'perf_translate_$i',
+          preferredLanguageLabel: 'English',
+          translationEnabled: true,
+        );
+        trSw.stop();
+        metrics.addSample('message_translate', trSw.elapsedMilliseconds);
+
+        // 7) Rides: Directions round trip + local fare estimate (same user-visible stack)
+        if (directions != null) {
+          final rideSw = Stopwatch()..start();
+          final route = await directions.getDrivingRoute(
+            origin: _kigaliRouteA,
+            destination: _kigaliRouteB,
+          );
+          final meters = route.route?.distanceMeters;
+          if (meters != null && meters > 0) {
+            estimateRwandaRideFareRwf(distanceMeters: meters);
+          }
+          rideSw.stop();
+          final ok = route.route != null && route.errorDetail == null;
+          metrics.addSample(
+            'rides_estimate',
+            rideSw.elapsedMilliseconds,
+            ok: ok,
+            error: ok ? null : (route.errorDetail ?? 'no_route'),
+          );
+          if (!ok) workflowOk = false;
+        } else {
+          metrics.addSample(
+            'rides_estimate',
+            0,
+            ok: false,
+            error: 'no_maps_api_key',
+          );
+        }
+
+        // 8) Explore: Places autocomplete (biased to Rwanda)
+        if (places != null) {
+          final exSw = Stopwatch()..start();
+          final preds = await places.autocomplete(input: 'cafe kigali');
+          exSw.stop();
+          final ok = preds.isNotEmpty;
+          metrics.addSample(
+            'explore_places',
+            exSw.elapsedMilliseconds,
+            ok: ok,
+            error: ok ? null : 'zero_results',
+          );
+        } else {
+          metrics.addSample(
+            'explore_places',
+            0,
+            ok: false,
+            error: 'no_maps_api_key',
+          );
+        }
       } catch (e) {
         workflowOk = false;
       } finally {
@@ -124,13 +206,18 @@ class PerfBenchmarkService {
     }
 
     final summary = metrics.summaryJson();
-    // Required output format keys.
+    final workflowHistory = metrics.buildWorkflowHistoryRecord(
+      environment: <String, dynamic>{
+        'runs': runs,
+        'entrypoint': 'lib/dev/perf_probe_main.dart',
+        'workflows': PerfWorkflowIds.chartOrder,
+        'maps_api_configured': apiKey.isNotEmpty,
+      },
+    );
+
     return <String, dynamic>{
-      'response_time_avg_ms': summary['response_time_avg_ms'],
-      'response_time_max_ms': summary['response_time_max_ms'],
-      'workflow_success_rate': summary['workflow_success_rate'],
-      'message_latency_ms': summary['message_latency_ms'],
-      'notes': summary['notes'],
+      ...summary,
+      'workflow_history': workflowHistory,
     };
   }
 
@@ -190,4 +277,3 @@ class _AssignmentAgent {
   final String agentUid;
   final String? agentName;
 }
-

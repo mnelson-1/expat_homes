@@ -1,2 +1,5 @@
 *.hprof
 
+# Generated QA test metrics (regenerate with scripts/collect-test-metrics.ps1)
+docs/qa/generated/
+
