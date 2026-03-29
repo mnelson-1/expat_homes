@@ -1,0 +1,56 @@
+{
+  "recorded_at": "2026-03-29T02:49:35.532279Z",
+  "benchmark_role": "expat",
+  "source_note": "Hydrated from docs/perf/history/workflow_history.jsonl latest expat row. Re-run perf probe on Windows desktop to overwrite with full payload including iterations.",
+  "iterations": [],
+  "workflow_history": {
+    "recorded_at": "2026-03-29T02:49:35.532279Z",
+    "schema": "workflow_perf/v1",
+    "environment": {
+      "runs": 5,
+      "entrypoint": "lib/dev/perf_probe_main.dart",
+      "workflows": [
+        "expat_explore_area",
+        "expat_rides_maps",
+        "expat_community_workflow",
+        "expat_listing_inquiry_messaging"
+      ],
+      "maps_api_configured": true,
+      "benchmark_role": "expat"
+    },
+    "workflows": {
+      "expat_explore_area": {
+        "avg_ms": 1732,
+        "max_ms": 2675,
+        "min_ms": 999,
+        "p90_ms": 2675,
+        "n": 5,
+        "success_rate": 100
+      },
+      "expat_rides_maps": {
+        "avg_ms": 1406,
+        "max_ms": 1908,
+        "min_ms": 1029,
+        "p90_ms": 1908,
+        "n": 5,
+        "success_rate": 100
+      },
+      "expat_community_workflow": {
+        "avg_ms": 1205,
+        "max_ms": 3502,
+        "min_ms": 558,
+        "p90_ms": 3502,
+        "n": 5,
+        "success_rate": 100
+      },
+      "expat_listing_inquiry_messaging": {
+        "avg_ms": null,
+        "max_ms": null,
+        "min_ms": null,
+        "p90_ms": null,
+        "n": 0
+      }
+    }
+  },
+  "summary": {}
+}

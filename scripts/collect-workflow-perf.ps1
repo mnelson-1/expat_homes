@@ -306,11 +306,34 @@ if (-not $SkipPlots) {
                 if ($LASTEXITCODE -ne 0) {
                     Write-Warning "plot_expat_iteration_linechart.py failed (needs expat row with iterations in workflow_history.jsonl)."
                 }
+                python scripts/plot_expat_performance_charts.py
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "plot_expat_performance_charts.py exited with code $LASTEXITCODE."
+                }
+            }
+            if ($Role -eq "landlord") {
+                python scripts/plot_landlord_performance_charts.py
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "plot_landlord_performance_charts.py exited with code $LASTEXITCODE."
+                }
+            }
+            if ($Role -eq "agent") {
+                python scripts/plot_agent_performance_charts.py
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "plot_agent_performance_charts.py exited with code $LASTEXITCODE."
+                }
             }
             $plotsDir = Join-Path $root "docs\perf\history\plots"
+            $testPlotsDir = Join-Path $root "test_results\plots"
             if (Test-Path $plotsDir) {
                 Write-Host "Chart files (open in Explorer or your IDE):" -ForegroundColor Green
                 Get-ChildItem -Path $plotsDir -Filter "*.png" -ErrorAction SilentlyContinue |
+                    Sort-Object LastWriteTime -Descending |
+                    ForEach-Object { Write-Host "  $($_.FullName)" }
+            }
+            if (Test-Path $testPlotsDir) {
+                Write-Host "test_results/plots:" -ForegroundColor Green
+                Get-ChildItem -Path $testPlotsDir -Filter "*.png" -ErrorAction SilentlyContinue |
                     Sort-Object LastWriteTime -Descending |
                     ForEach-Object { Write-Host "  $($_.FullName)" }
             }

@@ -30,7 +30,7 @@
 
 ### Admin web (`admin-web/`)
 
-- React-based **superadmin** panel (npm). Use it alongside the mobile app for admin workflows described in your internal runbooks.
+- React-based **superadmin** panel, hosted on Firebase. Source lives in `admin-web/`; day-to-day access is via the link below.
 
 ---
 
@@ -49,7 +49,7 @@
 ## Prerequisites
 
 - **Flutter** SDK (Dart ^3.7 per `pubspec.yaml`)
-- **Node.js** & npm (for `admin-web`)
+- **Node.js** & npm (optional — only if you run `admin-web` locally)
 - **Firebase** project with Android (and optionally iOS) apps registered
 - **Google Cloud** project with billing and APIs enabled for Maps, Places, Directions, and Geocoding (see `docs/GOOGLE_MAPS_SETUP.md`)
 
@@ -74,15 +74,16 @@ After changing the Maps key or Gradle env sources, use `flutter clean` before th
 
 ---
 
-## Run the admin web app
+## Admin web (hosted)
 
-```bash
-cd admin-web
-npm install
-npm run dev
-```
+**URL:** [https://expat-homes-28b62.web.app](https://expat-homes-28b62.web.app)
 
-Use credentials and URLs from your team’s internal documentation (do not commit production passwords to the repository).
+**Test login**
+
+| Field | Value |
+|--------|--------|
+| Email | `admin@expathomes.rw` |
+| Password | `admin123` |
 
 ---
 
@@ -115,8 +116,6 @@ The interactive prototype illustrates community and bowls, verified estates, mes
 <img src="png_directory/figma_mockups/Landlord Interface 2.png" alt="Landlord interface mockup">
 
 <img src="png_directory/figma_mockups/Rides Interface 2.png" alt="Rides interface mockup">
-
-<img src="png_directory/figma_mockups/Rides Interface 3.png" alt="Rides interface mockup (variant)">
 
 </div>
 

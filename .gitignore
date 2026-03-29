@@ -1,11 +1,31 @@
+# --- Editor (local preferences; not shared) ---
+.vscode/
+
+# --- Docs & scripts (kept local; not tracked in this repo policy) ---
+docs/
+scripts/
+
+# --- Private / sensitive data ---
+# Firebase rules (keep local; deploy separately if needed)
+/firestore.rules
+/storage.rules
+
+# API keys & local env (never commit real secrets)
+expat_app/env/google_maps.properties
+admin-web/.env.local
+.env
+.env.*.local
+
+# Signing & keystores
+**/key.properties
+keystore/
+*.jks
+*.keystore
+*.pem
+*.p12
+
+# Optional: local secret dumps or creds folders
+secrets/
+
+# --- Build / tooling noise ---
 *.hprof
-
-# Generated QA test metrics (regenerate with scripts/collect-test-metrics.ps1)
-docs/qa/generated/
-
-# Perf probe console may include user ids / session noise
-docs/perf/history/last_probe_console*.txt
-
-# Perf probe Firebase test users (copy from perf-probe-credentials.example.ps1)
-scripts/perf-probe-credentials.local.ps1
-

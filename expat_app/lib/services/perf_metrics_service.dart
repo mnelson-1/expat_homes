@@ -86,7 +86,7 @@ class PerfMetricsService {
     debugPrint('[PERF][message_latency] ${elapsedMs}ms');
   }
 
-  Map<String, dynamic> summaryJson() {
+  Map<String, dynamic> summaryJson({String? benchmarkRole}) {
     final opTimes = _samples
         .where((e) => legacyAggregateMetrics.contains(e.metric))
         .map((e) => e.elapsedMs)
@@ -99,17 +99,75 @@ class PerfMetricsService {
         ? 0
         : ((_workflowSuccesses / _workflowRuns) * 100).round();
 
-    return <String, dynamic>{
+    final out = <String, dynamic>{
       'response_time_avg_ms': avg,
       'response_time_max_ms': max,
       'workflow_success_rate': successRate,
       'message_latency_ms': _lastMessageLatencyMs ?? 0,
       'notes':
           'response_time_* uses Firestore-path samples only (${legacyAggregateMetrics.join(", ")}). '
-          'workflow_success_rate is full benchmark loop pass rate. '
+          'workflow_success_rate is iteration completion rate (no uncaught core failure). '
           'message_latency_ms is send→stream. '
-          'Use workflow_history / PERF_WORKFLOW_HISTORY_JSON for role UX workflows.',
+          'Use per_workflow for role UX timings; use workflow_history / PERF_WORKFLOW_HISTORY_JSON for series.',
     };
+
+    final role = benchmarkRole?.trim().toLowerCase();
+    if (role != null &&
+        (role == 'landlord' || role == 'agent' || role == 'expat')) {
+      out['per_workflow'] = _perWorkflowSummaryForRole(role);
+    }
+    return out;
+  }
+
+  /// Per-workflow averages, max, and sample-level success rate (for charting / defense).
+  Map<String, dynamic> _perWorkflowSummaryForRole(String benchmarkRole) {
+    final order = PerfWorkflowIds.chartOrderForRole(benchmarkRole);
+    final per = <String, dynamic>{};
+    for (final id in order) {
+      final metric = _metricNameForWorkflow(id);
+      final rel = _samples.where((s) => s.metric == metric).toList();
+      if (rel.isEmpty) {
+        per[id] = <String, dynamic>{
+          'avg_ms': null,
+          'max_ms': null,
+          'success_rate_pct': null,
+          'n': 0,
+        };
+        continue;
+      }
+      final times = rel.map((s) => s.elapsedMs).toList();
+      final stats = _statsMap(times);
+      final okN = rel.where((s) => s.ok).length;
+      per[id] = <String, dynamic>{
+        'avg_ms': stats['avg_ms'],
+        'max_ms': stats['max_ms'],
+        'success_rate_pct': ((okN / rel.length) * 100).round(),
+        'n': rel.length,
+      };
+    }
+    return per;
+  }
+
+  /// Chart-ready rows: `iteration` is 1-based; workflow keys match [PerfWorkflowIds.chartOrderForRole].
+  List<Map<String, dynamic>> chartReadyIterations(String benchmarkRole) {
+    final order = PerfWorkflowIds.chartOrderForRole(benchmarkRole);
+    final maxIter = _samples.fold<int>(
+      0,
+      (m, s) => s.iterationIndex > m ? s.iterationIndex : m,
+    );
+    final rows = <Map<String, dynamic>>[];
+    for (var i = 0; i <= maxIter; i++) {
+      final row = <String, dynamic>{'iteration': i + 1};
+      for (final id in order) {
+        final metric = _metricNameForWorkflow(id);
+        final hit = _samples
+            .where((s) => s.metric == metric && s.iterationIndex == i)
+            .toList();
+        row[id] = hit.isEmpty ? null : hit.first.elapsedMs;
+      }
+      rows.add(row);
+    }
+    return rows;
   }
 
   /// One JSON object to append to `docs/perf/history/workflow_history.jsonl`.
@@ -139,7 +197,7 @@ class PerfMetricsService {
       (m, s) => s.iterationIndex > m ? s.iterationIndex : m,
     );
     for (var i = 0; i <= maxIter; i++) {
-      final row = <String, dynamic>{'iteration': i};
+      final row = <String, dynamic>{'iteration': i + 1};
       for (final id in order) {
         final metric = _metricNameForWorkflow(id);
         final hit = _samples
@@ -194,7 +252,8 @@ class PerfMetricsService {
     };
   }
 
-  String summaryJsonString() => const JsonEncoder.withIndent('  ').convert(
-        summaryJson(),
+  String summaryJsonString({String? benchmarkRole}) =>
+      const JsonEncoder.withIndent('  ').convert(
+        summaryJson(benchmarkRole: benchmarkRole),
       );
 }

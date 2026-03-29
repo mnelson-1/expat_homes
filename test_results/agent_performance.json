@@ -1,0 +1,61 @@
+{
+  "recorded_at": "2026-03-28T19:19:31.603813Z",
+  "benchmark_role": "agent",
+  "source_note": "Hydrated from docs/perf/history/workflow_history.jsonl (latest agent). Old rows may use pre-agent workflow IDs; re-run probe with PERF_PROBE_BENCHMARK_ROLE=agent for agent_payment_workflow, agent_listing_assignment, agent_bio_view_update.",
+  "iterations": [],
+  "workflow_history": {
+    "recorded_at": "2026-03-28T19:19:31.603813Z",
+    "schema": "workflow_perf/v1",
+    "environment": {
+      "runs": 5,
+      "entrypoint": "lib/dev/perf_probe_main.dart",
+      "workflows": [
+        "landlord_listing_upload",
+        "message_translate",
+        "rides_estimate",
+        "explore_places",
+        "listing_assignment"
+      ],
+      "maps_api_configured": true,
+      "benchmark_role": "agent"
+    },
+    "workflows": {
+      "landlord_listing_upload": {
+        "avg_ms": 1645,
+        "max_ms": 3864,
+        "min_ms": 943,
+        "p90_ms": 3864,
+        "n": 5
+      },
+      "message_translate": {
+        "avg_ms": null,
+        "max_ms": null,
+        "min_ms": null,
+        "p90_ms": null,
+        "n": 0
+      },
+      "rides_estimate": {
+        "avg_ms": null,
+        "max_ms": null,
+        "min_ms": null,
+        "p90_ms": null,
+        "n": 0
+      },
+      "explore_places": {
+        "avg_ms": null,
+        "max_ms": null,
+        "min_ms": null,
+        "p90_ms": null,
+        "n": 0
+      },
+      "listing_assignment": {
+        "avg_ms": null,
+        "max_ms": null,
+        "min_ms": null,
+        "p90_ms": null,
+        "n": 0
+      }
+    }
+  },
+  "summary": {}
+}

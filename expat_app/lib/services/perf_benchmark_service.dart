@@ -73,7 +73,7 @@ class PerfBenchmarkService {
       }
     }
 
-    final summary = metrics.summaryJson();
+    final summary = metrics.summaryJson(benchmarkRole: benchmarkRole);
     final workflowHistory = metrics.buildWorkflowHistoryRecord(
       benchmarkRole: benchmarkRole,
       environment: <String, dynamic>{
@@ -133,7 +133,14 @@ class PerfBenchmarkService {
         searchQuery: 'Benchmark Listing',
       );
       final found = published.any((l) => l.id == listing.id);
-      if (!found) workflowOk = false;
+      if (!found) {
+        metrics.addSample(
+          'fetch_listings',
+          0,
+          ok: false,
+          error: 'benchmark_listing_not_in_search_results',
+        );
+      }
 
       final a = await _resolveAssignmentAgent(
         overrideAgentId: assignmentAgentId,
@@ -165,7 +172,12 @@ class PerfBenchmarkService {
           createAssnSw.elapsedMilliseconds + acceptSw.elapsedMilliseconds,
         );
       } else {
-        workflowOk = false;
+        metrics.addSample(
+          'listing_assignment',
+          0,
+          ok: false,
+          error: 'no_agent_available',
+        );
       }
 
       final paySw = Stopwatch()..start();
@@ -248,7 +260,6 @@ class PerfBenchmarkService {
           ok: false,
           error: 'no_agent_id',
         );
-        workflowOk = false;
       } else {
         agentIdForBio = agentId;
         final licensed = await AgentsService().getAgent(agentId);
@@ -285,23 +296,48 @@ class PerfBenchmarkService {
   ) async {
     var workflowOk = true;
     try {
+      // Community: query succeeds even when collection is empty — do not fail the iteration.
       final commSw = Stopwatch()..start();
-      await _firestore
-          .collection(_kPostsCollection)
-          .where('scope', isEqualTo: 'feed')
-          .limit(30)
-          .get();
-      commSw.stop();
-      metrics.addSample('expat_community_workflow', commSw.elapsedMilliseconds);
+      try {
+        await _firestore
+            .collection(_kPostsCollection)
+            .where('scope', isEqualTo: 'feed')
+            .limit(30)
+            .get();
+        commSw.stop();
+        metrics.addSample(
+          PerfWorkflowIds.expatCommunityWorkflow,
+          commSw.elapsedMilliseconds,
+        );
+      } catch (e) {
+        commSw.stop();
+        metrics.addSample(
+          PerfWorkflowIds.expatCommunityWorkflow,
+          commSw.elapsedMilliseconds,
+          ok: false,
+          error: 'firestore_posts_query_failed',
+        );
+      }
 
+      // Explore: Places optional — record partial failure without failing whole iteration.
       if (places != null) {
         final exploreSw = Stopwatch()..start();
-        await places.autocomplete(input: 'cafe kigali');
-        exploreSw.stop();
-        metrics.addSample(
-          PerfWorkflowIds.expatExploreArea,
-          exploreSw.elapsedMilliseconds,
-        );
+        try {
+          await places.autocomplete(input: 'cafe kigali');
+          exploreSw.stop();
+          metrics.addSample(
+            PerfWorkflowIds.expatExploreArea,
+            exploreSw.elapsedMilliseconds,
+          );
+        } catch (e) {
+          exploreSw.stop();
+          metrics.addSample(
+            PerfWorkflowIds.expatExploreArea,
+            exploreSw.elapsedMilliseconds,
+            ok: false,
+            error: 'places_autocomplete_failed',
+          );
+        }
       } else {
         metrics.addSample(
           PerfWorkflowIds.expatExploreArea,
@@ -309,28 +345,37 @@ class PerfBenchmarkService {
           ok: false,
           error: 'maps_not_configured',
         );
-        workflowOk = false;
       }
 
+      // Rides: Directions + fare estimate — API errors are partial failures.
       if (directions != null) {
         final ridesSw = Stopwatch()..start();
-        final route = await directions.getDrivingRoute(
-          origin: _kigaliRouteA,
-          destination: _kigaliRouteB,
-        );
-        final meters = route.route?.distanceMeters;
-        if (meters != null && meters > 0) {
-          estimateRwandaRideFareRwf(distanceMeters: meters);
+        try {
+          final route = await directions.getDrivingRoute(
+            origin: _kigaliRouteA,
+            destination: _kigaliRouteB,
+          );
+          final meters = route.route?.distanceMeters;
+          if (meters != null && meters > 0) {
+            estimateRwandaRideFareRwf(distanceMeters: meters);
+          }
+          final routeOk = route.route != null && route.errorDetail == null;
+          ridesSw.stop();
+          metrics.addSample(
+            PerfWorkflowIds.expatRidesMaps,
+            ridesSw.elapsedMilliseconds,
+            ok: routeOk,
+            error: routeOk ? null : 'directions_failed',
+          );
+        } catch (e) {
+          ridesSw.stop();
+          metrics.addSample(
+            PerfWorkflowIds.expatRidesMaps,
+            ridesSw.elapsedMilliseconds,
+            ok: false,
+            error: 'directions_exception',
+          );
         }
-        final routeOk = route.route != null && route.errorDetail == null;
-        ridesSw.stop();
-        metrics.addSample(
-          PerfWorkflowIds.expatRidesMaps,
-          ridesSw.elapsedMilliseconds,
-          ok: routeOk,
-          error: routeOk ? null : 'directions_failed',
-        );
-        if (!routeOk) workflowOk = false;
       } else {
         metrics.addSample(
           PerfWorkflowIds.expatRidesMaps,
@@ -338,48 +383,56 @@ class PerfBenchmarkService {
           ok: false,
           error: 'maps_not_configured',
         );
-        workflowOk = false;
       }
 
-      final published = await ListingsService().getPublishedListings(
-        searchQuery: '',
-      );
-      if (published.isEmpty) {
+      // Listing inquiry: missing listings is optional data — partial sample only.
+      try {
+        final published = await ListingsService().getPublishedListings(
+          searchQuery: '',
+        );
+        if (published.isEmpty) {
+          metrics.addSample(
+            PerfWorkflowIds.expatListingInquiryMessaging,
+            0,
+            ok: false,
+            error: 'no_published_listing',
+          );
+        } else {
+          final listing = published.first;
+          final inqSw = Stopwatch()..start();
+          final convo = await ConversationsService().getOrCreateConversation(
+            listingId: listing.id,
+            participantIds: [uid, 'benchmark_peer'],
+            participantNames: {
+              uid: 'Benchmark Expat',
+              'benchmark_peer': 'Benchmark Peer',
+            },
+            listingTitle: listing.title,
+            sharedLandlordAgentThread: false,
+          );
+          await ConversationsService().measureSendToReceiveLatency(
+            conversationId: convo.id,
+            senderId: uid,
+            content: 'expat_inquiry_$i',
+          );
+          await MessageTranslationService.instance.translateIncoming(
+            text: 'Is this listing still available?',
+            messageId: 'perf_expat_tr_$i',
+            preferredLanguageLabel: 'English',
+            translationEnabled: true,
+          );
+          inqSw.stop();
+          metrics.addSample(
+            PerfWorkflowIds.expatListingInquiryMessaging,
+            inqSw.elapsedMilliseconds,
+          );
+        }
+      } catch (e) {
         metrics.addSample(
-          'expat_listing_inquiry_messaging',
+          PerfWorkflowIds.expatListingInquiryMessaging,
           0,
           ok: false,
-          error: 'no_published_listing',
-        );
-        workflowOk = false;
-      } else {
-        final listing = published.first;
-        final inqSw = Stopwatch()..start();
-        final convo = await ConversationsService().getOrCreateConversation(
-          listingId: listing.id,
-          participantIds: [uid, 'benchmark_peer'],
-          participantNames: {
-            uid: 'Benchmark Expat',
-            'benchmark_peer': 'Benchmark Peer',
-          },
-          listingTitle: listing.title,
-          sharedLandlordAgentThread: false,
-        );
-        await ConversationsService().measureSendToReceiveLatency(
-          conversationId: convo.id,
-          senderId: uid,
-          content: 'expat_inquiry_$i',
-        );
-        await MessageTranslationService.instance.translateIncoming(
-          text: 'Is this listing still available?',
-          messageId: 'perf_expat_tr_$i',
-          preferredLanguageLabel: 'English',
-          translationEnabled: true,
-        );
-        inqSw.stop();
-        metrics.addSample(
-          'expat_listing_inquiry_messaging',
-          inqSw.elapsedMilliseconds,
+          error: 'listing_inquiry_failed',
         );
       }
     } catch (_) {

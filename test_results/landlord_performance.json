@@ -1,0 +1,68 @@
+{
+  "recorded_at": "2026-03-28T19:25:24.731321Z",
+  "benchmark_role": "landlord",
+  "source_note": "Hydrated from docs/perf/history/workflow_history.jsonl (latest landlord). Re-run perf probe with PERF_PROBE_BENCHMARK_ROLE=landlord on desktop to overwrite with full payload including iterations.",
+  "iterations": [],
+  "workflow_history": {
+    "recorded_at": "2026-03-28T19:25:24.731321Z",
+    "schema": "workflow_perf/v1",
+    "environment": {
+      "runs": 5,
+      "entrypoint": "lib/dev/perf_probe_main.dart",
+      "workflows": [
+        "landlord_listing_upload",
+        "message_translate",
+        "rides_estimate",
+        "explore_places",
+        "listing_assignment"
+      ],
+      "maps_api_configured": true,
+      "benchmark_role": "landlord"
+    },
+    "workflows": {
+      "landlord_listing_upload": {
+        "avg_ms": 1510,
+        "max_ms": 3614,
+        "min_ms": 904,
+        "p90_ms": 3614,
+        "n": 5
+      },
+      "message_translate": {
+        "avg_ms": null,
+        "max_ms": null,
+        "min_ms": null,
+        "p90_ms": null,
+        "n": 0
+      },
+      "rides_estimate": {
+        "avg_ms": null,
+        "max_ms": null,
+        "min_ms": null,
+        "p90_ms": null,
+        "n": 0
+      },
+      "explore_places": {
+        "avg_ms": null,
+        "max_ms": null,
+        "min_ms": null,
+        "p90_ms": null,
+        "n": 0
+      },
+      "listing_assignment": {
+        "avg_ms": null,
+        "max_ms": null,
+        "min_ms": null,
+        "p90_ms": null,
+        "n": 0
+      },
+      "landlord_listing_creation": {
+        "avg_ms": 1510,
+        "max_ms": 3614,
+        "min_ms": 904,
+        "p90_ms": 3614,
+        "n": 5
+      }
+    }
+  },
+  "summary": {}
+}

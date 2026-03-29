@@ -11,6 +11,8 @@ import 'package:expat_app/screens/get_started_screen.dart';
 
 import 'perf_probe_exit_stub.dart'
     if (dart.library.io) 'perf_probe_exit_io.dart' as perf_exit;
+import 'perf_probe_results_stub.dart'
+    if (dart.library.io) 'perf_probe_results_io.dart' as perf_results;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -77,18 +79,89 @@ class _PerfProbeAppState extends State<_PerfProbeApp> {
       final history = Map<String, dynamic>.from(
         full.remove('workflow_history')! as Map,
       );
+      final env = history['environment'] as Map<String, dynamic>?;
+      final benchmarkRole =
+          (env?['benchmark_role'] as String?)?.toLowerCase() ?? 'landlord';
+
+      final iterations = (history['iterations'] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final rawIterJson = const JsonEncoder.withIndent('  ').convert(iterations);
+
       // ignore: avoid_print
-      print('PERF_PROBE_RESULT=$full');
+      print('');
+      // ignore: avoid_print
+      print('========== PERF: RAW ITERATION DATA (JSON ARRAY) ==========');
+      // ignore: avoid_print
+      print(rawIterJson);
+      // ignore: avoid_print
+      print('========== END RAW ITERATION DATA ==========');
+      // ignore: avoid_print
+      print('PERF_RAW_ITERATION_JSON=$rawIterJson');
+
+      // ignore: avoid_print
+      print('');
+      // ignore: avoid_print
+      print('========== PERF: SUMMARY METRICS ==========');
+      final prettySummary =
+          const JsonEncoder.withIndent('  ').convert(full);
+      // ignore: avoid_print
+      print(prettySummary);
+      // ignore: avoid_print
+      print('========== END SUMMARY METRICS ==========');
+      // ignore: avoid_print
+      print('PERF_SUMMARY_JSON=${jsonEncode(full)}');
+
+      // ignore: avoid_print
+      print('PERF_PROBE_RESULT=${jsonEncode(full)}');
       debugPrint('PERF_PROBE_RESULT=$full');
-      // Keep `iterations` for per-iteration line charts (collect-workflow-perf.ps1 / append script).
+
       final forConsole = Map<String, dynamic>.from(history);
       final histLine = jsonEncode(forConsole);
+      // ignore: avoid_print
+      print('');
+      // ignore: avoid_print
+      print('========== PERF: WORKFLOW HISTORY ==========');
+      // ignore: avoid_print
+      print(const JsonEncoder.withIndent('  ').convert(forConsole));
+      // ignore: avoid_print
+      print('========== END WORKFLOW HISTORY ==========');
       // ignore: avoid_print
       print('PERF_WORKFLOW_HISTORY_JSON=$histLine');
       debugPrint('PERF_WORKFLOW_HISTORY_JSON=${jsonEncode(history)}');
 
+      final perfResultsFile = switch (benchmarkRole) {
+        'expat' => 'expat_performance.json',
+        'landlord' => 'landlord_performance.json',
+        'agent' => 'agent_performance.json',
+        _ => null,
+      };
+      if (perfResultsFile != null) {
+        try {
+          await perf_results.savePerfProbeJsonFile(
+            relativeSegments: perfResultsFile,
+            payload: <String, dynamic>{
+              'recorded_at': history['recorded_at'],
+              'benchmark_role': benchmarkRole,
+              'iterations': iterations,
+              'summary': Map<String, dynamic>.from(full),
+              'workflow_history': Map<String, dynamic>.from(forConsole),
+            },
+          );
+        } catch (e, st) {
+          debugPrint('PERF_SAVE_FAILED=$e\n$st');
+          // ignore: avoid_print
+          print('PERF_SAVE_FAILED=$e');
+        }
+      }
+
       if (!mounted) return;
-      setState(() => _status = full.toString());
+      setState(
+        () => _status =
+            'Benchmark finished ($benchmarkRole). Console: PERF_RAW_ITERATION_JSON, '
+            'PERF_SUMMARY_JSON, PERF_WORKFLOW_HISTORY_JSON; '
+            'results: test_results/expat_performance.json | landlord_performance.json | agent_performance.json.',
+      );
       _scheduleProcessExit(0);
     } catch (e) {
       debugPrint('PERF_PROBE_ERROR=$e');
