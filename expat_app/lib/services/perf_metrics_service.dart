@@ -108,22 +108,29 @@ class PerfMetricsService {
           'response_time_* uses Firestore-path samples only (${legacyAggregateMetrics.join(", ")}). '
           'workflow_success_rate is full benchmark loop pass rate. '
           'message_latency_ms is send→stream. '
-          'Use workflow_history / PERF_WORKFLOW_HISTORY_JSON for the five UX workflows.',
+          'Use workflow_history / PERF_WORKFLOW_HISTORY_JSON for role UX workflows.',
     };
   }
 
   /// One JSON object to append to `docs/perf/history/workflow_history.jsonl`.
   Map<String, dynamic> buildWorkflowHistoryRecord({
     required Map<String, dynamic> environment,
+    required String benchmarkRole,
     DateTime? recordedAt,
   }) {
     final at = (recordedAt ?? DateTime.now()).toUtc();
+    final order = PerfWorkflowIds.chartOrderForRole(benchmarkRole);
     final workflows = <String, dynamic>{};
-    for (final id in PerfWorkflowIds.chartOrder) {
+    for (final id in order) {
       final metric = _metricNameForWorkflow(id);
-      final times =
-          _samples.where((s) => s.metric == metric).map((s) => s.elapsedMs).toList();
-      workflows[id] = _statsMap(times);
+      final rel = _samples.where((s) => s.metric == metric).toList();
+      final times = rel.map((s) => s.elapsedMs).toList();
+      final block = Map<String, dynamic>.from(_statsMap(times));
+      if (rel.isNotEmpty) {
+        final okN = rel.where((s) => s.ok).length;
+        block['success_rate'] = ((okN / rel.length) * 100).round();
+      }
+      workflows[id] = block;
     }
 
     final iterations = <Map<String, dynamic>>[];
@@ -133,7 +140,7 @@ class PerfMetricsService {
     );
     for (var i = 0; i <= maxIter; i++) {
       final row = <String, dynamic>{'iteration': i};
-      for (final id in PerfWorkflowIds.chartOrder) {
+      for (final id in order) {
         final metric = _metricNameForWorkflow(id);
         final hit = _samples
             .where((s) => s.metric == metric && s.iterationIndex == i)
@@ -155,15 +162,9 @@ class PerfMetricsService {
 
   static String _metricNameForWorkflow(String workflowId) {
     switch (workflowId) {
-      case PerfWorkflowIds.landlordListingUpload:
+      case PerfWorkflowIds.landlordListingCreation:
         return 'create_listing';
-      case PerfWorkflowIds.messageTranslate:
-        return 'message_translate';
-      case PerfWorkflowIds.ridesEstimate:
-        return 'rides_estimate';
-      case PerfWorkflowIds.explorePlaces:
-        return 'explore_places';
-      case PerfWorkflowIds.listingAssignment:
+      case PerfWorkflowIds.landlordListingAssignment:
         return 'listing_assignment';
       default:
         return workflowId;

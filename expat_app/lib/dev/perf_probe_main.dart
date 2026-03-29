@@ -1,17 +1,55 @@
 import 'dart:convert';
 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:expat_app/services/auth_service.dart';
 import 'package:expat_app/services/perf_benchmark_service.dart';
 import 'package:expat_app/screens/get_started_screen.dart';
 
+import 'perf_probe_exit_stub.dart'
+    if (dart.library.io) 'perf_probe_exit_io.dart' as perf_exit;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await _perfProbeMaybeAutoSignIn();
   runApp(const _PerfProbeApp());
+}
+
+/// Optional non-interactive sign-in for CI / scripted runs.
+/// Pass via `--dart-define=PERF_PROBE_EMAIL=...` and `PERF_PROBE_PASSWORD=...`.
+/// Do not commit real credentials; use a throwaway Firebase test user.
+Future<void> _perfProbeMaybeAutoSignIn() async {
+  const email = String.fromEnvironment('PERF_PROBE_EMAIL', defaultValue: '');
+  const password = String.fromEnvironment('PERF_PROBE_PASSWORD', defaultValue: '');
+  if (email.isEmpty || password.isEmpty) return;
+  try {
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    // ignore: avoid_print
+    print('PERF_PROBE_AUTO_SIGN_IN=ok');
+  } catch (e) {
+    // ignore: avoid_print
+    print('PERF_PROBE_AUTO_SIGN_IN_FAILED=$e');
+  }
+}
+
+void _scheduleProcessExit(int code) {
+  if (kIsWeb) return;
+  const shouldExit = bool.fromEnvironment(
+    'PERF_PROBE_EXIT_WHEN_DONE',
+    defaultValue: false,
+  );
+  if (!shouldExit) return;
+  Future<void>(() async {
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    perf_exit.perfProbeExit(code);
+  });
 }
 
 class _PerfProbeApp extends StatefulWidget {
@@ -36,21 +74,29 @@ class _PerfProbeAppState extends State<_PerfProbeApp> {
       print('PERF_PROBE_USER=$userId');
 
       final full = await PerfBenchmarkService().runBenchmarks(runs: 5);
-      final history = full.remove('workflow_history');
+      final history = Map<String, dynamic>.from(
+        full.remove('workflow_history')! as Map,
+      );
       // ignore: avoid_print
       print('PERF_PROBE_RESULT=$full');
       debugPrint('PERF_PROBE_RESULT=$full');
-      final histLine = jsonEncode(history);
+      // Keep `iterations` for per-iteration line charts (collect-workflow-perf.ps1 / append script).
+      final forConsole = Map<String, dynamic>.from(history);
+      final histLine = jsonEncode(forConsole);
       // ignore: avoid_print
       print('PERF_WORKFLOW_HISTORY_JSON=$histLine');
-      debugPrint('PERF_WORKFLOW_HISTORY_JSON=$histLine');
+      debugPrint('PERF_WORKFLOW_HISTORY_JSON=${jsonEncode(history)}');
 
       if (!mounted) return;
       setState(() => _status = full.toString());
+      _scheduleProcessExit(0);
     } catch (e) {
       debugPrint('PERF_PROBE_ERROR=$e');
+      // ignore: avoid_print
+      print('PERF_PROBE_ERROR=$e');
       if (!mounted) return;
       setState(() => _status = 'Benchmark failed: $e');
+      _scheduleProcessExit(1);
     }
   }
 
@@ -64,12 +110,9 @@ class _PerfProbeAppState extends State<_PerfProbeApp> {
           builder: (context, snap) {
             final user = snap.data;
             if (user == null) {
-              // Show the normal onboarding/login UI so a real Firebase session
-              // exists before the benchmark runs.
               return const GetStartedScreen();
             }
 
-            // Run once right after sign-in.
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _runOnceIfNeeded(user);
             });
@@ -84,4 +127,3 @@ class _PerfProbeAppState extends State<_PerfProbeApp> {
     );
   }
 }
-

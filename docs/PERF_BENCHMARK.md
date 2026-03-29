@@ -75,4 +75,10 @@ PERF_WORKFLOW_HISTORY_JSON={"recorded_at":"...","schema":"workflow_perf/v1",...}
 - The benchmark runs 5 iterations by default.
 - Assignment workflow requires at least one registered agent in Firestore.
 - If the signed-in user is not authorized to publish listings, verification step can fail, reducing success rate.
-- **Historical charts:** Git does not store past probe timings; you build the timeline by appending each `PERF_WORKFLOW_HISTORY_JSON` line over the project.
+- **Historical charts:** Git does not store past probe timings; you build the timeline by appending each `PERF_WORKFLOW_HISTORY_JSON` line over the project. Use `scripts/collect-workflow-perf.ps1` (see `docs/perf/history/README.md`). Older `PERF_RESULTS_*.json` files do not contain per-workflow timings and are not imported into `workflow_history.jsonl`.
+
+### Roles (landlord / agent / expat)
+
+- **One Firebase sign-in = one user identity**, not “the whole ecosystem.” Firestore rules still apply per user.
+- The **current** benchmark is written for a user who can **publish listings** and drive **assignment** (typically a **landlord** test account, with at least one **agent** registered in Firestore for assignment steps).
+- You can run the script **three times** with `-Role landlord`, `-Role agent`, and `-Role expat` (and a matching test user each time). Each JSONL row records `environment.benchmark_role` for filtering. **Agent** or **expat** runs may **fail or skip** listing/assignment parts today; expanding coverage needs additional probe scenarios.

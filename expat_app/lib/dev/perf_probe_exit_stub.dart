@@ -1,0 +1,1 @@
+void perfProbeExit(int code) {}

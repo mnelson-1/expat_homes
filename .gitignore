@@ -3,3 +3,9 @@
 # Generated QA test metrics (regenerate with scripts/collect-test-metrics.ps1)
 docs/qa/generated/
 
+# Perf probe console may include user ids / session noise
+docs/perf/history/last_probe_console*.txt
+
+# Perf probe Firebase test users (copy from perf-probe-credentials.example.ps1)
+scripts/perf-probe-credentials.local.ps1
+

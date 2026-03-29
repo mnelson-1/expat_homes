@@ -18,6 +18,9 @@ import 'perf_workflow_ids.dart';
 const LatLng _kigaliRouteA = LatLng(-1.9403, 29.8739);
 const LatLng _kigaliRouteB = LatLng(-1.9565, 30.0615);
 
+const String _kPostsCollection = 'posts';
+const String _kCommissionSlipsCollection = 'commission_slips';
+
 class PerfBenchmarkService {
   PerfBenchmarkService._();
   static final PerfBenchmarkService _instance = PerfBenchmarkService._();
@@ -25,10 +28,10 @@ class PerfBenchmarkService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Runs real runtime measurements against current Firebase project + Maps APIs.
+  /// Runs real runtime measurements for [benchmarkRole]: `landlord`, `agent`, or `expat`.
   ///
-  /// Requires a signed-in user. For assignment workflow this works best when
-  /// the signed-in user is a landlord and at least one registered agent exists.
+  /// Role is read from `PERF_PROBE_BENCHMARK_ROLE` (dart-define). Unknown values
+  /// default to landlord-shaped probes.
   ///
   /// Returns [summaryJson] fields plus `workflow_history` for JSONL time-series.
   Future<Map<String, dynamic>> runBenchmarks({
@@ -40,6 +43,12 @@ class PerfBenchmarkService {
     final uid = AuthService().currentUser?.uid;
     if (uid == null) throw StateError('You must be signed in to run benchmarks.');
 
+    const rawRole = String.fromEnvironment(
+      'PERF_PROBE_BENCHMARK_ROLE',
+      defaultValue: 'unspecified',
+    );
+    final benchmarkRole = _normalizeBenchmarkRole(rawRole);
+
     final metrics = PerfMetricsService()..reset();
     final apiKey = await MapsApiKeyChannel.resolvePlacesApiKey();
     final directions =
@@ -49,80 +58,308 @@ class PerfBenchmarkService {
 
     for (var i = 0; i < runs; i++) {
       metrics.setIteration(i);
-      var workflowOk = true;
-      String? listingId;
-      String? assignmentId;
-      try {
-        // 1) Landlord listing upload (Storage + Firestore) — timed in ListingsService.
-        final listing = await ListingsService().createListing(
+      if (benchmarkRole == 'agent') {
+        await _runAgentIteration(metrics, uid, i);
+      } else if (benchmarkRole == 'expat') {
+        await _runExpatIteration(metrics, uid, i, directions, places);
+      } else {
+        await _runLandlordIteration(
+          metrics,
+          uid,
+          i,
+          assignmentAgentId: assignmentAgentId,
+          assignmentAgentUid: assignmentAgentUid,
+        );
+      }
+    }
+
+    final summary = metrics.summaryJson();
+    final workflowHistory = metrics.buildWorkflowHistoryRecord(
+      benchmarkRole: benchmarkRole,
+      environment: <String, dynamic>{
+        'runs': runs,
+        'entrypoint': 'lib/dev/perf_probe_main.dart',
+        'workflows': PerfWorkflowIds.chartOrderForRole(benchmarkRole),
+        'maps_api_configured': apiKey.isNotEmpty,
+        'benchmark_role': benchmarkRole,
+      },
+    );
+
+    return <String, dynamic>{
+      ...summary,
+      'workflow_history': workflowHistory,
+    };
+  }
+
+  String _normalizeBenchmarkRole(String raw) {
+    final r = raw.trim().toLowerCase();
+    if (r == 'landlord' || r == 'agent' || r == 'expat') return r;
+    return 'landlord';
+  }
+
+  Future<void> _runLandlordIteration(
+    PerfMetricsService metrics,
+    String uid,
+    int i, {
+    String? assignmentAgentId,
+    String? assignmentAgentUid,
+  }) async {
+    var workflowOk = true;
+    String? listingId;
+    String? assignmentId;
+    try {
+      final listing = await ListingsService().createListing(
+        landlordId: uid,
+        type: ListingType.apartment,
+        title: 'Benchmark Listing #$i',
+        description: 'Perf benchmark listing',
+        location: 'Benchmark',
+        price: '1000',
+        imageBytes: const [],
+      );
+      listingId = listing.id;
+
+      final verifySw = Stopwatch()..start();
+      await _firestore.collection('listings').doc(listing.id).update({
+        'status': ListingStatus.published.value,
+        'verifiedBy': uid,
+        'publishedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      verifySw.stop();
+      metrics.addSample('verify_listing_update', verifySw.elapsedMilliseconds);
+
+      final published = await ListingsService().getPublishedListings(
+        searchQuery: 'Benchmark Listing',
+      );
+      final found = published.any((l) => l.id == listing.id);
+      if (!found) workflowOk = false;
+
+      final a = await _resolveAssignmentAgent(
+        overrideAgentId: assignmentAgentId,
+        overrideAgentUid: assignmentAgentUid,
+      );
+      if (a != null) {
+        final createAssnSw = Stopwatch()..start();
+        final assn = await AgentsService().createAssignment(
+          listingId: listing.id,
+          agentId: a.agentId,
           landlordId: uid,
-          type: ListingType.apartment,
-          title: 'Benchmark Listing #$i',
-          description: 'Perf benchmark listing',
-          location: 'Benchmark',
-          price: '1000',
-          imageBytes: const [],
+          agentUid: a.agentUid,
+          agentName: a.agentName,
+          listingTitle: listing.title,
         );
-        listingId = listing.id;
-
-        // 2) Listing verification simulation (super admin action)
-        final verifySw = Stopwatch()..start();
-        await _firestore.collection('listings').doc(listing.id).update({
-          'status': ListingStatus.published.value,
-          'verifiedBy': uid,
-          'publishedAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        verifySw.stop();
-        metrics.addSample('verify_listing_update', verifySw.elapsedMilliseconds);
-
-        // 3) Retrieval — search matches title/location/description (not id).
-        final published = await ListingsService().getPublishedListings(
-          searchQuery: 'Benchmark Listing',
+        createAssnSw.stop();
+        metrics.addSample(
+          'create_assignment',
+          createAssnSw.elapsedMilliseconds,
         );
-        final found = published.any((l) => l.id == listing.id);
-        if (!found) workflowOk = false;
+        assignmentId = assn.id;
 
-        // 4) Listing assignment create -> acceptance
-        final a = await _resolveAssignmentAgent(
-          overrideAgentId: assignmentAgentId,
-          overrideAgentUid: assignmentAgentUid,
+        final acceptSw = Stopwatch()..start();
+        await AgentsService().acceptAssignment(assn.id);
+        acceptSw.stop();
+        metrics.addSample('accept_assignment', acceptSw.elapsedMilliseconds);
+        metrics.addSample(
+          'listing_assignment',
+          createAssnSw.elapsedMilliseconds + acceptSw.elapsedMilliseconds,
         );
-        if (a != null) {
-          final createAssnSw = Stopwatch()..start();
-          final assn = await AgentsService().createAssignment(
-            listingId: listing.id,
-            agentId: a.agentId,
-            landlordId: uid,
-            agentUid: a.agentUid,
-            agentName: a.agentName,
-            listingTitle: listing.title,
-          );
-          createAssnSw.stop();
-          metrics.addSample(
-            'create_assignment',
-            createAssnSw.elapsedMilliseconds,
-          );
-          assignmentId = assn.id;
+      } else {
+        workflowOk = false;
+      }
 
-          final acceptSw = Stopwatch()..start();
-          await AgentsService().acceptAssignment(assn.id);
-          acceptSw.stop();
-          metrics.addSample('accept_assignment', acceptSw.elapsedMilliseconds);
-          metrics.addSample(
-            'listing_assignment',
-            createAssnSw.elapsedMilliseconds + acceptSw.elapsedMilliseconds,
+      final paySw = Stopwatch()..start();
+      await _firestore
+          .collection(_kCommissionSlipsCollection)
+          .where('landlordId', isEqualTo: uid)
+          .limit(50)
+          .get();
+      paySw.stop();
+      metrics.addSample('landlord_payment_workflow', paySw.elapsedMilliseconds);
+
+      final msgSw = Stopwatch()..start();
+      final convo = await ConversationsService().getOrCreateConversation(
+        listingId: listing.id,
+        participantIds: [uid, 'benchmark_peer'],
+        participantNames: {
+          uid: 'Benchmark User',
+          'benchmark_peer': 'Benchmark Peer',
+        },
+        listingTitle: listing.title,
+        sharedLandlordAgentThread: false,
+      );
+      await ConversationsService().measureSendToReceiveLatency(
+        conversationId: convo.id,
+        senderId: uid,
+        content: 'benchmark_ping_$i',
+      );
+      await MessageTranslationService.instance.translateIncoming(
+        text: 'Bonjour, je voudrais visiter cet appartement.',
+        messageId: 'perf_translate_$i',
+        preferredLanguageLabel: 'English',
+        translationEnabled: true,
+      );
+      msgSw.stop();
+      metrics.addSample('landlord_messaging', msgSw.elapsedMilliseconds);
+    } catch (_) {
+      workflowOk = false;
+    } finally {
+      metrics.addWorkflowResult(workflowOk);
+      await _cleanupBenchmarkArtifacts(
+        listingId: listingId,
+        assignmentId: assignmentId,
+      );
+    }
+  }
+
+  Future<void> _runAgentIteration(
+    PerfMetricsService metrics,
+    String uid,
+    int i,
+  ) async {
+    var workflowOk = true;
+    String? agentIdForBio;
+    String? originalBio;
+    try {
+      final paySw = Stopwatch()..start();
+      await _firestore
+          .collection(_kCommissionSlipsCollection)
+          .where('agentUid', isEqualTo: uid)
+          .limit(50)
+          .get();
+      paySw.stop();
+      metrics.addSample('agent_payment_workflow', paySw.elapsedMilliseconds);
+
+      final assnSw = Stopwatch()..start();
+      await _firestore
+          .collection(kAssignmentsCollection)
+          .where('agentUid', isEqualTo: uid)
+          .limit(50)
+          .get();
+      assnSw.stop();
+      metrics.addSample('agent_listing_assignment', assnSw.elapsedMilliseconds);
+
+      final profile = await AuthService().getCurrentUserProfile();
+      final agentId = profile?.agentId?.trim();
+      if (agentId == null || agentId.isEmpty) {
+        metrics.addSample(
+          'agent_bio_view_update',
+          0,
+          ok: false,
+          error: 'no_agent_id',
+        );
+        workflowOk = false;
+      } else {
+        agentIdForBio = agentId;
+        final licensed = await AgentsService().getAgent(agentId);
+        originalBio = licensed?.bio ?? '';
+        final bioSw = Stopwatch()..start();
+        await AgentsService().updateLicensedAgentProfile(
+          agentId,
+          bio: '$originalBio [perf$i]'.trim(),
+        );
+        bioSw.stop();
+        metrics.addSample('agent_bio_view_update', bioSw.elapsedMilliseconds);
+      }
+    } catch (_) {
+      workflowOk = false;
+    } finally {
+      if (agentIdForBio != null && originalBio != null) {
+        try {
+          await AgentsService().updateLicensedAgentProfile(
+            agentIdForBio,
+            bio: originalBio,
           );
-        } else {
-          workflowOk = false;
+        } catch (_) {}
+      }
+      metrics.addWorkflowResult(workflowOk);
+    }
+  }
+
+  Future<void> _runExpatIteration(
+    PerfMetricsService metrics,
+    String uid,
+    int i,
+    GoogleDirectionsService? directions,
+    GooglePlacesService? places,
+  ) async {
+    var workflowOk = true;
+    try {
+      final commSw = Stopwatch()..start();
+      await _firestore
+          .collection(_kPostsCollection)
+          .where('scope', isEqualTo: 'feed')
+          .limit(30)
+          .get();
+      commSw.stop();
+      metrics.addSample('expat_community_workflow', commSw.elapsedMilliseconds);
+
+      if (places != null) {
+        final exploreSw = Stopwatch()..start();
+        await places.autocomplete(input: 'cafe kigali');
+        exploreSw.stop();
+        metrics.addSample(
+          PerfWorkflowIds.expatExploreArea,
+          exploreSw.elapsedMilliseconds,
+        );
+      } else {
+        metrics.addSample(
+          PerfWorkflowIds.expatExploreArea,
+          0,
+          ok: false,
+          error: 'maps_not_configured',
+        );
+        workflowOk = false;
+      }
+
+      if (directions != null) {
+        final ridesSw = Stopwatch()..start();
+        final route = await directions.getDrivingRoute(
+          origin: _kigaliRouteA,
+          destination: _kigaliRouteB,
+        );
+        final meters = route.route?.distanceMeters;
+        if (meters != null && meters > 0) {
+          estimateRwandaRideFareRwf(distanceMeters: meters);
         }
+        final routeOk = route.route != null && route.errorDetail == null;
+        ridesSw.stop();
+        metrics.addSample(
+          PerfWorkflowIds.expatRidesMaps,
+          ridesSw.elapsedMilliseconds,
+          ok: routeOk,
+          error: routeOk ? null : 'directions_failed',
+        );
+        if (!routeOk) workflowOk = false;
+      } else {
+        metrics.addSample(
+          PerfWorkflowIds.expatRidesMaps,
+          0,
+          ok: false,
+          error: 'maps_not_configured',
+        );
+        workflowOk = false;
+      }
 
-        // 5) Chat send -> stream (message_latency summary field)
+      final published = await ListingsService().getPublishedListings(
+        searchQuery: '',
+      );
+      if (published.isEmpty) {
+        metrics.addSample(
+          'expat_listing_inquiry_messaging',
+          0,
+          ok: false,
+          error: 'no_published_listing',
+        );
+        workflowOk = false;
+      } else {
+        final listing = published.first;
+        final inqSw = Stopwatch()..start();
         final convo = await ConversationsService().getOrCreateConversation(
           listingId: listing.id,
           participantIds: [uid, 'benchmark_peer'],
           participantNames: {
-            uid: 'Benchmark User',
+            uid: 'Benchmark Expat',
             'benchmark_peer': 'Benchmark Peer',
           },
           listingTitle: listing.title,
@@ -131,94 +368,25 @@ class PerfBenchmarkService {
         await ConversationsService().measureSendToReceiveLatency(
           conversationId: convo.id,
           senderId: uid,
-          content: 'benchmark_ping_$i',
+          content: 'expat_inquiry_$i',
         );
-
-        // 6) Message translate (ML Kit on-device when not web)
-        final trSw = Stopwatch()..start();
         await MessageTranslationService.instance.translateIncoming(
-          text: 'Bonjour, je voudrais visiter cet appartement.',
-          messageId: 'perf_translate_$i',
+          text: 'Is this listing still available?',
+          messageId: 'perf_expat_tr_$i',
           preferredLanguageLabel: 'English',
           translationEnabled: true,
         );
-        trSw.stop();
-        metrics.addSample('message_translate', trSw.elapsedMilliseconds);
-
-        // 7) Rides: Directions round trip + local fare estimate (same user-visible stack)
-        if (directions != null) {
-          final rideSw = Stopwatch()..start();
-          final route = await directions.getDrivingRoute(
-            origin: _kigaliRouteA,
-            destination: _kigaliRouteB,
-          );
-          final meters = route.route?.distanceMeters;
-          if (meters != null && meters > 0) {
-            estimateRwandaRideFareRwf(distanceMeters: meters);
-          }
-          rideSw.stop();
-          final ok = route.route != null && route.errorDetail == null;
-          metrics.addSample(
-            'rides_estimate',
-            rideSw.elapsedMilliseconds,
-            ok: ok,
-            error: ok ? null : (route.errorDetail ?? 'no_route'),
-          );
-          if (!ok) workflowOk = false;
-        } else {
-          metrics.addSample(
-            'rides_estimate',
-            0,
-            ok: false,
-            error: 'no_maps_api_key',
-          );
-        }
-
-        // 8) Explore: Places autocomplete (biased to Rwanda)
-        if (places != null) {
-          final exSw = Stopwatch()..start();
-          final preds = await places.autocomplete(input: 'cafe kigali');
-          exSw.stop();
-          final ok = preds.isNotEmpty;
-          metrics.addSample(
-            'explore_places',
-            exSw.elapsedMilliseconds,
-            ok: ok,
-            error: ok ? null : 'zero_results',
-          );
-        } else {
-          metrics.addSample(
-            'explore_places',
-            0,
-            ok: false,
-            error: 'no_maps_api_key',
-          );
-        }
-      } catch (e) {
-        workflowOk = false;
-      } finally {
-        metrics.addWorkflowResult(workflowOk);
-        await _cleanupBenchmarkArtifacts(
-          listingId: listingId,
-          assignmentId: assignmentId,
+        inqSw.stop();
+        metrics.addSample(
+          'expat_listing_inquiry_messaging',
+          inqSw.elapsedMilliseconds,
         );
       }
+    } catch (_) {
+      workflowOk = false;
+    } finally {
+      metrics.addWorkflowResult(workflowOk);
     }
-
-    final summary = metrics.summaryJson();
-    final workflowHistory = metrics.buildWorkflowHistoryRecord(
-      environment: <String, dynamic>{
-        'runs': runs,
-        'entrypoint': 'lib/dev/perf_probe_main.dart',
-        'workflows': PerfWorkflowIds.chartOrder,
-        'maps_api_configured': apiKey.isNotEmpty,
-      },
-    );
-
-    return <String, dynamic>{
-      ...summary,
-      'workflow_history': workflowHistory,
-    };
   }
 
   Future<_AssignmentAgent?> _resolveAssignmentAgent({
@@ -255,7 +423,10 @@ class PerfBenchmarkService {
   }) async {
     try {
       if (assignmentId != null) {
-        await _firestore.collection('listing_assignments').doc(assignmentId).delete();
+        await _firestore
+            .collection(kAssignmentsCollection)
+            .doc(assignmentId)
+            .delete();
       }
     } catch (_) {}
     try {
