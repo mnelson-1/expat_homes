@@ -168,22 +168,24 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
                   _buildDropdown<String>(
                     value: _selectedRole?.label,
                     hint: 'Select an option',
-                    items: _UserRole.values
-                        .map(
-                          (r) => DropdownMenuItem<String>(
-                            value: r.label,
-                            child: Text(
-                              r.label,
-                              style: _dropdownItemStyle(context),
-                            ),
-                          ),
-                        )
-                        .toList(),
+                    items:
+                        _UserRole.values
+                            .map(
+                              (r) => DropdownMenuItem<String>(
+                                value: r.label,
+                                child: Text(
+                                  r.label,
+                                  style: _dropdownItemStyle(context),
+                                ),
+                              ),
+                            )
+                            .toList(),
                     onChanged: (v) {
                       if (v == null) return;
                       setState(() {
-                        _selectedRole =
-                            _UserRole.values.firstWhere((r) => r.label == v);
+                        _selectedRole = _UserRole.values.firstWhere(
+                          (r) => r.label == v,
+                        );
                       });
                     },
                   ),
@@ -198,17 +200,21 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
                   _buildDropdown<String>(
                     value: _selectedLanguage,
                     hint: 'Select language',
-                    items: kPreferredLanguages
-                        .map(
-                          (lang) => DropdownMenuItem<String>(
-                            value: lang,
-                            child: Text(lang,
-                                style: _dropdownItemStyle(context)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) =>
-                        setState(() => _selectedLanguage = v ?? 'English'),
+                    items:
+                        kPreferredLanguages
+                            .map(
+                              (lang) => DropdownMenuItem<String>(
+                                value: lang,
+                                child: Text(
+                                  lang,
+                                  style: _dropdownItemStyle(context),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                    onChanged:
+                        (v) =>
+                            setState(() => _selectedLanguage = v ?? 'English'),
                   ),
                   const SizedBox(height: 4),
                   _buildHelper(
@@ -277,9 +283,9 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
 
   TextStyle? _dropdownItemStyle(BuildContext context) {
     return Theme.of(context).textTheme.bodyLarge?.copyWith(
-          fontSize: _GetStartedColors.fieldFontSize,
-          color: _GetStartedColors.bodyText,
-        );
+      fontSize: _GetStartedColors.fieldFontSize,
+      color: _GetStartedColors.bodyText,
+    );
   }
 
   Widget _buildDropdown<T>({
@@ -355,16 +361,17 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
               horizontal: 16,
               vertical: 14,
             ),
-            suffixIcon: _emailLookupInFlight
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : null,
+            suffixIcon:
+                _emailLookupInFlight
+                    ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                    : null,
           ),
         ),
         if (msg != null) ...[
@@ -412,10 +419,11 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
         if (_selectedRole == _UserRole.expat) {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => SignUpScreen(
-                initialEmail: email,
-                preferredLanguage: _selectedLanguage,
-              ),
+              builder:
+                  (_) => SignUpScreen(
+                    initialEmail: email,
+                    preferredLanguage: _selectedLanguage,
+                  ),
             ),
           );
           return;
@@ -423,10 +431,11 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
         if (_selectedRole == _UserRole.landlord) {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => LandlordSignUpScreen(
-                initialEmail: email,
-                preferredLanguage: _selectedLanguage,
-              ),
+              builder:
+                  (_) => LandlordSignUpScreen(
+                    initialEmail: email,
+                    preferredLanguage: _selectedLanguage,
+                  ),
             ),
           );
           return;
@@ -434,10 +443,11 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
         if (_selectedRole == _UserRole.agent) {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => AgentSignUpScreen(
-                initialEmail: email,
-                preferredLanguage: _selectedLanguage,
-              ),
+              builder:
+                  (_) => AgentSignUpScreen(
+                    initialEmail: email,
+                    preferredLanguage: _selectedLanguage,
+                  ),
             ),
           );
         }
@@ -463,11 +473,9 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
     return Center(
       child: GestureDetector(
         onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const SignInScreen(),
-            ),
-          );
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const SignInScreen()));
         },
         child: RichText(
           text: TextSpan(
@@ -525,8 +533,8 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
             'assets/images/google-icon.png',
             width: 24,
             height: 24,
-            errorBuilder: (_, __, ___) =>
-                const Icon(Icons.g_mobiledata, size: 24),
+            errorBuilder:
+                (_, __, ___) => const Icon(Icons.g_mobiledata, size: 24),
           ),
           const SizedBox(width: 12),
           Text(

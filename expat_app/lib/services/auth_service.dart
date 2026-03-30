@@ -18,8 +18,10 @@ const String kRegisteredEmailsCollection = 'registered_emails';
 enum EmailLookupKind {
   empty,
   invalidFormat,
+
   /// Not taken in Firebase Auth or in [kRegisteredEmailsCollection].
   available,
+
   /// Email already used (Auth and/or Firestore registry).
   alreadyRegistered,
   error,
@@ -63,9 +65,7 @@ class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  static final RegExp _emailFormat = RegExp(
-    r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-  );
+  static final RegExp _emailFormat = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   /// Basic shape check for sign-up flows (Get Started, etc.).
   static bool emailLooksValid(String email) =>
@@ -76,8 +76,9 @@ class AuthService {
       email.trim().toLowerCase();
 
   Future<void> _claimRegisteredEmail(String normalizedEmail, String uid) async {
-    final ref =
-        _firestore.collection(kRegisteredEmailsCollection).doc(normalizedEmail);
+    final ref = _firestore
+        .collection(kRegisteredEmailsCollection)
+        .doc(normalizedEmail);
     await ref.set({
       'uid': uid,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -92,15 +93,17 @@ class AuthService {
     if (oldNormalized == newNormalized) return;
     await _firestore.runTransaction((txn) async {
       if (oldNormalized != null && oldNormalized.isNotEmpty) {
-        final oldRef =
-            _firestore.collection(kRegisteredEmailsCollection).doc(oldNormalized);
+        final oldRef = _firestore
+            .collection(kRegisteredEmailsCollection)
+            .doc(oldNormalized);
         final oldSnap = await txn.get(oldRef);
         if (oldSnap.exists && oldSnap.data()?['uid'] == uid) {
           txn.delete(oldRef);
         }
       }
-      final newRef =
-          _firestore.collection(kRegisteredEmailsCollection).doc(newNormalized);
+      final newRef = _firestore
+          .collection(kRegisteredEmailsCollection)
+          .doc(newNormalized);
       final newSnap = await txn.get(newRef);
       if (newSnap.exists) {
         final existing = newSnap.data()?['uid'] as String?;
@@ -108,10 +111,7 @@ class AuthService {
           throw StateError('email_already_registered');
         }
       }
-      txn.set(newRef, {
-        'uid': uid,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      txn.set(newRef, {'uid': uid, 'updatedAt': FieldValue.serverTimestamp()});
     });
   }
 
@@ -147,10 +147,11 @@ class AuthService {
           kind: EmailLookupKind.alreadyRegistered,
         );
       }
-      final regSnap = await _firestore
-          .collection(kRegisteredEmailsCollection)
-          .doc(normalized)
-          .get();
+      final regSnap =
+          await _firestore
+              .collection(kRegisteredEmailsCollection)
+              .doc(normalized)
+              .get();
       if (regSnap.exists) {
         return const EmailRegistrationLookupResult(
           kind: EmailLookupKind.alreadyRegistered,
@@ -203,11 +204,9 @@ class AuthService {
 
   /// Real-time stream of a user's profile (e.g. message thread avatars).
   Stream<UserProfile?> userProfileStream(String uid) {
-    return _firestore
-        .collection(kUsersCollection)
-        .doc(uid)
-        .snapshots()
-        .map((snap) {
+    return _firestore.collection(kUsersCollection).doc(uid).snapshots().map((
+      snap,
+    ) {
       if (!snap.exists || snap.data() == null) return null;
       return UserProfile.fromFirestore(snap);
     });
@@ -294,10 +293,9 @@ class AuthService {
       final aid = profile.agentId!.trim().toUpperCase();
       if (aid.isNotEmpty) {
         try {
-          await _firestore
-              .collection('licensed_agents')
-              .doc(aid)
-              .update({'registeredUid': user.uid});
+          await _firestore.collection('licensed_agents').doc(aid).update({
+            'registeredUid': user.uid,
+          });
         } catch (_) {}
       }
     }
@@ -429,9 +427,10 @@ class AuthService {
     if (user == null) throw StateError('Not signed in');
     final trimmed = email.trim();
     if (trimmed.isEmpty) throw ArgumentError.value(email, 'email', 'empty');
-    final oldNorm = user.email != null && user.email!.trim().isNotEmpty
-        ? normalizeRegistrationEmail(user.email!)
-        : null;
+    final oldNorm =
+        user.email != null && user.email!.trim().isNotEmpty
+            ? normalizeRegistrationEmail(user.email!)
+            : null;
     final newNorm = normalizeRegistrationEmail(trimmed);
     await _firestore.collection(kUsersCollection).doc(user.uid).update({
       'email': trimmed,
