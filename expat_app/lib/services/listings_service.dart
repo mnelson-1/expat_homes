@@ -250,12 +250,16 @@ class ListingsService {
   }
 
   /// Stream of listings for a landlord (My Listings). Sorted by createdAt in memory to avoid composite index.
+  /// Omits [ListingStatus.archived] (super-admin reject) so those listings drop off **My Listings**.
   Stream<List<Listing>> landlordListingsStream(String landlordId) {
     return _listingsRef
         .where('landlordId', isEqualTo: landlordId)
         .snapshots()
         .map((snap) {
-          final list = snap.docs.map((d) => Listing.fromFirestore(d)).toList();
+          final list = snap.docs
+              .map((d) => Listing.fromFirestore(d))
+              .where((l) => l.status != ListingStatus.archived)
+              .toList();
           list.sort((a, b) {
             final aAt = a.createdAt ?? DateTime(0);
             final bAt = b.createdAt ?? DateTime(0);
